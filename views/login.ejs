@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - <%= settings?.company_name || '案件管理系统' %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <% if (settings?.company_logo) { %>
+          <img src="/uploads/logo/<%= settings.company_logo %>" alt="Logo" style="height:56px;width:auto;margin-bottom:.5rem">
+        <% } else { %>
+          <div class="logo-icon"><i class="bi bi-shield-lock-fill"></i></div>
+        <% } %>
+        <span><%= settings?.company_name || '案件管理系统' %></span>
+      </div>
+      <% if (error) { %>
+        <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-circle"></i> <%= error %></div>
+      <% } %>
+      <form method="POST" action="/login">
+        <div class="mb-3">
+          <label class="form-label">用户名</label>
+          <input type="text" name="username" class="form-control" autocomplete="username" required autofocus placeholder="请输入账号">
+        </div>
+        <div class="mb-4">
+          <label class="form-label">密码</label>
+          <input type="password" name="password" class="form-control" autocomplete="current-password" required placeholder="请输入密码">
+        </div>
+        <button type="submit" class="btn btn-primary w-100">登 录</button>
+      </form>
+      <div class="text-center mt-3"><a href="/forgot-password" class="small text-muted" style="text-decoration:none"><i class="bi bi-question-circle"></i> 忘记密码？</a></div>
+      <div class="login-tip"><i class="bi bi-shield-check"></i> 登录即表示您已同意系统使用规范</div>
+    </div>
+  </div>
+</body>
+</html>

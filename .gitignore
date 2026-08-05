@@ -1,0 +1,9 @@
+node_modules/
+.test-uploads/
+.test-pg/
+uploads/
+backups/
+test/
+screenshots/
+.env
+*.log

@@ -1,0 +1,142 @@
+<div class="page-head">
+  <div>
+    <h1><%= mode === 'new' ? '新增案件' : '编辑案件' %></h1>
+    <div class="lead"><%= caseData ? caseData.case_no : '' %></div>
+  </div>
+  <a href="/cases" class="btn btn-light"><i class="bi bi-arrow-left"></i> 返回列表</a>
+</div>
+
+<div class="card">
+  <div class="card-body p-4">
+    <form id="caseForm">
+      <% if (mode === 'edit') { %><input type="hidden" name="case_id" value="<%= caseData.id %>"><% } %>
+
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">案件类型 <span class="text-danger">*</span></label>
+          <select class="form-select" name="case_type_id" id="caseTypeSelect">
+            <% types.forEach(t => { %>
+              <option value="<%= t.id %>" <%= caseTypeId === t.id ? 'selected' : '' %>><%= t.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-12 col-md-8">
+          <label class="form-label">案件名称 <span class="text-danger">*</span></label>
+          <input type="text" name="title" class="form-control" placeholder="如：张某某交通事故理赔案" value="<%= caseData ? caseData.title : '' %>" required>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+          <label class="form-label">客户/当事人</label>
+          <input type="text" name="client_name" class="form-control" placeholder="姓名" value="<%= caseData ? (caseData.client_name || '') : '' %>">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">负责员工</label>
+          <% if (can('cases.assign')) { %>
+            <select name="assignee_id" class="form-select">
+              <option value="">未分配</option>
+              <% staff.forEach(s => { %>
+                <option value="<%= s.id %>" <%= caseData && caseData.assignee_id === s.id ? 'selected' : '' %>><%= s.display_name %></option>
+              <% }) %>
+            </select>
+          <% } else { %>
+            <input type="text" class="form-control" value="<%= user.display_name %>" disabled>
+            <input type="hidden" name="assignee_id" value="<%= user.id %>">
+          <% } %>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">当前状态</label>
+          <select name="status_id" class="form-select">
+            <% statuses.forEach(s => { %>
+              <option value="<%= s.id %>" <%= caseData && caseData.status_id === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">下一步流程</label>
+          <textarea name="next_action" class="form-control" rows="2" placeholder="描述下一步要做什么"><%= caseData ? (caseData.next_action || '') : '' %></textarea>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">提醒时间</label>
+          <input type="datetime-local" name="reminder_at" class="form-control" value="<%= caseData && caseData.reminder_at ? new Date(caseData.reminder_at).toISOString().slice(0,16) : '' %>">
+        </div>
+        <div class="col-12">
+          <label class="form-label">服务费约定方式</label>
+          <textarea name="fee_agreement" class="form-control" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData ? (caseData.fee_agreement || '') : '' %></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">费用明细</label>
+          <textarea name="fee_details" class="form-control" rows="3" placeholder="如：鉴定费由XX支付、诉讼费由XX支付、保全费由XX支付、律师费由XX支付"><%= caseData ? (caseData.fee_details || '') : '' %></textarea>
+        </div>
+      </div>
+
+      <div class="form-section-title"><i class="bi bi-file-earmark-text"></i> 案件信息</div>
+      <div class="row gx-4" id="dynamicFields"></div>
+
+      <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4"><%= mode === 'new' ? '保存案件' : '保存修改' %></button>
+        <a href="<%= mode === 'edit' ? '/cases/' + caseData.id : '/cases' %>" class="btn btn-light">取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const FIELDS = <%- safeJson(fieldsByType) %>;
+  const VALUES = <%- safeJson(values) %>;
+  const CASE_ID = <%- mode === 'edit' ? caseData.id : 'null' %>;
+  const IS_EDIT = <%- mode === 'edit' ? 'true' : 'false' %>;
+
+  function renderFields(typeId) {
+    const box = document.getElementById('dynamicFields');
+    const fields = FIELDS[typeId] || [];
+    if (fields.length === 0) {
+      box.innerHTML = '<div class="col-12 text-muted small">该案件类型暂无自定义字段</div>';
+      return;
+    }
+    box.innerHTML = fields.map(f => {
+      const val = VALUES[f.id] || '';
+      let control = '';
+      const req = f.required ? '<span class="text-danger">*</span>' : '';
+      let opts = [];
+      try { opts = JSON.parse(f.options || '[]'); } catch (e) {}
+      if (f.field_type === 'textarea') {
+        control = `<textarea class="form-control" name="field_${f.id}" rows="3" placeholder="${(f.placeholder || '').replace(/"/g,'&quot;')}">${val}</textarea>`;
+      } else if (f.field_type === 'select') {
+        const os = opts.map(o => `<option value="${(o.label||'').replace(/"/g,'&quot;')}" ${val === o.label ? 'selected' : ''}>${o.label}</option>`).join('');
+        control = `<select class="form-select" name="field_${f.id}"><option value="">请选择</option>${os}</select>`;
+      } else if (f.field_type === 'date') {
+        control = `<input type="date" class="form-control" name="field_${f.id}" value="${val}">`;
+      } else if (f.field_type === 'number') {
+        control = `<input type="number" step="any" class="form-control" name="field_${f.id}" value="${val}" placeholder="${(f.placeholder || '').replace(/"/g,'&quot;')}">`;
+      } else {
+        const it = f.field_type === 'phone' ? 'tel' : 'text';
+        control = `<input type="${it}" class="form-control" name="field_${f.id}" value="${val}" placeholder="${(f.placeholder || '').replace(/"/g,'&quot;')}">`;
+      }
+      return `<div class="col-12 col-md-6"><div class="mb-3"><label class="form-label">${f.label} ${req}</label>${control}</div></div>`;
+    }).join('');
+  }
+
+  const sel = document.getElementById('caseTypeSelect');
+  sel.addEventListener('change', () => renderFields(parseInt(sel.value, 10)));
+  renderFields(<%= caseTypeId || 0 %>);
+
+  document.getElementById('caseForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    const fd = new FormData(e.target);
+    const data = {};
+    fd.forEach((v, k) => { data[k] = v; });
+    const url = IS_EDIT ? '/api/cases/' + CASE_ID + '/update' : '/api/cases/create';
+    try {
+      const r = await postJSON(url, data);
+      toast('保存成功', 'success');
+      setTimeout(() => location.href = '/cases/' + r.id, 400);
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+</script>

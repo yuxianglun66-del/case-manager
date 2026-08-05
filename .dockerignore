@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.test-uploads
+.test-pg
+test
+screenshots
+.env
+*.log
+uploads
+backups
+.git

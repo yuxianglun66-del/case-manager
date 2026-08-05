@@ -1,0 +1,27 @@
+<%
+  const val = typeof value !== 'undefined' && value !== null ? value : '';
+  const reqMark = f.required ? '<span class="text-danger">*</span>' : '';
+  let opts = [];
+  try { opts = JSON.parse(f.options || '[]'); } catch (e) { opts = []; }
+%>
+<div class="col-12 col-md-6">
+  <div class="mb-3">
+    <label class="form-label"><%= f.label %> <%- reqMark %></label>
+    <% if (f.field_type === 'textarea') { %>
+      <textarea class="form-control" name="field_<%= f.id %>" rows="3" placeholder="<%= f.placeholder || '' %>"><%= val %></textarea>
+    <% } else if (f.field_type === 'select') { %>
+      <select class="form-select" name="field_<%= f.id %>">
+        <option value="">请选择</option>
+        <% opts.forEach(o => { %>
+          <option value="<%= o.label %>" <%= val === o.label ? 'selected' : '' %>><%= o.label %></option>
+        <% }) %>
+      </select>
+    <% } else if (f.field_type === 'date') { %>
+      <input type="date" class="form-control" name="field_<%= f.id %>" value="<%= val %>">
+    <% } else if (f.field_type === 'number') { %>
+      <input type="number" step="any" class="form-control" name="field_<%= f.id %>" value="<%= val %>" placeholder="<%= f.placeholder || '' %>">
+    <% } else { %>
+      <input type="<%= f.field_type === 'phone' ? 'tel' : 'text' %>" class="form-control" name="field_<%= f.id %>" value="<%= val %>" placeholder="<%= f.placeholder || '' %>">
+    <% } %>
+  </div>
+</div>

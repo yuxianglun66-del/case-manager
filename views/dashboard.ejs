@@ -1,0 +1,256 @@
+<div class="page-head">
+  <div>
+    <h1>工作看板</h1>
+    <div class="lead">欢迎回来，<%= user.display_name %></div>
+  </div>
+  <a href="/cases/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增案件</a>
+</div>
+
+<% 
+  const totalPending = byStatus.filter(s => s.category === 'pending').reduce((a,b) => a + b.n, 0);
+  const totalProcessing = byStatus.filter(s => s.category === 'processing').reduce((a,b) => a + b.n, 0);
+  const totalLitigation = byStatus.filter(s => s.category === 'litigation').reduce((a,b) => a + b.n, 0);
+  const totalClosed = byStatus.filter(s => s.category === 'closed' || s.category === 'archived').reduce((a,b) => a + b.n, 0);
+%>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-primary)"><i class="bi bi-folder-fill"></i></div>
+      <div>
+        <div class="stat-num"><%= total %></div>
+        <div class="stat-label">全部案件</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-amber)"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div class="stat-num"><%= totalPending %></div>
+        <div class="stat-label">待受理</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-gear-wide-connected"></i></div>
+      <div>
+        <div class="stat-num"><%= totalProcessing %></div>
+        <div class="stat-label">处理中</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-patch-check-fill"></i></div>
+      <div>
+        <div class="stat-num"><%= totalClosed %></div>
+        <div class="stat-label">已结案/归档</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (reminders.length && (overdueCount > 0 || todayCount > 0)) { %>
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-4 reminder-banner" role="alert">
+  <i class="bi bi-bell-fill" style="font-size:1.3rem"></i>
+  <div class="flex-grow-1">
+    <strong>提醒：</strong>
+    <% if (todayCount > 0) { %>今天有 <b class="text-danger"><%= todayCount %></b> 条流程提醒待处理<% } %>
+    <% if (todayCount > 0 && overdueCount > 0) { %>，<% } %>
+    <% if (overdueCount > 0) { %><b class="text-danger"><%= overdueCount %></b> 条已逾期，请尽快处理<% } %>
+    <a href="#reminderPanel" class="ms-2 fw-semibold">查看 →</a>
+  </div>
+</div>
+<% } %>
+
+<% if (reminders.length) { %>
+<div class="card mb-4" id="reminderPanel">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-bell"></i> 待办提醒 <small class="text-muted">已逾期 · 今天 · 未来 <%= advanceDays %> 天内</small></span>
+    <% if (upcomingCount > 0) { %><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa">另有 <%= upcomingCount %> 条即将到期</span><% } %>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr><th>案号</th><th>案件名称</th><th>提醒事项</th><th>提醒时间</th><th class="hide-mobile">负责人</th><th class="hide-mobile">状态</th><th>签收</th></tr>
+        </thead>
+        <tbody>
+          <% reminders.forEach(r => { %>
+            <% const cls = r.level === 'overdue' ? 'bg-danger-subtle' : r.level === 'today' ? 'bg-warning-subtle' : ''; %>
+            <tr class="<%= cls %>">
+              <td class="fw-semibold"><a class="row-link" href="/cases/<%= r.id %>"><%= r.case_no %></a></td>
+              <td class="text-truncate" style="max-width:200px"><a class="row-link" href="/cases/<%= r.id %>"><%= r.title %></a></td>
+              <td class="text-truncate" style="max-width:240px"><i class="bi bi-arrow-repeat text-muted me-1"></i><%= r.next_action %></td>
+              <td class="text-nowrap">
+                <% if (r.level === 'overdue') { %><span class="status-badge" style="background:#dc3545">已逾期</span><% } %>
+                <% if (r.level === 'today') { %><span class="status-badge" style="background:#f59e0b">今天</span><% } %>
+                <% if (r.level === 'upcoming') { %><span class="status-badge" style="background:#0ea5e9">即将</span><% } %>
+                <span class="text-muted ms-1"><%= new Date(r.reminder_at).toLocaleString('zh-CN') %></span>
+              </td>
+              <td class="hide-mobile">
+                <% if (r.assignee_name) { %><span class="status-badge" style="background:#6f42c1"><%= r.assignee_name %></span><% } else { %><span class="text-muted">—</span><% } %>
+              </td>
+              <td class="hide-mobile"><span class="status-badge" style="background:<%= r.status_color || '#6c757d' %>"><%= r.status_name || '未设置' %></span></td>
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-success" onclick="ackReminder(<%= r.id %>, this)"><i class="bi bi-check2-circle me-1"></i>签收</button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bar-chart-fill"></i> 各类型案件数量</div>
+      <div class="card-body">
+        <canvas id="chartType" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pie-chart-fill"></i> 案件状态分布</div>
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-6">
+            <canvas id="chartStatus" height="200"></canvas>
+          </div>
+          <div class="col-6">
+            <div id="statusLegend"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history"></i> 最近更新的案件</span>
+        <a href="/cases" class="btn btn-sm btn-outline-primary">查看全部</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr><th>案号</th><th>案件名称</th><th>类型</th><th>状态</th><th class="hide-mobile">负责人</th><th class="hide-mobile">更新时间</th></tr>
+            </thead>
+            <tbody>
+              <% recent.forEach(c => { %>
+                <tr class="row-link" onclick="location.href='/cases/<%= c.id %>'">
+                  <td class="fw-semibold"><%= c.case_no %></td>
+                  <td><%= c.title %></td>
+                  <td><span class="type-badge" style="background:<%= c.type_color %>"><%= c.type_name %></span></td>
+                  <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_name || '未设置' %></span></td>
+                  <td class="hide-mobile"><i class="bi bi-person text-muted me-1"></i><%= c.assignee_name || '—' %></td>
+                  <td class="hide-mobile text-muted"><%= c.updated_at ? new Date(c.updated_at).toLocaleString('zh-CN') : '' %></td>
+                </tr>
+              <% }) %>
+              <% if (recent.length === 0) { %>
+                <tr><td colspan="6" class="empty-tip"><i class="bi bi-inbox"></i>暂无案件，点击右上角「新增案件」开始</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% if (admin && workload.length) { %>
+  <div class="col-12 col-xl-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-people-fill"></i> 员工办案量</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th>员工</th><th>案件数</th></tr></thead>
+            <tbody>
+              <% workload.forEach(w => { %>
+                <tr>
+                  <td><span class="user-avatar" style="width:28px;height:28px;font-size:13px;display:inline-flex;margin-right:8px"><%= w.display_name.charAt(0) %></span><%= w.display_name %></td>
+                  <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= w.n %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script src="/vendor/chart.js/chart.umd.js"></script>
+<script>
+  const typeData = {
+    labels: <%- safeJson(byType.map(t => t.name)) %>,
+    colors: <%- safeJson(byType.map(t => t.color)) %>,
+    counts: <%- safeJson(byType.map(t => t.n)) %>,
+  };
+  const statusData = {
+    labels: <%- safeJson(byStatus.map(s => s.name)) %>,
+    colors: <%- safeJson(byStatus.map(s => s.color)) %>,
+    counts: <%- safeJson(byStatus.map(s => s.n)) %>,
+  };
+
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = 'rgba(59,130,246,.06)';
+
+  new Chart(document.getElementById('chartType'), {
+    type: 'bar',
+    data: {
+      labels: typeData.labels,
+      datasets: [{
+        data: typeData.counts,
+        backgroundColor: typeData.colors,
+        borderRadius: 6,
+        maxBarThickness: 46,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+    },
+  });
+
+  new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: statusData.labels,
+      datasets: [{ data: statusData.counts, backgroundColor: statusData.colors, borderWidth: 2, borderColor: '#0f172a' }],
+    },
+    options: { plugins: { legend: { display: false } }, cutout: '62%' },
+  });
+
+  const legend = document.getElementById('statusLegend');
+  legend.innerHTML = statusData.labels.map((l, i) =>
+    `<div class="d-flex align-items-center mb-2 small">
+      <span style="width:12px;height:12px;border-radius:3px;background:${statusData.colors[i]};display:inline-block;margin-right:8px;box-shadow:0 0 6px ${statusData.colors[i]}40"></span>
+      <span class="text-truncate" style="flex:1;color:#94a3b8">${l}</span>
+      <b style="color:#e2e8f0">${statusData.counts[i]}</b>
+    </div>`).join('');
+
+  async function ackReminder(caseId, btn) {
+    if (!(await confirmBox('确认已处理该提醒？签收后此提醒将从待办列表中移除。', '签收提醒'))) return;
+    const csrf = getCsrfToken();
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/cases/' + caseId + '/reminder/ack', {method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'x-csrf-token':csrf}:{}),}});
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '签收失败'); }
+      toast('已签收', 'success');
+      setTimeout(()=>location.reload(), 400);
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  }
+</script>

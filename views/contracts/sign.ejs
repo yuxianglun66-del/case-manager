@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>电子签署 - <%= contractTitle %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif; background:#f5f6fa; min-height:100vh; }
+    .sign-header { background:#fff; border-bottom:1px solid #e0e0e0; padding:12px 16px; position:sticky; top:0; z-index:100; }
+    .sign-header h5 { margin:0; font-size:1rem; color:#333; }
+    .sign-header small { color:#999; font-size:.75rem; }
+    .pdf-container { position:relative; height:calc(100vh - 60px); overflow:auto; background:#ddd; padding:16px; }
+    .pdf-page { background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.1); margin:0 auto 16px; max-width:100%; }
+    .pdf-page img { width:100%; height:auto; display:block; }
+    .sign-overlay { position:absolute; border:2px dashed #0d6efd; background:rgba(13,110,253,.05); pointer-events:none; }
+    .sign-canvas-wrap { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e0e0e0; padding:16px; box-shadow:0 -2px 10px rgba(0,0,0,.05); z-index:200; }
+    .sign-canvas { border:1px solid #ccc; background:#fafafa; border-radius:8px; touch-action:none; width:100%; max-width:100%; height:160px; }
+    .btn-sign { width:100%; padding:14px; font-size:1.1rem; font-weight:600; border-radius:10px; }
+    .toast-bottom { position:fixed; bottom:100px; left:16px; right:16px; z-index:300; }
+    @media (min-width: 768px) {
+      .sign-canvas-wrap { position:static; box-shadow:none; border-top:none; padding:24px; }
+      .sign-canvas { max-width:480px; margin:0 auto; display:block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sign-header d-flex justify-content-between align-items-center">
+    <div>
+      <h5><%= contractTitle %></h5>
+      <small><%= partyName %> · <%= partyRole %></small>
+    </div>
+    <span class="badge bg-primary">请在下方签名</span>
+  </div>
+
+  <div class="pdf-container" id="pdfContainer">
+    <div class="pdf-page" id="pdfPage">
+      <iframe id="pdfFrame" src="/sign/<%= token %>/pdf" style="width:100%;height:100%;border:none;min-height:60vh" onload="onPdfLoaded()"></iframe>
+    </div>
+  </div>
+
+  <div class="sign-canvas-wrap">
+    <div class="mb-2 d-flex justify-content-between align-items-center">
+      <label class="mb-0 fw-semibold"><%= partyRole %>：<%= partyName %></label>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearCanvas()"><i class="bi bi-eraser"></i> 清空</button>
+    </div>
+    <canvas class="sign-canvas" id="signCanvas"></canvas>
+    <div class="mt-3 d-grid">
+      <button class="btn btn-primary btn-sign" id="btnSubmit" onclick="submitSign()"><i class="bi bi-pen"></i> 确认签署</button>
+    </div>
+  </div>
+
+  <script>
+    const token = '<%= token %>';
+    const canvas = document.getElementById('signCanvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false, lastX = 0, lastY = 0;
+    let signPosition = <%- safeJson(signPosition) %>;
+
+    // 高 DPI 适配
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2 * dpr;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1a1a2e';
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // 触摸/鼠标事件
+    function getPoint(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    function start(e) { e.preventDefault(); drawing = true; const p = getPoint(e); lastX = p.x; lastY = p.y; }
+    function move(e) { if (!drawing) return; e.preventDefault(); const p = getPoint(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }
+    function end() { drawing = false; }
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    function canvasToBase64() { return canvas.toDataURL('image/png'); }
+
+    function isCanvasEmpty() {
+      const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < d.length; i += 4) {
+        if (d[i] !== 0) return false;
+      }
+      return true;
+    }
+
+    async function submitSign() {
+      if (isCanvasEmpty()) { showToast('请先签名'); return; }
+      const dataUrl = canvasToBase64();
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></i>提交中...';
+      try {
+        const res = await fetch('/sign/' + token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signature_base64: dataUrl })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (data.all_signed) {
+            showToast('签署完成，所有当事人已签署', 'success');
+          } else {
+            showToast('签署成功，等待其他当事人签署', 'success');
+          }
+          setTimeout(() => location.href = '/sign/' + token + '/done', 1000);
+        } else {
+          showToast(data.error || '签署失败', 'danger');
+          btn.disabled = false; btn.innerHTML = '<i class="bi bi-pen"></i> 确认签署';
+        }
+      } catch (err) {
+        showToast('网络错误：' + err.message, 'danger');
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-pen"></i> 确认签署';
+      }
+    }
+
+    function showToast(msg, type='info') {
+      const el = document.createElement('div');
+      el.className = `toast align-items-center text-white bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0 show`;
+      el.role = 'alert'; el.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div></div>`;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2500);
+    }
+
+    function onPdfLoaded() {
+      // 模板配置了签名位置时，可在此高亮提示（可选）
+      if (signPosition && signPosition.page === 1) {
+        // 预留：可在 PDF 上标注签名区域
+      }
+    }
+  </script>
+</body>
+</html>

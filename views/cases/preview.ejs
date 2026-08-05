@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>预览 - <%= att.original_name %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <style>
+    body { margin: 0; height: 100vh; overflow: hidden; }
+    .preview-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #fff; border-bottom: 1px solid #dee2e6; padding: .5rem 1rem; }
+    .preview-content { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; overflow: auto; }
+    .preview-image { max-width: 100%; height: auto; display: block; margin: 2rem auto; box-shadow: 0 0 20px rgba(0,0,0,.1); }
+    .preview-pdf { width: 100%; height: calc(100vh - 52px); border: none; }
+    .preview-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 52px); text-align: center; padding: 2rem; }
+    .preview-fallback i { font-size: 5rem; color: #6c757d; margin-bottom: 1rem; }
+    .preview-fallback h4 { margin-bottom: .5rem; }
+    .preview-fallback .text-muted { margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="preview-header d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-2">
+      <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
+      <span class="fw-semibold text-truncate" style="max-width:300px"><%= att.original_name %></span>
+    </div>
+    <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+  </div>
+  <div class="preview-content">
+    <% if (isImage) { %>
+      <img class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
+    <% } else { %>
+      <iframe class="preview-pdf" src="/api/attachments/<%= att.id %>/preview-file"></iframe>
+      <% if (isWord) { %>
+      <div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;z-index:200">
+        <i class="bi bi-arrow-repeat"></i> Word 已转为 PDF 预览，首次打开可能需要几秒
+      </div>
+      <% } %>
+    <% } %>
+  </div>
+</body>
+</html>

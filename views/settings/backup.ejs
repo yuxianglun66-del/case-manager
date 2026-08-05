@@ -1,0 +1,155 @@
+<div class="page-head">
+  <div>
+    <h1>备份与恢复</h1>
+    <div class="lead">仅备份业务数据（不含上传的附件文件），支持手动与自动备份</div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-4 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-clock-history"></i> 自动备份设置</div>
+      <div class="card-body">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="bkEnabled" <%= backupSettings.backup_enabled ? 'checked' : '' %>>
+          <label class="form-check-label" for="bkEnabled">启用自动备份</label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">备份频率</label>
+          <select class="form-select" id="bkType">
+            <option value="daily" <%= backupSettings.backup_schedule_type === 'daily' ? 'selected' : '' %>>每天</option>
+            <option value="weekly" <%= backupSettings.backup_schedule_type === 'weekly' ? 'selected' : '' %>>每周</option>
+          </select>
+        </div>
+        <div class="mb-3" id="bkWeekdayRow">
+          <label class="form-label">每周星期几</label>
+          <select class="form-select" id="bkWeekday">
+            <% ['周日','周一','周二','周三','周四','周五','周六'].forEach((d,i) => { %>
+              <option value="<%= i %>" <%= (backupSettings.backup_weekday || 0) === i ? 'selected' : '' %>><%= d %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">每天执行时间（24小时制）</label>
+          <input type="time" class="form-control" id="bkTime" value="<%= backupSettings.backup_time || '02:00' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">备份保留天数</label>
+          <input type="number" class="form-control" id="bkRetention" min="1" max="365" value="<%= backupSettings.backup_retention_days || 7 %>">
+          <div class="form-text">超过该天数的备份会自动清除</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" id="btnSaveBk"><i class="bi bi-check-lg"></i> 保存设置</button>
+          <button class="btn btn-outline-primary" id="btnManualBk"><i class="bi bi-database-fill-down"></i> 立即备份</button>
+        </div>
+        <hr>
+        <div class="small text-muted">
+          上次自动备份：<span id="bkLastRun"><%= backupSettings.backup_last_run ? new Date(backupSettings.backup_last_run).toLocaleString('zh-CN') : '从未' %></span><br>
+          上次结果：<span id="bkLastResult" class="<%= backupSettings.backup_last_result === 'ok' ? 'text-success' : 'text-danger' %>"><%= backupSettings.backup_last_result === 'ok' ? '成功' : (backupSettings.backup_last_result || '—') %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8 mb-3">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-database-fill"></i> 备份列表</span>
+        <button class="btn btn-sm btn-light" id="btnRefresh"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead>
+              <tr><th>备份文件</th><th>大小</th><th>创建时间</th><th class="text-end">操作</th></tr>
+            </thead>
+            <tbody id="bkTbody">
+              <% if (files && files.length) { %>
+                <% files.forEach(f => { %>
+                  <tr>
+                    <td class="text-break"><i class="bi bi-file-earmark-zip me-1"></i><%= f.name %></td>
+                    <td><%= (f.size / 1024).toFixed(1) %> KB</td>
+                    <td><%= f.created_at ? new Date(f.created_at).toLocaleString('zh-CN') : '—' %></td>
+                    <td class="text-end">
+                      <button class="btn btn-ico btn-light" title="下载" onclick="dlBackup('<%= f.name %>')"><i class="bi bi-download"></i></button>
+                      <button class="btn btn-ico btn-outline-warning" title="恢复" onclick="restoreBackup('<%= f.name %>')"><i class="bi bi-arrow-counterclockwise"></i></button>
+                      <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delBackup('<%= f.name %>')"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="4" class="text-center text-muted py-4">暂无备份，点击「立即备份」创建</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const isWeekly = () => document.getElementById('bkType').value === 'weekly';
+  function toggleWeekday() {
+    document.getElementById('bkWeekdayRow').style.display = isWeekly() ? '' : 'none';
+  }
+  document.getElementById('bkType').addEventListener('change', toggleWeekday);
+  toggleWeekday();
+
+  document.getElementById('btnSaveBk').addEventListener('click', async () => {
+    const body = {
+      backup_enabled: document.getElementById('bkEnabled').checked,
+      backup_schedule_type: document.getElementById('bkType').value,
+      backup_weekday: parseInt(document.getElementById('bkWeekday').value, 10),
+      backup_time: document.getElementById('bkTime').value,
+      backup_retention_days: parseInt(document.getElementById('bkRetention').value, 10) || 7
+    };
+    try {
+      const res = await postJSON('/api/backup/settings', body);
+      if (!res.ok) throw new Error(res.error || '保存失败');
+      toast('设置已保存', 'success');
+    } catch (e) { toast(e.message, 'danger'); }
+  });
+
+  document.getElementById('btnManualBk').addEventListener('click', async () => {
+    try {
+      const res = await postJSON('/api/backup/create', {});
+      if (!res.ok) throw new Error(res.error || '备份失败');
+      toast('备份完成：' + res.file, 'success');
+      setTimeout(() => location.reload(), 600);
+    } catch (e) { toast(e.message, 'danger'); }
+  });
+
+  document.getElementById('btnRefresh').addEventListener('click', () => location.reload());
+
+  window.restoreBackup = async function (name) {
+    if (!(await confirmBox('恢复将覆盖当前所有业务数据，且不可撤销。确定要恢复「' + name + '」吗？', '确认恢复'))) return;
+    try {
+      const res = await postJSON('/api/backup/restore', { file: name });
+      if (!res.ok) throw new Error(res.error || '恢复失败');
+      toast('恢复成功，正在刷新…', 'success');
+      setTimeout(() => location.href = '/settings/backup', 800);
+    } catch (e) { toast(e.message, 'danger'); }
+  };
+
+  window.delBackup = async function (name) {
+    if (!(await confirmBox('确定删除备份「' + name + '」？', '删除备份'))) return;
+    try {
+      const res = await postJSON('/api/backup/delete', { file: name });
+      if (!res.ok) throw new Error(res.error || '删除失败');
+      toast('已删除', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (e) { toast(e.message, 'danger'); }
+  };
+
+  window.dlBackup = function (name) {
+    const csrf = getCsrfToken();
+    const a = document.createElement('a');
+    a.href = '/api/backup/download/' + encodeURIComponent(name) + (csrf ? '?_csrf=' + encodeURIComponent(csrf) : '');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+})();
+</script>

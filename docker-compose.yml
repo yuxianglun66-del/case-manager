@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: casemgr
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-please-change-me}
+      POSTGRES_DB: casemgr
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U casemgr -d casemgr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 生产模式（禁用 DEMO 自动登录等所有调试绕过）
+      NODE_ENV: production
+      DATABASE_URL: postgres://casemgr:${DB_PASSWORD:-please-change-me}@db:5432/casemgr
+      SESSION_SECRET: ${SESSION_SECRET:?请设置 SESSION_SECRET 环境变量}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      UPLOAD_DIR: /app/uploads
+      BACKUP_DIR: /app/backups
+      PORT: 3000
+      TZ: Asia/Shanghai
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - uploads:/app/uploads
+      - backups:/app/backups
+
+volumes:
+  pgdata:
+  uploads:
+  backups:

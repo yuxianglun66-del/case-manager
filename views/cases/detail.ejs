@@ -1,0 +1,841 @@
+<%
+  const roleColors = { 原告:'#4361ee', 被告:'#dc3545', 第三人:'#0ea5e9', 伤者:'#f59e0b', 用人单位:'#6f42c1', 保险公司:'#0d9488', 肇事方:'#ef4444', 受害人:'#e11d48', 其他:'#64748b' };
+  const roleColor = r => roleColors[r] || '#64748b';
+%>
+<div class="page-head">
+  <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="me-1"><%= caseData.case_no %></h1>
+      <span class="type-badge" style="background:<%= caseData.type_color %>"><%= caseData.type_name %></span>
+      <span class="status-badge" style="background:<%= caseData.status_color || '#6c757d' %>"><%= caseData.status_name || '未设置' %></span>
+    </div>
+    <div class="lead"><i class="bi bi-folder2-open me-1"></i><%= caseData.title %></div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <% if (can('cases.edit')) { %>
+    <a href="/cases/<%= caseData.id %>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> 编辑</a>
+    <% } %>
+    <a href="/cases" class="btn btn-light"><i class="bi bi-arrow-left"></i> 返回</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-info-circle"></i> 案件信息</div>
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-file-earmark-text"></i> 案件名称</div>
+            <div class="info-value"><%= caseData.title %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-person"></i> 客户/当事人</div>
+            <div class="info-value"><%= caseData.client_name || '—' %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-person-badge"></i> 负责员工</div>
+            <div class="info-value"><%= caseData.assignee_name || '—' %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-calendar-plus"></i> 创建时间</div>
+            <div class="info-value"><%= new Date(caseData.created_at).toLocaleString('zh-CN') %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-clock-history"></i> 最近更新</div>
+            <div class="info-value"><%= new Date(caseData.updated_at).toLocaleString('zh-CN') %></div>
+          </div>
+          <% if (caseData.status_at) { %>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-arrow-repeat"></i> 状态更新时间</div>
+            <div class="info-value"><%= new Date(caseData.status_at).toLocaleString('zh-CN') %></div>
+          </div>
+          <% } %>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-person-plus"></i> 创建人</div>
+            <div class="info-value"><%= caseData.creator_name || '—' %></div>
+          </div>
+        </div>
+
+        <% if (fields.length) { %>
+        <div class="form-section-title mt-4"><i class="bi bi-file-earmark-text"></i> 详细信息</div>
+        <div class="info-grid">
+          <% fields.forEach(f => { %>
+            <div class="info-item">
+              <div class="info-label"><%= f.label %></div>
+              <div class="info-value"><%= values[f.id] || '—' %></div>
+            </div>
+          <% }) %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- ============ 当事人 ============ -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people"></i> 当事人（<span id="partyCount"><%= parties?.length || 0 %></span>）</span>
+        <% if (can('parties.manage')) { %>
+        <button class="btn btn-sm btn-primary" onclick="openPartyCreate()"><i class="bi bi-plus-lg"></i> 新增当事人</button>
+        <% } %>
+      </div>
+      <div class="card-body">
+        <div id="partyList">
+          <% if (parties && parties.length) { %>
+            <% parties.forEach(p => { %>
+              <div class="party-item mb-2" id="party-<%= p.id %>">
+                <div class="py-2 px-3">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="min-w-0">
+                      <div class="fw-semibold d-flex align-items-center flex-wrap">
+                        <span class="party-avatar"><%= p.name.charAt(0) %></span>
+                        <span class="me-1"><%= p.name %></span>
+                        <div class="d-flex align-items-center flex-wrap gap-1">
+                        <span class="role-badge" style="background:<%= roleColor(p.role) %>"><%= p.role %></span>
+                        <% if (p.gender) { %><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa;font-size:11px"><%= p.gender === 'male' ? '男' : p.gender === 'female' ? '女' : p.gender %></span><% } %>
+                        <% if (p.age) { %><span class="badge rounded-pill" style="background:rgba(16,185,129,.15);color:#34d399;font-size:11px"><%= p.age %>岁</span><% } %>
+                      </div>
+                      </div>
+                      <div class="text-muted small mt-1">
+                        <% if (p.id_card) { %><i class="bi bi-card-text"></i> <%= p.id_card %> · <% } %>
+                        <% if (p.phone) { %><i class="bi bi-telephone"></i> <%= p.phone %> · <% } %>
+                        <% if (p.address) { %><i class="bi bi-geo-alt"></i> <%= p.address %> · <% } %>
+                        <% if (p.contact_person) { %><i class="bi bi-person-badge"></i> <%= p.contact_person %> <% if (p.contact_phone) { %>（<%= p.contact_phone %>）<% } %> · <% } %>
+                        <% if (p.injury_info) { %><i class="bi bi-activity"></i> <%= p.injury_info %> · <% } %>
+                        <% if (p.hospital_dept) { %><i class="bi bi-hospital"></i> <%= p.hospital_dept %> · <% } %>
+                        <% if (p.remark) { %><i class="bi bi-chat-left-text"></i> <%= p.remark %> · <% } %>
+                      </div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                      <% if (can('parties.manage')) { %>
+                      <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(<%= p.id %>)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delParty(<%= p.id %>, '<%= p.name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-trash"></i></button>
+                      <% } %>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="empty-tip"><i class="bi bi-people"></i>暂无当事人记录，点击「新增当事人」添加</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 费用（约定+明细合并） ============ -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash"></i> 费用</span>
+        <% if (can('cases.fee')) { %>
+        <button class="btn btn-sm btn-outline-primary" onclick="toggleFeeEdit()"><i class="bi bi-pencil"></i> 编辑</button>
+        <% } %>
+      </div>
+      <div class="card-body py-2">
+        <div id="feeDisplay">
+          <% if (caseData.fee_agreement) { %>
+            <div class="small mb-1"><%= caseData.fee_agreement %></div>
+          <% } else { %>
+            <div class="text-muted small mb-1">未约定服务费方式</div>
+          <% } %>
+          <% if (caseData.fee_details) { %>
+            <div class="small"><%= caseData.fee_details %></div>
+          <% } else { %>
+            <div class="text-muted small">暂无费用明细</div>
+          <% } %>
+        </div>
+        <div id="feeEdit" style="display:none">
+          <div class="mb-2">
+            <label class="form-label small">服务费约定方式</label>
+            <textarea name="fee_agreement" id="feeAgreement" class="form-control form-control-sm" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData.fee_agreement || '' %></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">费用明细</label>
+            <textarea name="fee_details" id="feeDetails" class="form-control form-control-sm" rows="3" placeholder="如：鉴定费由XX支付、诉讼费由XX支付、保全费由XX支付、律师费由XX支付"><%= caseData.fee_details || '' %></textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="saveFeeAll()"><i class="bi bi-check-lg"></i> 保存</button>
+            <button class="btn btn-sm btn-light" onclick="toggleFeeEdit()"><i class="bi bi-x-lg"></i> 取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 电子合同 ============ -->
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-file-earmark-text"></i> 电子合同（<%= contracts?.length || 0 %>）</span>
+      <% if (can('contracts.manage')) { %>
+      <button class="btn btn-sm btn-primary" onclick="openContractCreate()"><i class="bi bi-plus-lg"></i> 发起签署</button>
+      <% } %>
+    </div>
+    <div class="card-body">
+      <div id="contractList">
+        <% if (contracts && contracts.length) { %>
+          <% contracts.forEach(c => { %>
+            <div class="card mb-2" id="contract-<%= c.id %>">
+              <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <div class="min-w-0">
+                    <div class="fw-semibold d-flex align-items-center flex-wrap">
+                      <i class="bi bi-file-earmark-text me-2" style="color:#4361ee"></i>
+                      <span class="me-1"><%= c.title %></span>
+                      <span class="role-badge" style="background:<%= c.status==='signed'?'#198754':c.status==='sent'?'#0d6efd':c.status==='revoked'?'#6c757d':'#ffc107' %>"><%= c.status==='signed'?'已完成':c.status==='sent'?'签署中':c.status==='revoked'?'已撤回':'草稿' %></span>
+                    </div>
+                    <div class="text-muted small mt-1"><i class="bi bi-collection me-1"></i>模板：<%= c.template_name || '—' %> · <i class="bi bi-send"></i>发起：<%= c.created_at ? new Date(c.created_at).toLocaleString('zh-CN') : '—' %></div>
+                    <% if (c.signatures && c.signatures.length) { %>
+                      <div class="text-muted small mt-1">
+                        <% c.signatures.forEach(s => { %>
+                          <span class="me-3"><i class="bi bi-person-check"></i> <%= s.party_name %> (<%= s.party_role %>): <span class="<%= s.status==='signed'?'text-success fw-semibold':'text-warning fw-semibold' %>"><%= s.status==='signed'?'已签署':'待签署' %></span><%= s.signed_at ? ' · ' + new Date(s.signed_at).toLocaleString('zh-CN') : '' %></span>
+                        <% }) %>
+                      </div>
+                    <% } %>
+                  </div>
+                  <div class="d-flex gap-1 flex-shrink-0">
+                    <% if (c.status === 'signed' && c.pdf_path) { %>
+                      <a href="/api/contracts/<%= c.id %>/download" class="btn btn-ico btn-success" title="下载已签署合同"><i class="bi bi-download"></i></a>
+                    <% } %>
+                    <% if (c.status === 'sent') { %>
+                      <button class="btn btn-ico btn-light" title="查看签署进度" onclick="viewContractProgress(<%= c.id %>)"><i class="bi bi-eye"></i></button>
+                      <% if (can('contracts.manage')) { %>
+                      <button class="btn btn-ico btn-outline-danger" title="撤回" onclick="revokeContract(<%= c.id %>)"><i class="bi bi-x-circle"></i></button>
+                      <% } %>
+                    <% } %>
+                    <% if (typeof user !== 'undefined' && user && (user.role === 'super_admin' || user.role === 'admin')) { %>
+                      <button class="btn btn-ico btn-outline-danger" title="删除合同" onclick="deleteContract(<%= c.id %>)"><i class="bi bi-trash"></i></button>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div class="empty-tip"><i class="bi bi-file-earmark-text"></i>暂无合同，点击「发起签署」创建</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+    <!-- ============ 附件 ============ -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-paperclip"></i> 附件（<%= attachments.length %>）</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <% if (can('attachments.manage')) { %>
+          <form id="uploadForm" class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="file" name="files" class="form-control" multiple id="uploadInput" style="max-width:280px">
+            <input type="text" name="remark" id="uploadRemark" class="form-control" placeholder="备注（如：发票、病历、证明、认定书等）" style="max-width:260px">
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-cloud-arrow-up"></i> 上传</button>
+            <small class="text-muted">支持图片、Word、PDF、Excel、ZIP、RAR 等，单个不超过 <%= MAX_MB %>MB</small>
+          </form>
+          <% } %>
+        </div>
+        <div id="fileList">
+          <% attachments.forEach(a => { %>
+            <div class="file-item d-flex align-items-center gap-2 mb-2" id="file-<%= a.id %>">
+              <i class="bi bi-file-earmark-text fs-4" style="color:#4361ee"></i>
+              <div class="flex-grow-1 text-truncate">
+                <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="text-decoration-none fw-semibold"><%= a.original_name %></a>
+                <% if (a.remark) { %><span class="badge rounded-pill ms-1" style="background:rgba(99,102,241,.15);color:#818cf8;font-size:11px"><%= a.remark %></span><% } %>
+                <div class="text-muted small">
+                  <i class="bi bi-database"></i> <%= (a.size / 1024).toFixed(1) %> KB · <i class="bi bi-person"></i> <%= a.uploader_name || '' %> · <i class="bi bi-clock"></i> <%= new Date(a.created_at).toLocaleString('zh-CN') %>
+                </div>
+              </div>
+              <div class="d-flex gap-1 flex-shrink-0">
+                <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="btn btn-ico btn-light" title="预览"><i class="bi bi-eye"></i></a>
+                <a href="/api/attachments/<%= a.id %>/download" class="btn btn-ico btn-light" title="下载"><i class="bi bi-download"></i></a>
+                <% if (can('attachments.manage')) { %>
+                <button class="btn btn-ico btn-light" title="替换文件" onclick="replaceFile(<%= a.id %>, '<%= a.original_name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-arrow-repeat"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delFile(<%= a.id %>)"><i class="bi bi-trash"></i></button>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
+          <% if (attachments.length === 0) { %>
+            <div class="empty-tip"><i class="bi bi-paperclip"></i>暂无附件</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-arrow-repeat"></i> 更新进度</div>
+      <div class="card-body">
+        <% if (can('cases.edit')) { %>
+        <form id="statusForm">
+          <div class="mb-2">
+            <select name="status_id" class="form-select" id="statusSelect">
+              <% statuses.forEach(s => { %>
+                <option value="<%= s.id %>" <%= caseData.status_id === s.id ? 'selected' : '' %>><%= s.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-2">
+            <textarea name="note" class="form-control" rows="3" placeholder="填写本次进度说明（如：已提交理赔材料，等待审核）"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check2-circle"></i> 更新状态</button>
+        </form>
+        <% } else { %>
+          <div class="text-muted small">当前状态：<%= caseData.status_name || '未设置' %></div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- ============ 下一步流程（紧凑·内联编辑） ============ -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-arrow-repeat"></i> 下一步流程</span>
+        <% if (can('cases.remind')) { %>
+        <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-pencil"></i> 更新</button>
+        <% } %>
+      </div>
+      <div class="card-body py-2">
+        <div id="naDisplay">
+          <% if (caseData.next_action) { %>
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-check-circle-fill text-success mt-1"></i>
+              <div class="min-w-0">
+                <div class="small fw-semibold"><%= caseData.next_action %></div>
+                <% if (caseData.reminder_at) {
+                     const rd = new Date(caseData.reminder_at);
+                     const rnow = new Date();
+                     const rStartToday = new Date(rnow.getFullYear(), rnow.getMonth(), rnow.getDate());
+                     const rEndToday = new Date(rnow.getFullYear(), rnow.getMonth(), rnow.getDate() + 1);
+                     const overdue = rd < rStartToday;
+                     const today = !overdue && rd < rEndToday;
+                %>
+                  <div class="text-muted small"><i class="bi bi-clock"></i> <%= rd.toLocaleString('zh-CN') %>
+                    <% if (overdue) { %><span class="status-badge" style="background:#dc3545">已逾期</span><% } %>
+                    <% if (!overdue && today) { %><span class="status-badge" style="background:#f59e0b">今天</span><% } %>
+                    <% if (!overdue && !today) { %><span class="status-badge" style="background:#0ea5e9">即将</span><% } %>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% } else { %>
+            <div class="text-muted small">暂无下一步流程，点击「更新」设置</div>
+          <% } %>
+        </div>
+        <div id="naEdit" style="display:none">
+          <div class="mb-2">
+            <textarea name="next_action" id="naNextAction" class="form-control form-control-sm" rows="2" placeholder="描述下一步要做什么"><%= caseData.next_action || '' %></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">提醒时间</label>
+            <input type="datetime-local" id="naReminderAt" class="form-control form-control-sm" value="<%= caseData.reminder_at ? new Date(caseData.reminder_at).toISOString().slice(0,16) : '' %>">
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="saveNextAction()"><i class="bi bi-check-lg"></i> 保存</button>
+            <button class="btn btn-sm btn-light" onclick="toggleNextActionEdit()"><i class="bi bi-x-lg"></i> 取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history"></i> 进度记录</div>
+      <div class="card-body">
+        <div class="timeline">
+          <% history.forEach(h => { %>
+            <div class="tl-item tl-<%= h.action %>">
+              <div class="tl-title d-flex align-items-center justify-content-between gap-2">
+                <span>
+                  <%= h.action === 'created' ? '创建案件' : h.action === 'status' ? (h.status_name || '状态变更') : h.action === 'attachment' ? '附件操作' : h.action === 'attachment-del' ? '删除附件' : '更新信息' %>
+                </span>
+                <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
+                <button class="btn btn-ico btn-outline-danger" style="width:26px;height:26px;padding:0" title="删除此条进度记录" onclick="deleteHistory(<%= h.id %>)"><i class="bi bi-trash" style="font-size:12px"></i></button>
+                <% } %>
+              </div>
+              <% if (h.note) { %><div class="tl-note"><%= h.note %></div><% } %>
+              <div class="tl-time"><i class="bi bi-person"></i> <%= h.operator_name || '系统' %> · <%= new Date(h.created_at).toLocaleString('zh-CN') %></div>
+            </div>
+          <% }) %>
+          <% if (history.length === 0) { %>
+            <div class="empty-tip"><i class="bi bi-clock"></i>暂无进度记录</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 替换附件弹窗 ============ -->
+<div class="modal fade" id="replaceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">替换附件</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted small mb-2" id="replaceName"></div>
+        <input type="file" class="form-control" id="replaceInput">
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="replaceOk">确认替换</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 当事人弹窗 ============ -->
+<div class="modal fade" id="partyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="partyForm">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="partyModalTitle">新增当事人</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="party_id" id="pId">
+          <div class="mb-3">
+            <label class="form-label">姓名/名称 <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="pName" class="form-control" placeholder="如：张三 / 某某保险公司" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">角色 <span class="text-danger">*</span></label>
+            <select name="role" id="pRole" class="form-select" required>
+              <option value="">请选择</option>
+              <option value="原告">原告</option>
+              <option value="被告">被告</option>
+              <option value="第三人">第三人</option>
+              <option value="伤者">伤者</option>
+              <option value="用人单位">用人单位</option>
+              <option value="保险公司">保险公司</option>
+              <option value="肇事方">肇事方</option>
+              <option value="受害人">受害人</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">性别</label>
+              <select name="gender" id="pGender" class="form-select">
+                <option value="">不限</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">年龄</label>
+              <input type="number" name="age" id="pAge" class="form-control" min="0" max="150" placeholder="岁">
+            </div>
+            <div class="col-6">
+              <label class="form-label">身份证号</label>
+              <input type="text" name="id_card" id="pIdCard" class="form-control">
+            </div>
+            <div class="col-6">
+              <label class="form-label">联系电话</label>
+              <input type="text" name="phone" id="pPhone" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label">地址</label>
+              <input type="text" name="address" id="pAddress" class="form-control">
+            </div>
+            <div class="col-6">
+              <label class="form-label">联系人（如公司代表）</label>
+              <input type="text" name="contact_person" id="pContactPerson" class="form-control">
+            </div>
+            <div class="col-6">
+              <label class="form-label">联系人电话</label>
+              <input type="text" name="contact_phone" id="pContactPhone" class="form-control">
+            </div>
+            <div class="col-6">
+              <label class="form-label">伤情</label>
+              <input type="text" name="injury_info" id="pInjuryInfo" class="form-control" placeholder="如：左腿骨折、脑震荡等">
+            </div>
+            <div class="col-6">
+              <label class="form-label">住院科室</label>
+              <input type="text" name="hospital_dept" id="pHospitalDept" class="form-control" placeholder="如：骨科、神经外科等">
+            </div>
+            <div class="col-12">
+              <label class="form-label">备注</label>
+              <textarea name="remark" id="pRemark" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-12 d-flex align-items-end">
+              <label class="form-label me-2">排序</label>
+              <input type="number" name="sort" id="pSort" class="form-control" style="width:80px" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  let replaceTarget = null;
+
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('uploadInput');
+    if (!input.files.length) return toast('请选择文件', 'danger');
+    const remark = document.getElementById('uploadRemark').value.trim();
+    const fd = new FormData();
+    for (const f of input.files) fd.append('files', f);
+    if (remark) fd.append('remark', remark);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await postForm('/api/cases/<%= caseData.id %>/attachments', fd);
+      toast('上传成功', 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  const statusFormEl = document.getElementById('statusForm');
+  if (statusFormEl) statusFormEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    const data = {
+      status_id: document.getElementById('statusSelect').value,
+      note: e.target.note.value,
+    };
+    try {
+      await postJSON('/api/cases/<%= caseData.id %>/status', data);
+      toast('进度已更新', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  async function delFile(id) {
+    if (!(await confirmBox('确定删除该附件吗？删除后无法恢复。', '删除附件'))) return;
+    try {
+      await postJSON('/api/attachments/' + id + '/delete', {});
+      toast('已删除', 'success');
+      setTimeout(() => location.reload(), 300);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  function replaceFile(id, name) {
+    replaceTarget = id;
+    document.getElementById('replaceName').textContent = '原文件：' + name;
+    document.getElementById('replaceInput').value = '';
+    new bootstrap.Modal(document.getElementById('replaceModal')).show();
+  }
+
+  document.getElementById('replaceOk').addEventListener('click', async () => {
+    const input = document.getElementById('replaceInput');
+    if (!input.files.length) return toast('请选择文件', 'danger');
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    const btn = document.getElementById('replaceOk');
+    btn.disabled = true;
+    try {
+      await postForm('/api/attachments/' + replaceTarget + '/replace', fd);
+      bootstrap.Modal.getInstance(document.getElementById('replaceModal')).hide();
+      toast('替换成功', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  /* ============ 下一步流程（内联编辑） ============ */
+  function toggleNextActionEdit() {
+    const display = document.getElementById('naDisplay');
+    const edit = document.getElementById('naEdit');
+    if (!display || !edit) return;
+    const isEditing = edit.style.display !== 'none';
+    if (isEditing) {
+      edit.style.display = 'none';
+      display.style.display = '';
+    } else {
+      edit.style.display = '';
+      display.style.display = 'none';
+    }
+  }
+  async function saveNextAction() {
+    const nextAction = document.getElementById('naNextAction').value.trim();
+    const reminderAt = document.getElementById('naReminderAt').value || null;
+    if (!nextAction) return toast('请填写下一步流程', 'warning');
+    try {
+      const res = await postJSON('/api/cases/<%= caseData.id %>/next-action', { next_action: nextAction, reminder_at: reminderAt });
+      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
+      toggleNextActionEdit();
+      toast('下一步流程已更新', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ============ 服务费约定方式 ============ */
+  function toggleFeeEdit() {
+    const display = document.getElementById('feeDisplay');
+    const edit = document.getElementById('feeEdit');
+    if (!display || !edit) return;
+    const isEditing = edit.style.display !== 'none';
+    if (isEditing) {
+      edit.style.display = 'none';
+      display.style.display = '';
+    } else {
+      edit.style.display = '';
+      display.style.display = 'none';
+    }
+  }
+  async function saveFeeAgreement() {
+    const feeAgreement = document.getElementById('feeAgreement').value.trim();
+    try {
+      const res = await postJSON('/api/cases/<%= caseData.id %>/update', { fee_agreement: feeAgreement || null });
+      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
+      toggleFeeEdit();
+      toast('服务费约定已更新', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+  function toggleFeeEdit() {
+    const display = document.getElementById('feeDisplay');
+    const edit = document.getElementById('feeEdit');
+    if (!display || !edit) return;
+    const isEditing = edit.style.display !== 'none';
+    if (isEditing) { edit.style.display = 'none'; display.style.display = ''; }
+    else { edit.style.display = ''; display.style.display = 'none'; }
+  }
+  async function saveFeeAll() {
+    const feeAgreement = document.getElementById('feeAgreement').value.trim();
+    const feeDetails = document.getElementById('feeDetails').value.trim();
+    try {
+      const res = await postJSON('/api/cases/<%= caseData.id %>/fee', { fee_agreement: feeAgreement || null, fee_details: feeDetails || null });
+      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
+      toggleFeeEdit();
+      toast('费用信息已更新', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+  const PARTY_ROLE_COLORS = <%- safeJson({ 原告:'#4361ee', 被告:'#dc3545', 第三人:'#0ea5e9', 伤者:'#f59e0b', 用人单位:'#6f42c1', 保险公司:'#0d9488', 肇事方:'#ef4444', 受害人:'#e11d48', 其他:'#64748b' }) %>;
+  const roleColor = r => PARTY_ROLE_COLORS[r] || '#64748b';
+  const CAN_MANAGE_PARTIES = <%= can('parties.manage') ? 'true' : 'false' %>;
+  async function loadParties() {
+    try {
+      const res = await fetch('/api/cases/<%= caseData.id %>/parties');
+      const data = await res.json();
+      const box = document.getElementById('partyList');
+      document.getElementById('partyCount').textContent = data.parties?.length || 0;
+      if (!data.parties?.length) {
+        box.innerHTML = '<div class="empty-tip"><i class="bi bi-people"></i>暂无当事人记录，点击「新增当事人」添加</div>';
+        return;
+      }
+      box.innerHTML = data.parties.map(p => `
+        <div class="party-item mb-2" id="party-${p.id}">
+          <div class="py-2 px-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="min-w-0">
+                <div class="fw-semibold d-flex align-items-center flex-wrap">
+                  <span class="party-avatar">${p.name.charAt(0)}</span>
+                  <span class="me-1">${p.name}</span>
+                  <span class="role-badge" style="background:${roleColor(p.role)}">${p.role}</span>
+                  ${p.gender ? `<span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa;font-size:11px">${p.gender === 'male' ? '男' : p.gender === 'female' ? '女' : p.gender}</span>` : ''}
+                  ${p.age ? `<span class="badge rounded-pill" style="background:rgba(16,185,129,.15);color:#34d399;font-size:11px">${p.age}岁</span>` : ''}
+                </div>
+                <div class="text-muted small mt-1">
+                  ${p.id_card ? `<i class="bi bi-card-text"></i> ${p.id_card} · ` : ''}
+                  ${p.phone ? `<i class="bi bi-telephone"></i> ${p.phone} · ` : ''}
+                  ${p.address ? `<i class="bi bi-geo-alt"></i> ${p.address} · ` : ''}
+                  ${p.contact_person ? `<i class="bi bi-person-badge"></i> ${p.contact_person}${p.contact_phone ? '（' + p.contact_phone + '）' : ''} · ` : ''}
+                  ${p.injury_info ? `<i class="bi bi-activity"></i> ${p.injury_info} · ` : ''}
+                  ${p.hospital_dept ? `<i class="bi bi-hospital"></i> ${p.hospital_dept} · ` : ''}
+                  ${p.remark ? `<i class="bi bi-chat-left-text"></i> ${p.remark} · ` : ''}
+                </div>
+              </div>
+              <div class="d-flex gap-1 flex-shrink-0">
+                ${CAN_MANAGE_PARTIES ? `
+                <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delParty(${p.id}, '${p.name.replace(/[\\'"<>]/g, '')}')"><i class="bi bi-trash"></i></button>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  }
+
+  function openPartyCreate() {
+    document.getElementById('partyForm').reset();
+    document.getElementById('pId').value = '';
+    document.getElementById('partyModalTitle').textContent = '新增当事人';
+    new bootstrap.Modal(document.getElementById('partyModal')).show();
+  }
+
+  async function openPartyEdit(id) {
+    try {
+      const res = await fetch('/api/cases/<%= caseData.id %>/parties');
+      const data = await res.json();
+      const p = data.parties.find(x => x.id === id);
+      if (!p) return toast('当事人不存在', 'danger');
+      document.getElementById('partyForm').reset();
+      document.getElementById('pId').value = id;
+      document.getElementById('pName').value = p.name;
+      document.getElementById('pRole').value = p.role;
+      document.getElementById('pIdCard').value = p.id_card || '';
+      document.getElementById('pPhone').value = p.phone || '';
+      document.getElementById('pAddress').value = p.address || '';
+      document.getElementById('pContactPerson').value = p.contact_person || '';
+      document.getElementById('pContactPhone').value = p.contact_phone || '';
+      document.getElementById('pGender').value = p.gender || '';
+      document.getElementById('pAge').value = p.age || '';
+      document.getElementById('pInjuryInfo').value = p.injury_info || '';
+      document.getElementById('pHospitalDept').value = p.hospital_dept || '';
+      document.getElementById('pRemark').value = p.remark || '';
+      document.getElementById('pSort').value = p.sort || 0;
+      document.getElementById('partyModalTitle').textContent = '编辑当事人';
+      new bootstrap.Modal(document.getElementById('partyModal')).show();
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  }
+
+  document.getElementById('partyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('pId').value;
+    const body = {
+      name: document.getElementById('pName').value,
+      role: document.getElementById('pRole').value,
+      gender: document.getElementById('pGender').value,
+      age: document.getElementById('pAge').value || null,
+      id_card: document.getElementById('pIdCard').value,
+      phone: document.getElementById('pPhone').value,
+      address: document.getElementById('pAddress').value,
+      contact_person: document.getElementById('pContactPerson').value,
+      contact_phone: document.getElementById('pContactPhone').value,
+      injury_info: document.getElementById('pInjuryInfo').value,
+      hospital_dept: document.getElementById('pHospitalDept').value,
+      remark: document.getElementById('pRemark').value,
+      sort: document.getElementById('pSort').value,
+    };
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      if (id) {
+        await postJSON('/api/cases/<%= caseData.id %>/parties/' + id, body);
+      } else {
+        await postJSON('/api/cases/<%= caseData.id %>/parties', body);
+      }
+      bootstrap.Modal.getInstance(document.getElementById('partyModal')).hide();
+      toast('已保存', 'success');
+      loadParties();
+      btn.disabled = false;
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message, 'danger');
+    }
+  });
+
+  async function delParty(id, name) {
+    if (!(await confirmBox('确定删除当事人「' + name + '」吗？', '删除当事人'))) return;
+    try {
+      await postJSON('/api/cases/<%= caseData.id %>/parties/' + id + '/delete', {});
+      toast('已删除', 'success');
+      loadParties();
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 合同管理 ---- */
+  function openContractCreate() {
+    fetch('/api/contract-templates').then(r=>r.json()).then(d=>{
+      const tpls = d.templates || [];
+      if (!tpls.length) return toast('请先在系统设置上传合同模板', 'warning');
+      const parties = <%- safeJson(parties || []) %>;
+      let html = '<div class="mb-3"><label class="form-label">选择模板</label><select id="ctTemplateId" class="form-select"><option value="">请选择</option>';
+      tpls.forEach(t=>html+=`<option value="${t.id}">${t.name}${t.type_name?'（'+t.type_name+'）':''}</option>`);
+      html += '</select></div>';
+      html += '<div class="mb-3"><label class="form-label">合同标题</label><input type="text" id="ctTitle" class="form-control" placeholder="如：王小明交通事故调解协议书" required></div>';
+      html += '<div class="mb-3"><label class="form-label">签署当事人</label><select id="ctPartyIds" class="form-select" multiple size="' + Math.min(6, (parties.length||1)) + '">';
+      parties.forEach(p=>html+=`<option value="${p.id}">${p.name}（${p.role}）</option>`);
+      html += '</select><div class="form-text">按模板签名位置顺序选择，按住 Ctrl 可多选</div></div>';
+      const mb = modalBox('发起合同签署', html, { okText: '创建并发送' });
+      mb.show();
+      mb.okBtn.addEventListener('click', async () => {
+        const template_id = document.getElementById('ctTemplateId').value;
+        const title = document.getElementById('ctTitle').value.trim();
+        const party_ids = Array.from(document.getElementById('ctPartyIds').selectedOptions).map(o=>Number(o.value));
+        if (!template_id || !title || !party_ids.length) return toast('请填写完整', 'warning');
+        mb.okBtn.disabled = true;
+        try {
+          const csrf2 = getCsrfToken();
+          const res = await fetch('/api/cases/<%= caseData.id %>/contracts', {method:'POST',headers:{'Content-Type':'application/json',...(csrf2?{'x-csrf-token':csrf2}:{}),},body:JSON.stringify({template_id:parseInt(template_id),title,party_ids})});
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '创建失败');
+          mb.close();
+          toast('合同已发起，签署链接已生成', 'success');
+          setTimeout(()=>location.reload(),500);
+        } catch(err) { mb.okBtn.disabled = false; toast(err.message, 'danger'); }
+      });
+    });
+  }
+  async function viewContractProgress(id) {
+    const res = await fetch('/api/cases/<%= caseData.id %>/contracts');
+    const data = await res.json();
+    const c = data.contracts.find(x=>x.id===id);
+    if (!c) return;
+    let html = '<div class="text-start"><h6>' + c.title + '</h6><table class="table table-sm"><thead><tr><th>当事人</th><th>角色</th><th>状态</th><th>签署时间</th></tr></thead><tbody>';
+    c.signatures.forEach(s=>html+=`<tr><td>${s.party_name}</td><td>${s.party_role}</td><td><span class="badge ${s.status==='signed'?'bg-success':'bg-warning'}">${s.status==='signed'?'已签署':'待签署'}</span></td><td>${s.signed_at?new Date(s.signed_at).toLocaleString('zh-CN'):'—'}</td></tr>`);
+    html += '</tbody></table></div>';
+    const mb = modalBox('签署进度', html, { okText: '关闭', footer: true });
+    mb.show();
+    mb.okBtn.addEventListener('click', () => mb.close());
+    if (c.status === 'sent') {
+      let links = '<hr><div class="text-start small">签署链接：</div>';
+      c.signatures.forEach(s=>{
+        links += `<div class="input-group input-group-sm mt-1"><input class="form-control form-control-sm" readonly value="${getAppUrl()}/sign/${s.sign_token}"><button class="btn btn-outline-secondary btn-sm" onclick="copySignLink(this)" data-token="${s.sign_token}">复制</button></div>`;
+      });
+      const extra = document.createElement('div');
+      extra.innerHTML = links;
+      mb.body.appendChild(extra);
+    }
+  }
+  async function copySignLink(btn) {
+    try {
+      const url = btn.dataset.token ? getAppUrl() + '/sign/' + btn.dataset.token : btn.value;
+      await navigator.clipboard.writeText(url);
+      toast('链接已复制', 'success');
+    } catch (err) { toast('复制失败', 'danger'); }
+  }
+  async function revokeContract(id) {
+    if (!(await confirmBox('确定撤回该合同？已签署的当事人将保留记录。', '撤回合同'))) return;
+    try {
+      const csrf3 = getCsrfToken();
+      const res = await fetch('/api/cases/<%= caseData.id %>/contracts/' + id + '/revoke', {method:'POST',headers:{'Content-Type':'application/json',...(csrf3?{'x-csrf-token':csrf3}:{}),}});
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '撤回失败'); }
+      toast('已撤回', 'success');
+      setTimeout(()=>location.reload(),400);
+    } catch(err) { toast(err.message,'danger'); }
+  }
+  async function deleteContract(id) {
+    if (!(await confirmBox('确定删除该合同？删除后不可恢复，相关签署记录将一并清除。', '删除合同'))) return;
+    try {
+      const csrf4 = getCsrfToken();
+      const res = await fetch('/api/cases/<%= caseData.id %>/contracts/' + id + '/delete', {method:'POST',headers:{'Content-Type':'application/json',...(csrf4?{'x-csrf-token':csrf4}:{}),}});
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '删除失败'); }
+      toast('已删除', 'success');
+      setTimeout(()=>location.reload(),400);
+    } catch(err) { toast(err.message,'danger'); }
+  }
+  async function deleteHistory(id) {
+    if (!(await confirmBox('确定删除该条进度记录？删除后不可恢复。', '删除进度记录'))) return;
+    try {
+      const csrfH = getCsrfToken();
+      const res = await fetch('/api/cases/<%= caseData.id %>/history/' + id + '/delete', {method:'POST',headers:{'Content-Type':'application/json',...(csrfH?{'x-csrf-token':csrfH}:{}),}});
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '删除失败'); }
+      toast('已删除', 'success');
+      setTimeout(()=>location.reload(),400);
+    } catch(err) { toast(err.message,'danger'); }
+  }
+</script>

@@ -1,0 +1,366 @@
+<%
+  // 服务端：tpl = { id, name, sign_positions, text_fields }
+  function edParse(v) {
+    if (Array.isArray(v)) return v;
+    if (v == null) return [];
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; }
+  }
+  const initSigns = edParse(tpl.sign_positions);
+  const initTexts = edParse(tpl.text_fields);
+  const ROLE_HINTS = ['原告', '被告', '伤者', '用人单位', '保险公司', '家长/监护人', '被保人', '委托人', '受托人', '第三人', '受害人', '肇事方'];
+%>
+<div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h4 class="mb-1"><i class="bi bi-pencil-square"></i> 模板编辑器：<%= tpl.name %></h4>
+    <p class="text-muted mb-0 small">在 PDF 页面上拖拽放置 <span class="badge bg-primary">签名框</span> 与 <span class="badge bg-info text-dark">文本</span>，保存后即可用于发起合同签署。</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/settings" class="btn btn-light"><i class="bi bi-arrow-left"></i> 返回设置</a>
+    <button class="btn btn-success" id="btnSave"><i class="bi bi-check-lg"></i> 保存配置</button>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-primary active" data-tool="select"><i class="bi bi-mouse2"></i> 选择</button>
+          <button type="button" class="btn btn-outline-primary" data-tool="sig"><i class="bi bi-pen"></i> 添加签名框</button>
+          <button type="button" class="btn btn-outline-primary" data-tool="txt"><i class="bi bi-type"></i> 添加文本</button>
+        </div>
+        <span class="text-muted small" id="toolHint">点击选择框体，拖拽移动，右下角调整大小；Delete 删除</span>
+      </div>
+      <div class="card-body editor-canvas">
+        <div id="editorPages" class="editor-pages"></div>
+        <div id="edLoading" class="text-center text-muted py-5">正在加载 PDF…</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card">
+      <div class="card-header py-2"><i class="bi bi-sliders"></i> 属性设置</div>
+      <div class="card-body" id="propPanel">
+        <p class="text-muted small mb-0">在左侧选择一个框体进行编辑。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<datalist id="roleList">
+  <% ROLE_HINTS.forEach(r => { %><option value="<%= r %>"></option><% }) %>
+</datalist>
+
+<style>
+  .editor-canvas { background: repeating-conic-gradient(#f1f5f9 0% 25%, #fff 0% 50%) 0 0 / 24px 24px; }
+  .editor-pages { display: flex; flex-direction: column; gap: 18px; align-items: center; }
+  .ed-page { position: relative; width: 720px; max-width: 100%; box-shadow: 0 4px 18px rgba(0,0,0,.18); background: #fff; }
+  .ed-page canvas { display: block; width: 100%; height: auto; }
+  .ed-box { position: absolute; box-sizing: border-box; cursor: move; }
+  .ed-box.sig { border: 2px dashed #3b82f6; background: rgba(59,130,246,.10); border-radius: 6px; }
+  .ed-box.sig::after { content: '签'; position: absolute; right: 4px; bottom: 2px; font-size: 11px; color: #3b82f6; }
+  .ed-box.txt { border: 2px solid #06b6d4; background: rgba(6,182,212,.10); border-radius: 6px; }
+  .ed-box.txt .ed-label { position: absolute; left: 4px; top: 2px; font-size: 11px; color: #0e7490; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ed-box.selected { outline: 2px solid #f59e0b; z-index: 20; }
+  .ed-resize { position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px; background: #f59e0b; border: 2px solid #fff; border-radius: 3px; cursor: nwse-resize; }
+  .ed-page.resizing { user-select: none; }
+  .ed-box.creating { z-index: 30; }
+  #toolHint { min-height: 1.2em; }
+</style>
+
+<script type="module">
+  import * as pdfjsLib from '/vendor/pdfjs/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
+
+  const TEMPLATE_ID = <%= tpl.id %>;
+  const initSigns = <%- safeJson(initSigns) %>;
+  const initTexts = <%- safeJson(initTexts) %>;
+  const RENDER_SCALE = 2;
+
+  let pdf = null;
+  let pageEls = [];          // 每页 { el, ptW, ptH }
+  let boxes = [];            // { id, kind, page, x, y, w, h, party_role, label, text, size }
+  let tool = 'select';
+  let selectedId = null;
+  let nextId = 1;
+  let drag = null;
+
+  // ---- 坐标换算（pt = PDF 点，y 从页面顶部算起；css = 渲染后的像素）----
+  function ptToCss(pageIdx, xPt, yPt, wPt, hPt) {
+    const p = pageEls[pageIdx];
+    if (!p) return { left: 0, top: 0, width: 0, height: 0 };
+    const k = p.el.clientWidth / p.ptW;
+    return { left: xPt * k, top: yPt * k, width: wPt * k, height: hPt * k };
+  }
+  function cssToPt(pageIdx, ev) {
+    const p = pageEls[pageIdx];
+    const r = p.el.getBoundingClientRect();
+    const k = p.ptW / r.width;
+    return { x: (ev.clientX - r.left) * k, y: (ev.clientY - r.top) * k };
+  }
+
+  // ---- 渲染 ----
+  async function loadPdf() {
+    const load = document.getElementById('edLoading');
+    try {
+      const pdfB64 = '<%= pdfB64 %>';
+      let data;
+      if (pdfB64) {
+        const raw = atob(pdfB64);
+        data = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) data[i] = raw.charCodeAt(i);
+      } else {
+        data = { url: '/api/contract-templates/' + TEMPLATE_ID + '/pdf' };
+      }
+      pdf = await pdfjsLib.getDocument({ data }).promise;
+      const wrap = document.getElementById('editorPages');
+      wrap.innerHTML = '';
+      pageEls = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const vp = page.getViewport({ scale: RENDER_SCALE });
+        const el = document.createElement('div');
+        el.className = 'ed-page';
+        el.dataset.page = i;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(vp.width);
+        canvas.height = Math.floor(vp.height);
+        el.appendChild(canvas);
+        wrap.appendChild(el);
+        pageEls.push({ el, ptW: vp.width / RENDER_SCALE, ptH: vp.height / RENDER_SCALE });
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      }
+      load.style.display = 'none';
+      seedBoxes();
+      renderAll();
+      renderProps();
+    } catch (e) {
+      load.innerHTML = '<div class="alert alert-danger">PDF 加载失败：' + e.message + '</div>';
+    }
+  }
+
+  function seedBoxes() {
+    initSigns.forEach(s => boxes.push({
+      id: nextId++, kind: 'sig', page: s.page || 1,
+      x: s.x, y: s.y, w: s.width, h: s.height,
+      party_role: s.party_role || '', label: s.label || ''
+    }));
+    initTexts.forEach(t => boxes.push({
+      id: nextId++, kind: 'txt', page: t.page || 1,
+      x: t.x, y: t.y, w: t.width, h: t.height,
+      text: t.text || '', size: t.size || 12
+    }));
+  }
+
+  function renderAll() {
+    document.querySelectorAll('.ed-box').forEach(b => b.remove());
+    boxes.forEach(renderBox);
+  }
+
+  function renderBox(b) {
+    const p = pageEls[b.page - 1];
+    if (!p) return;
+    const css = ptToCss(b.page - 1, b.x, b.y, b.w, b.h);
+    const div = document.createElement('div');
+    div.className = 'ed-box ' + (b.kind === 'sig' ? 'sig' : 'txt') + (b.id === selectedId ? ' selected' : '');
+    div.dataset.id = b.id;
+    div.dataset.kind = b.kind;
+    div.style.left = css.left + 'px';
+    div.style.top = css.top + 'px';
+    div.style.width = css.width + 'px';
+    div.style.height = css.height + 'px';
+    if (b.kind === 'txt') {
+      const lbl = document.createElement('div');
+      lbl.className = 'ed-label';
+      lbl.textContent = b.text || '（空文本）';
+      div.appendChild(lbl);
+    }
+    const handle = document.createElement('div');
+    handle.className = 'ed-resize';
+    handle.dataset.resize = '1';
+    div.appendChild(handle);
+    p.el.appendChild(div);
+  }
+
+  // ---- 选择 ----
+  function selectBox(id) {
+    selectedId = id;
+    document.querySelectorAll('.ed-box').forEach(b => b.classList.toggle('selected', Number(b.dataset.id) === id));
+    renderProps();
+  }
+  function renderProps() {
+    const panel = document.getElementById('propPanel');
+    const b = boxes.find(x => x.id === selectedId);
+    if (!b) { panel.innerHTML = '<p class="text-muted small mb-0">在左侧选择一个框体进行编辑。</p>'; return; }
+    const isSig = b.kind === 'sig';
+    panel.innerHTML = `
+      <div class="mb-2"><span class="badge ${isSig ? 'bg-primary' : 'bg-info text-dark'}">${isSig ? '签名框' : '文本'}</span> 第 ${b.page} 页</div>
+      ${isSig ? `
+        <div class="mb-2">
+          <label class="form-label">签署角色（对应当事人角色）</label>
+          <input id="ppRole" class="form-control" list="roleList" value="${escAttr(b.party_role)}">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">标签</label>
+          <input id="ppLabel" class="form-control" value="${escAttr(b.label)}">
+        </div>` : `
+        <div class="mb-2">
+          <label class="form-label">文本内容（支持 {title}/{case_no}/{client_name}/{date}）</label>
+          <textarea id="ppText" class="form-control" rows="3">${esc(b.text)}</textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">字号</label>
+          <input id="ppSize" type="number" class="form-control" value="${b.size || 12}" min="6" max="72">
+        </div>`}
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">X</label><input id="ppX" type="number" class="form-control" value="${Math.round(b.x)}"></div>
+        <div class="col-6"><label class="form-label">Y(距顶部)</label><input id="ppY" type="number" class="form-control" value="${Math.round(b.y)}"></div>
+        <div class="col-6"><label class="form-label">宽</label><input id="ppW" type="number" class="form-control" value="${Math.round(b.w)}"></div>
+        <div class="col-6"><label class="form-label">高</label><input id="ppH" type="number" class="form-control" value="${Math.round(b.h)}"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-danger flex-fill" id="ppDelete"><i class="bi bi-trash"></i> 删除</button>
+        <button class="btn btn-sm btn-outline-secondary" id="ppApply"><i class="bi bi-check"></i> 应用</button>
+      </div>`;
+    panel.querySelector('#ppDelete').addEventListener('click', () => {
+      boxes = boxes.filter(x => x.id !== b.id);
+      selectedId = null;
+      renderAll();
+      renderProps();
+    });
+    panel.querySelector('#ppApply').addEventListener('click', () => {
+      applyProps(b);
+      renderAll();
+    });
+    panel.querySelectorAll('#ppX,#ppY,#ppW,#ppH').forEach(inp => inp.addEventListener('change', () => {
+      applyProps(b);
+      renderAll();
+    }));
+  }
+  function applyProps(b) {
+    const g = id => document.getElementById(id);
+    b.x = parseFloat(g('ppX')?.value) || b.x;
+    b.y = parseFloat(g('ppY')?.value) || b.y;
+    b.w = parseFloat(g('ppW')?.value) || b.w;
+    b.h = parseFloat(g('ppH')?.value) || b.h;
+    if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; }
+    else { b.text = g('ppText')?.value || ''; b.size = parseInt(g('ppSize')?.value, 10) || 12; }
+  }
+
+  // ---- 拖拽交互 ----
+  document.getElementById('editorPages').addEventListener('pointerdown', (e) => {
+    const boxEl = e.target.closest('.ed-box');
+    const pageEl = e.target.closest('.ed-page');
+    if (!pageEl) return;
+    const pageIdx = Number(pageEl.dataset.page) - 1;
+    const pt = cssToPt(pageIdx, e);
+
+    if (boxEl) {
+      const id = Number(boxEl.dataset.id);
+      const box = boxes.find(x => x.id === id);
+      if (!box) return;
+      if (e.target.closest('[data-resize]')) {
+        selectBox(id);
+        drag = { type: 'resize', box, pageIdx, sx: e.clientX, sy: e.clientY, ox: box.x, oy: box.y, ow: box.w, oh: box.h };
+        startDrag(e);
+        return;
+      }
+      selectBox(id);
+      drag = { type: 'move', box, pageIdx, sx: e.clientX, sy: e.clientY, ox: box.x, oy: box.y };
+      startDrag(e);
+      return;
+    }
+
+    // 空白处
+    if (tool === 'select') { selectBox(null); return; }
+    // 创建新框
+    const b = { id: nextId++, kind: tool === 'sig' ? 'sig' : 'txt', page: pageIdx + 1, x: pt.x, y: pt.y, w: tool === 'sig' ? 180 : 240, h: tool === 'sig' ? 60 : 40, party_role: '', label: '', text: '文本内容', size: 12 };
+    boxes.push(b);
+    drag = { type: 'create', box: b, pageIdx, sx: e.clientX, sy: e.clientY, ox: pt.x, oy: pt.y };
+    startDrag(e);
+  });
+
+  function startDrag(e) {
+    e.preventDefault();
+    pageEls.forEach(p => p.el.classList.add('resizing'));
+    document.addEventListener('pointermove', onDragMove);
+    document.addEventListener('pointerup', onDragUp, { once: true });
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    const p = pageEls[drag.pageIdx];
+    const r = p.el.getBoundingClientRect();
+    const k = p.ptW / r.width;
+    const dx = (e.clientX - drag.sx) * k;
+    const dy = (e.clientY - drag.sy) * k;
+    const b = drag.box;
+    if (drag.type === 'move') { b.x = Math.max(0, drag.ox + dx); b.y = Math.max(0, drag.oy + dy); }
+    else if (drag.type === 'resize') { b.w = Math.max(20, drag.ow + dx); b.h = Math.max(16, drag.oh + dy); }
+    else if (drag.type === 'create') {
+      b.w = Math.max(30, (e.clientX - drag.sx) * k);
+      b.h = Math.max(20, (e.clientY - drag.sy) * k);
+      if (drag.sx > e.clientX) b.x = Math.max(0, drag.ox - b.w);
+      if (drag.sy > e.clientY) b.y = Math.max(0, drag.oy - b.h);
+    }
+    renderBox(b);
+    renderProps();
+  }
+  function onDragUp() {
+    if (!drag) return;
+    if (drag.type === 'create') {
+      // 刚创建的框直接进入编辑
+      const b = drag.box;
+      b.x = Math.round(b.x); b.y = Math.round(b.y); b.w = Math.round(b.w); b.h = Math.round(b.h);
+      renderAll();
+      selectBox(b.id);
+    }
+    drag = null;
+    pageEls.forEach(p => p.el.classList.remove('resizing'));
+    document.removeEventListener('pointermove', onDragMove);
+  }
+
+  // 选择模式下，点击文字层不触发创建；已在 pointerdown 处理
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (selectedId != null) {
+        boxes = boxes.filter(x => x.id !== selectedId);
+        selectedId = null;
+        renderAll();
+        renderProps();
+      }
+    }
+  });
+
+  // 工具切换
+  document.querySelectorAll('[data-tool]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tool = btn.dataset.tool;
+      document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b === btn));
+      const hints = { select: '点击选择框体，拖拽移动，右下角调整大小；Delete 删除', sig: '在页面空白处按住拖拽，画出签名框位置', txt: '在页面空白处按住拖拽，画出文本区域' };
+      document.getElementById('toolHint').textContent = hints[tool];
+      if (tool !== 'select') selectBox(null);
+    });
+  });
+
+  // 保存
+  document.getElementById('btnSave').addEventListener('click', async () => {
+    const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label }));
+    const text_fields = boxes.filter(b => b.kind === 'txt').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), text: b.text, size: b.size }));
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    try {
+      const j = await postJSON('/api/contract-templates/' + TEMPLATE_ID + '/positions', { sign_positions, text_fields });
+      toast('配置已保存', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+    btn.disabled = false;
+  });
+
+  // ---- 工具函数 ----
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
+
+  loadPdf();
+</script>

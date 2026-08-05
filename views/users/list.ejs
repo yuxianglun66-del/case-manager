@@ -1,0 +1,335 @@
+<div class="page-head">
+  <div>
+    <h1>用户管理</h1>
+    <div class="lead">管理员工账号与权限</div>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal"><i class="bi bi-person-plus"></i> 新增用户</button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr><th>ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>名下案件</th><th>创建时间</th><th class="text-end">操作</th></tr>
+        </thead>
+        <tbody>
+          <% users.forEach(u => { %>
+            <tr>
+              <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= u.id %></span></td>
+              <td class="fw-semibold"><span class="user-avatar" style="width:30px;height:30px;font-size:13px;display:inline-flex;margin-right:8px"><%= u.display_name.charAt(0) %></span><span style="color:var(--primary-text, #3b82f6)"><%= u.username %></span></td>
+              <td><%= u.display_name %></td>
+              <td>
+                <span class="type-badge" style="background:<%= roles[u.role] ? roles[u.role].color : '#6f42c1' %>"><%= roles[u.role] ? roles[u.role].label : u.role %></span>
+              </td>
+              <td>
+                <% if (u.active) { %>
+                  <span class="status-badge" style="background:#198754">正常</span>
+                <% } else { %>
+                  <span class="status-badge" style="background:#dc3545">已停用</span>
+                <% } %>
+              </td>
+              <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= u.case_count %></span></td>
+              <td class="hide-mobile text-muted"><%= new Date(u.created_at).toLocaleDateString('zh-CN') %></td>
+              <td class="text-end">
+                <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>)"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-key"></i></button>
+                <button class="btn btn-ico btn-light" title="设置安全问题" onclick="editSecurityQuestion(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-question-circle"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="停用" onclick="disableUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-person-x"></i></button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<% if (canManageRoles) { %>
+<!-- 角色权限配置 -->
+<div class="card mt-4" id="rolePermCard">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0"><i class="bi bi-shield-lock"></i> 角色与权限配置</h6>
+      <div class="text-muted small">超级管理员始终拥有全部权限；为「管理员」「员工」勾选可授予的功能与操作，保存后立即生效。</div>
+    </div>
+    <button class="btn btn-primary btn-sm" id="btnSaveRolePerms"><i class="bi bi-check-lg"></i> 保存权限</button>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <% Object.entries(rolePerms).forEach(([rkey, rp]) => { %>
+        <div class="col-lg-4">
+          <div class="card h-100">
+            <div class="card-header py-2">
+              <span class="type-badge" style="background:<%= roles[rkey].color %>"><%= roles[rkey].label %></span>
+              <% if (rp.locked) { %><span class="text-muted small ms-1">全部权限（不可修改）</span><% } %>
+            </div>
+            <div class="card-body p-2" style="max-height:360px;overflow:auto">
+              <% let curGroup = ''; %>
+              <% perms.forEach(p => { %>
+                <% if (p.group !== curGroup) { curGroup = p.group; %>
+                  <div class="text-muted text-uppercase small mt-2 mb-1 px-1"><%= p.group %></div>
+                <% } %>
+                <label class="d-flex align-items-start gap-2 px-1 py-1 rounded hover-bg" title="<%= p.desc %>">
+                  <input type="checkbox" class="form-check-input mt-1 perm-cb" data-role="<%= rkey %>" value="<%= p.key %>"
+                    <%= rp.locked ? 'disabled' : '' %> <%= rp.permissions.includes(p.key) ? 'checked' : '' %>>
+                  <span class="small">
+                    <div class="fw-semibold"><%= p.label %></div>
+                    <div class="text-muted" style="font-size:12px"><%= p.desc %></div>
+                  </span>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<!-- 新增/编辑用户 -->
+<div class="modal fade" id="userModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="userForm">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="userModalTitle">新增用户</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="user_id" id="uId">
+          <div class="mb-3">
+            <label class="form-label">用户名（登录账号）</label>
+            <input type="text" name="username" id="uUsername" class="form-control" autocomplete="off">
+            <div class="form-text" id="uUsernameHint">仅创建时设置，之后不可修改</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">姓名</label>
+            <input type="text" name="display_name" id="uName" class="form-control" required>
+          </div>
+          <div class="mb-3" id="passwordWrap">
+            <label class="form-label">初始密码</label>
+            <input type="password" name="password" id="uPassword" class="form-control" autocomplete="new-password" minlength="8">
+            <div class="form-text">至少 8 位</div>
+          </div>
+          <div class="mb-3" id="sqWrap">
+            <label class="form-label">安全问题（用于忘记密码）</label>
+            <input type="text" name="security_question" id="uSecurityQuestion" class="form-control" placeholder="例如：我的生日是哪一天？">
+          </div>
+          <div class="mb-3" id="saWrap">
+            <label class="form-label">安全答案</label>
+            <input type="text" name="security_answer" id="uSecurityAnswer" class="form-control" placeholder="例如：0101">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">角色</label>
+            <select name="role" id="uRole" class="form-select">
+              <option value="staff">员工（仅操作自己负责的案件，权限可配置）</option>
+              <option value="admin">管理员（业务功能全开，系统管理权限可配置）</option>
+            </select>
+            <div class="form-text" id="uRoleHint"></div>
+          </div>
+          <div class="form-check" id="activeWrap" style="display:none">
+            <input class="form-check-input" type="checkbox" id="uActive" name="active" value="1" checked>
+            <label class="form-check-label" for="uActive">账号启用</label>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 重置密码 -->
+<div class="modal fade" id="resetModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">重置密码</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted small mb-2" id="resetName"></div>
+        <input type="password" class="form-control" id="resetPwd" placeholder="新密码（至少 8 位）" minlength="8">
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="resetOk">确认重置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置安全问题 -->
+<div class="modal fade" id="sqModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">设置安全问题</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted small mb-2" id="sqName"></div>
+        <div class="mb-3">
+          <label class="form-label">安全问题</label>
+          <input type="text" class="form-control" id="sqQuestion" placeholder="例如：我的生日是哪一天？">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">安全答案</label>
+          <input type="text" class="form-control" id="sqAnswer" placeholder="例如：0101">
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="sqOk">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let editingUserId = null;
+  let editingOrigRole = null;
+  let editingOrigActive = true;
+
+  function editUser(id, name, role, active) {
+    editingUserId = id;
+    editingOrigRole = role;
+    editingOrigActive = !!active;
+    document.getElementById('userModalTitle').textContent = '编辑用户';
+    document.getElementById('uId').value = id;
+    document.getElementById('uUsername').value = '';
+    document.getElementById('uUsername').disabled = true;
+    document.getElementById('uUsernameHint').textContent = '用户名创建后不可修改';
+    document.getElementById('uName').value = name;
+    document.getElementById('passwordWrap').style.display = 'none';
+    document.getElementById('sqWrap').style.display = 'none';
+    document.getElementById('saWrap').style.display = 'none';
+    const roleSel = document.getElementById('uRole');
+    if (role === 'super_admin') {
+      roleSel.value = 'admin';
+      roleSel.disabled = true;
+      document.getElementById('uRoleHint').textContent = '超级管理员账号的角色与启用状态不可修改';
+      document.getElementById('uActive').disabled = true;
+    } else {
+      roleSel.value = role;
+      roleSel.disabled = false;
+      document.getElementById('uRoleHint').textContent = '';
+      document.getElementById('uActive').disabled = false;
+    }
+    document.getElementById('activeWrap').style.display = '';
+    document.getElementById('uActive').checked = active;
+    new bootstrap.Modal(document.getElementById('userModal')).show();
+  }
+
+  function openCreate() {
+    editingUserId = null;
+    editingOrigRole = null;
+    editingOrigActive = true;
+    document.getElementById('userModalTitle').textContent = '新增用户';
+    document.getElementById('userForm').reset();
+    document.getElementById('uId').value = '';
+    document.getElementById('uUsername').disabled = false;
+    document.getElementById('uUsernameHint').textContent = '仅创建时设置，之后不可修改';
+    document.getElementById('passwordWrap').style.display = '';
+    document.getElementById('sqWrap').style.display = '';
+    document.getElementById('saWrap').style.display = '';
+    document.getElementById('activeWrap').style.display = 'none';
+    const roleSel = document.getElementById('uRole');
+    roleSel.value = 'staff';
+    roleSel.disabled = false;
+    document.getElementById('uRoleHint').textContent = '';
+    new bootstrap.Modal(document.getElementById('userModal')).show();
+  }
+  document.querySelector('[data-bs-target="#userModal"]').addEventListener('click', openCreate);
+
+  document.getElementById('userForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      if (editingUserId) {
+        await postJSON('/api/users/' + editingUserId + '/update', {
+          display_name: document.getElementById('uName').value,
+          role: editingOrigRole === 'super_admin' ? 'super_admin' : document.getElementById('uRole').value,
+          active: (editingOrigRole === 'super_admin' && document.getElementById('uActive').disabled) ? (editingOrigActive ? '1' : '0') : (document.getElementById('uActive').checked ? '1' : '0'),
+        });
+        toast('已保存', 'success');
+      } else {
+        await postJSON('/api/users/create', {
+          username: document.getElementById('uUsername').value,
+          display_name: document.getElementById('uName').value,
+          password: document.getElementById('uPassword').value,
+          role: document.getElementById('uRole').value,
+          security_question: document.getElementById('uSecurityQuestion').value,
+          security_answer: document.getElementById('uSecurityAnswer').value,
+        });
+        toast('已创建', 'success');
+      }
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message || '操作失败', 'danger'); }
+  });
+
+  let resetTarget = null;
+  function resetUser(id, name) {
+    resetTarget = id;
+    document.getElementById('resetName').textContent = '为用户「' + name + '」设置新密码';
+    document.getElementById('resetPwd').value = '';
+    new bootstrap.Modal(document.getElementById('resetModal')).show();
+  }
+  document.getElementById('resetOk').addEventListener('click', async () => {
+    const pwd = document.getElementById('resetPwd').value;
+    if (pwd.length < 8) return toast('密码至少 8 位', 'danger');
+    try {
+      await postJSON('/api/users/' + resetTarget + '/reset', { password: pwd });
+      bootstrap.Modal.getInstance(document.getElementById('resetModal')).hide();
+      toast('密码已重置', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+
+  let sqTarget = null;
+  function editSecurityQuestion(id, name) {
+    sqTarget = id;
+    document.getElementById('sqName').textContent = '为用户「' + name + '」设置安全问题';
+    document.getElementById('sqQuestion').value = '';
+    document.getElementById('sqAnswer').value = '';
+    new bootstrap.Modal(document.getElementById('sqModal')).show();
+  }
+  document.getElementById('sqOk').addEventListener('click', async () => {
+    const q = document.getElementById('sqQuestion').value.trim();
+    const a = document.getElementById('sqAnswer').value.trim();
+    if (!q || !a) return toast('请填写安全问题和答案', 'danger');
+    try {
+      await postJSON('/api/users/' + sqTarget + '/security-question', { security_question: q, security_answer: a });
+      bootstrap.Modal.getInstance(document.getElementById('sqModal')).hide();
+      toast('安全问题已保存', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+
+  async function disableUser(id, name) {
+    if (!(await confirmBox('停用用户「' + name + '」？停用后该账号将无法登录，其名下案件不会被删除。', '停用账号'))) return;
+    try {
+      await postJSON('/api/users/' + id + '/delete', {});
+      toast('已停用', 'success');
+      setTimeout(() => location.reload(), 300);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  <% if (canManageRoles) { %>
+  document.getElementById('btnSaveRolePerms').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSaveRolePerms');
+    btn.disabled = true;
+    try {
+      const rolesToSave = ['admin', 'staff'];
+      for (const role of rolesToSave) {
+        const perms = Array.from(document.querySelectorAll('.perm-cb[data-role="' + role + '"]:checked')).map((cb) => cb.value);
+        await postJSON('/api/roles/permissions', { role, permissions: perms });
+      }
+      toast('权限已保存并立即生效', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message || '保存失败', 'danger'); }
+    finally { btn.disabled = false; }
+  });
+  <% } %>
+</script>

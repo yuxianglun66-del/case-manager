@@ -1,0 +1,330 @@
+<%
+  const _active = typeof active !== 'undefined' ? active : '';
+  const _can = typeof can === 'function' ? can : () => false;
+  const _roleLabel = typeof roleLabel !== 'undefined' ? roleLabel : (typeof user !== 'undefined' && user?.role === 'admin' ? '管理员' : '员工');
+  const _isAdmin = (typeof user !== 'undefined' && (user?.role === 'admin' || user?.role === 'super_admin')) || typeof admin !== 'undefined' && admin;
+%><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - <%= settings?.company_name || '案件管理系统' %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <style>
+    :root {
+      --bs-primary: <%= settings?.theme_primary || '#3b82f6' %>;
+      --sidebar-bg: <%= settings?.theme_sidebar || '#080c18' %>;
+      --body-bg-gradient: <%= settings?.bg_gradient || 'linear-gradient(180deg, #060a14, #0b1120 40%, #0f172a 100%)' %>;
+      --primary-contrast: #ffffff;
+      --primary-text: <%= settings?.theme_primary || '#3b82f6' %>;
+      --primary-edge: #234a8f;
+      --sidebar-fg: #e6edf7;
+      --sidebar-muted: rgba(226, 232, 240, .66);
+      --sidebar-faint: rgba(148, 163, 184, .92);
+      --sidebar-border: rgba(255, 255, 255, .08);
+      --sidebar-hover-fg: #e2e8f0;
+      --sidebar-active-fg: #ffffff;
+      --sidebar-foot-bg: rgba(0, 0, 0, .2);
+      --content-fg: #e2e8f0;
+      --content-muted: #94a3b8;
+      --content-faint: #64748b;
+      --content-border: rgba(255, 255, 255, .08);
+    }
+  </style>
+  <meta name="app-url" content="<%= settings?.app_url || '' %>">
+  <script>
+    (function () {
+      function hexToRgb(h) {
+        h = (h || '').trim().replace(/^#/, '');
+        if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(h)) return [59, 130, 246];
+        if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+        var n = parseInt(h, 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      }
+      function lum(rgb) {
+        var a = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+      }
+      function isLight(rgb) { return lum(rgb) >= 0.45; }
+      function mix(c1, c2, t) { return 'rgb(' + c1.map(function (v, i) { return Math.round(v + (c2[i] - v) * t); }).join(', ') + ')'; }
+      function rgba(rgb, a) { return 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')'; }
+      function applyStyle(css) {
+        var old = document.getElementById('theme-style');
+        if (old) old.remove();
+        var n = document.createElement('style');
+        n.id = 'theme-style';
+        n.textContent = css;
+        document.head.appendChild(n);
+      }
+      window.applyThemeContrast = function () {
+        var root = document.documentElement;
+        var cs = getComputedStyle(root);
+        var primary = (cs.getPropertyValue('--bs-primary') || '#3b82f6').trim();
+        var sidebar = (cs.getPropertyValue('--sidebar-bg') || '#080c18').trim();
+        var p = hexToRgb(primary), s = hexToRgb(sidebar);
+        // 同时写入自定义属性（兼容其它用 var 的地方）
+        root.style.setProperty('--primary', primary);
+        root.style.setProperty('--bs-primary-rgb', p.join(', '));
+        var primContrast = isLight(p) ? '#0b1120' : '#ffffff';
+        var primText = isLight(p) ? mix(p, [11, 17, 32], 0.6) : primary;
+        var primEdge = mix(p, [11, 17, 32], 0.38);
+        var primRGBA = rgba(p, 0.3);
+        root.style.setProperty('--primary-contrast', primContrast);
+        root.style.setProperty('--primary-text', primText);
+        root.style.setProperty('--primary-edge', primEdge);
+        var l = isLight(s);
+        var sFg = l ? '#0f172a' : '#f8fafc';
+        var sMuted = l ? '#334155' : '#a8b5cc';
+        var sFaint = l ? '#1e293b' : '#dbe4f0';
+        var sBorder = l ? 'rgba(15,23,42,.1)' : 'rgba(255,255,255,.08)';
+        var sHoverFg = l ? '#0f172a' : '#e2e8f0';
+        var sActiveFg = l ? '#0f172a' : '#ffffff';
+        var sFootBg = l ? 'rgba(15,23,42,.06)' : 'rgba(0,0,0,.2)';
+        root.style.setProperty('--sidebar-fg', sFg);
+        root.style.setProperty('--sidebar-muted', sMuted);
+        root.style.setProperty('--sidebar-faint', sFaint);
+        root.style.setProperty('--sidebar-border', sBorder);
+        root.style.setProperty('--sidebar-hover-fg', sHoverFg);
+        root.style.setProperty('--sidebar-active-fg', sActiveFg);
+        root.style.setProperty('--sidebar-foot-bg', sFootBg);
+        // 内容区文字对比度——基于页面实际背景（不是侧边栏）判断
+        // themes.js 会按主题 mode 给 body 加/不加 theme-dark；这里在 body 开头运行，body 一定存在
+        var bodyDark = document.body && document.body.classList && document.body.classList.contains('theme-dark');
+        var cFg = bodyDark ? '#e2e8f0' : '#0f172a';
+        var cMuted = bodyDark ? '#94a3b8' : '#475569';
+        var cFaint = bodyDark ? '#64748b' : '#64748b';
+        var cBorder = bodyDark ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.1)';
+        var cSurface = bodyDark ? 'rgba(15,23,42,.85)' : 'rgba(255,255,255,.92)';
+        var cSurfaceSolid = bodyDark ? '#0f172a' : '#ffffff';
+        var cSurfaceElevated = bodyDark ? 'rgba(20,30,55,.92)' : 'rgba(241,245,249,.95)';
+        root.style.setProperty('--surface', cSurface);
+        root.style.setProperty('--surface-solid', cSurfaceSolid);
+        root.style.setProperty('--surface-elevated', cSurfaceElevated);
+        root.style.setProperty('--content-fg', cFg);
+        root.style.setProperty('--content-muted', cMuted);
+        root.style.setProperty('--content-faint', cFaint);
+        root.style.setProperty('--content-border', cBorder);
+        // 直接写入解析后颜色，规避浏览器对 var 依赖的延迟重算，保证文字始终清晰
+        var css = '' +
+          '.sidebar{background:' + sidebar + '!important;color:' + sFaint + '!important;}' +
+          '.sidebar-nav a,.sidebar-nav a:link{color:' + sMuted + '!important;}' +
+          '.sidebar-nav a:hover{color:' + sHoverFg + '!important;}' +
+          '.sidebar-nav a.active{color:' + sActiveFg + '!important;}' +
+          '.sidebar-brand{color:' + sFg + '!important;}' +
+          '.sidebar-brand{border-bottom-color:' + sBorder + '!important;}' +
+          '.sidebar-footer{border-top-color:' + sBorder + '!important;background:' + sFootBg + '!important;}' +
+          '.user-meta strong{color:' + sFg + '!important;}' +
+          '.user-meta small{color:' + sMuted + '!important;}' +
+          '.btn-primary{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;}' +
+          '.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;}' +
+          '.pagination .page-link{color:' + primText + '!important;}' +
+          '.pagination .page-item.active .page-link{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;border-color:' + primary + '!important;}' +
+          '.text-primary{color:' + primText + '!important;}' +
+          '.text-muted{color:' + cMuted + '!important;}' +
+          '.small,.text-sm{color:' + cMuted + '!important;}' +
+          '.text-muted.small,.small.text-muted{color:' + cFaint + '!important;}' +
+          '.card{background:var(--surface)!important;border-color:' + cBorder + '!important;}' +
+          '.card-header{color:' + cFg + '!important;border-bottom-color:' + cBorder + '!important;}' +
+          '.card-body{color:' + cFg + '!important;}' +
+          '.fw-semibold,.fw-bold,.fw-medium{color:' + cFg + '!important;}' +
+          '.lead{color:' + cMuted + '!important;}' +
+          '.page-head h1{color:' + cFg + '!important;}' +
+          '.btn-light{color:' + cFg + '!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
+          '.btn-outline-secondary{color:' + cMuted + '!important;border-color:' + cBorder + '!important;}' +
+          '.btn-ico.btn-light{color:' + cFg + '!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
+          '.info-label{color:' + cMuted + '!important;}' +
+          '.info-value{color:' + cFg + '!important;}' +
+          '.file-item{background:var(--surface)!important;border-color:' + cBorder + '!important;color:' + cFg + '!important;}' +
+          '.file-item:hover{background:rgba(59,130,246,.05)!important;}' +
+          '.tl-time{color:' + cMuted + '!important;}' +
+          '.tl-title{color:' + cFg + '!important;}' +
+          '.tl-note{color:' + cMuted + '!important;background:rgba(59,130,246,.05)!important;border-left-color:var(--accent)!important;}' +
+          '.party-item{background:var(--surface)!important;border-color:' + cBorder + '!important;}' +
+          '.empty-tip{color:' + cMuted + '!important;}' +
+          '.stat-label{color:' + cMuted + '!important;}' +
+          '.form-label{color:' + cMuted + '!important;}' +
+          '.form-text{color:' + cFaint + '!important;}' +
+          '.form-control::placeholder{color:' + cFaint + '!important;}' +
+          '.modal-content{background:var(--surface-elevated)!important;border-color:' + cBorder + '!important;}' +
+          '.modal-title{color:' + cFg + '!important;}' +
+          '.modal-header{border-bottom-color:' + cBorder + '!important;}' +
+          '.modal-footer{border-top-color:' + cBorder + '!important;}';
+        applyStyle(css);
+      };
+      // 注：window.applyThemeContrast() 由 body 开头的脚本调用，
+      // 以便基于 document.body 的 theme-dark 类正确判断页面明暗。
+    })();
+  </script>
+</head>
+<body style="background: var(--body-bg-gradient);">
+  <script>if (window.applyThemeContrast) window.applyThemeContrast();</script>
+  <div class="app-shell">
+    <aside class="sidebar d-print-none">
+      <div class="sidebar-brand">
+        <% if (settings?.company_logo) { %>
+          <img src="/uploads/logo/<%= settings.company_logo %>" alt="Logo" style="height:32px;width:auto">
+        <% } else { %>
+          <i class="bi bi-shield-lock-fill"></i>
+        <% } %>
+        <span><%= settings?.company_name || '案件管理系统' %></span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="<%= _active === 'dashboard' ? 'active' : '' %>"><i class="bi bi-grid-1x2-fill"></i><span>工作看板</span></a>
+        <a href="/cases" class="<%= _active === 'cases' ? 'active' : '' %>"><i class="bi bi-folder2-open"></i><span>案件管理</span></a>
+        <% if (_can('system.users')) { %>
+          <a href="/users" class="<%= _active === 'users' ? 'active' : '' %>"><i class="bi bi-people-fill"></i><span>用户管理</span></a>
+        <% } %>
+        <% if (_can('system.settings')) { %>
+          <a href="/settings" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-sliders"></i><span>系统设置</span></a>
+        <% } %>
+        <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
+          <a href="/settings/backup" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-database-fill-down"></i><span>备份与恢复</span></a>
+        <% } %>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-chip">
+          <div class="user-avatar"><%= (user?.display_name || '?').charAt(0) %></div>
+          <div class="user-meta">
+            <strong><%= user?.display_name %></strong>
+            <small><i class="bi bi-shield-lock"></i> <%= _roleLabel %></small>
+          </div>
+        </div>
+        <a href="/logout" class="btn btn-sm w-100 mt-2 btn-logout"><i class="bi bi-box-arrow-right"></i> 退出登录</a>
+        <button class="btn btn-sm btn-theme-switch w-100 mt-1" id="themeSwitchBtnSide" type="button"><i class="bi bi-palette-fill"></i> 切换主题</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="mobile-topbar">
+        <button class="btn btn-sm" id="menuToggle"><i class="bi bi-list fs-5"></i></button>
+        <span class="fw-bold text-truncate brand-text"><i class="bi bi-shield-lock-fill me-1"></i><%= settings?.company_name || '案件管理系统' %></span>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button class="btn btn-sm btn-grid" id="themeSwitchBtnMobile" title="主题" type="button"><i class="bi bi-palette-fill"></i></button>
+          <div class="user-chip-mobile">
+            <span class="d-none d-sm-inline"><%= user?.display_name %></span>
+            <span class="d-sm-none"><i class="bi bi-person-circle"></i></span>
+          </div>
+        </div>
+      </div>
+      <div class="page-content">
+        <%- body %>
+      </div>
+    </main>
+  </div>
+
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/themes.js"></script>
+  <%- include('partials/toast') %>
+  <!-- ============ 快速主题切换面板 ============ -->
+  <div class="theme-switch-popover" id="themeSwitchPanel" hidden>
+    <div class="ts-head">
+      <span><i class="bi bi-palette-fill me-1"></i> 切换主题</span>
+      <button type="button" class="btn-close btn-close-white" id="themeSwitchClose" aria-label="关闭"></button>
+    </div>
+    <div class="ts-themes" id="themeSwitchList"></div>
+    <div class="ts-foot">
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" id="themeSwitchGlobal" <% if (_isAdmin) { %>checked<% } %> <% if (!_isAdmin) { %>disabled<% } %>>
+        <label class="form-check-label small" for="themeSwitchGlobal">设为全局默认<% if (!_isAdmin) { %>（仅管理员）<% } %></label>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const saved = localStorage.getItem('themeMode');
+      const mode = saved || '<%= settings?.theme_mode || "light" %>';
+      if (mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.body.classList.add('theme-dark');
+      }
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (localStorage.getItem('themeMode') === 'auto' || !localStorage.getItem('themeMode')) {
+          document.body.classList.toggle('theme-dark', e.matches);
+        }
+      });
+    })();
+    /* ===== 快速主题切换面板 ===== */
+    (function () {
+      const isAdmin = <%= _isAdmin ? 'true' : 'false' %>;
+      function renderList() {
+        const list = document.getElementById('themeSwitchList');
+        if (!list || !window.uiTheme) return;
+        const cur = window.uiTheme.currentKey();
+        list.innerHTML = window.uiTheme.list.map(t => `
+          <button type="button" class="ts-item ${t.key === cur ? 'active' : ''}" data-ui-theme="${t.key}">
+            <span class="ts-swatch" style="background:${t.sidebar};border-color:${t.primary}"></span>
+            <span class="ts-meta">
+              <span class="ts-name">${t.name}</span>
+              <span class="ts-desc">${t.desc}</span>
+            </span>
+            <i class="bi ts-check ${t.key === cur ? 'bi-check2-circle' : 'bi-circle'}"></i>
+          </button>
+        `).join('');
+      }
+      function openPanel(originBtn) {
+        renderList();
+        const panel = document.getElementById('themeSwitchPanel');
+        panel.hidden = false;
+        panel.classList.add('show');
+        if (originBtn) {
+          const r = originBtn.getBoundingClientRect();
+          const pr = panel.getBoundingClientRect();
+          let left = r.left - 260 + r.width;
+          if (left < 8) left = 8;
+          if (left + 260 > window.innerWidth - 8) left = window.innerWidth - 268;
+          panel.style.left = left + 'px';
+          let top = r.bottom + 8;
+          if (top + 320 > window.innerHeight) top = Math.max(8, r.top - 320);
+          panel.style.top = top + 'px';
+        }
+      }
+      function closePanel() {
+        const panel = document.getElementById('themeSwitchPanel');
+        panel.classList.remove('show');
+        panel.hidden = true;
+      }
+      function togglePanel(btn) {
+        const panel = document.getElementById('themeSwitchPanel');
+        if (panel.hidden) openPanel(btn);
+        else closePanel();
+      }
+      document.addEventListener('click', (e) => {
+        if (e.target.id === 'themeSwitchBtnMobile' || e.target.closest('#themeSwitchBtnMobile')) {
+          e.preventDefault();
+          togglePanel(document.getElementById('themeSwitchBtnMobile'));
+          return;
+        }
+        if (e.target.id === 'themeSwitchBtnSide' || e.target.closest('#themeSwitchBtnSide')) {
+          e.preventDefault();
+          togglePanel(document.getElementById('themeSwitchBtnSide'));
+          return;
+        }
+        const panel = document.getElementById('themeSwitchPanel');
+        if (!panel.hidden && !e.target.closest('#themeSwitchPanel')) {
+          closePanel();
+        }
+      });
+      document.getElementById('themeSwitchClose').addEventListener('click', closePanel);
+      document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-ui-theme]');
+        if (!btn) return;
+        e.preventDefault();
+        const key = btn.dataset.uiTheme;
+        const saveGlobal = isAdmin && document.getElementById('themeSwitchGlobal').checked;
+        try {
+          await window.uiTheme.quickApply(key, { save: saveGlobal });
+          renderList();
+        } catch (err) { /* toast handled inside */ }
+      });
+      /* 启动时：如果本地保存了主题，则立刻覆盖页面主题 */
+      const savedTheme = localStorage.getItem('uiTheme');
+      if (savedTheme && window.uiTheme && window.uiTheme.find(savedTheme)) {
+        window.uiTheme.applyNow(window.uiTheme.find(savedTheme));
+      }
+    })();
+  </script>
+</body>
+</html>

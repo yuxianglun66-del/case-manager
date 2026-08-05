@@ -1,0 +1,694 @@
+<div class="page-head">
+  <div>
+    <h1>系统设置</h1>
+    <div class="lead">自定义案件类型、字段、状态、品牌与主题</div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabTypes" type="button">案件类型与字段</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStatuses" type="button">案件状态</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabBrand" type="button">品牌与主题</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabContracts" type="button">合同模板</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- ============ 案件类型 ============ -->
+  <div class="tab-pane fade show active" id="tabTypes">
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" onclick="openTypeCreate()"><i class="bi bi-plus-lg"></i> 新增案件类型</button>
+    </div>
+
+    <% Object.values(types).forEach(t => { %>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span style="width:16px;height:16px;border-radius:5px;background:<%= t.color %>;display:inline-block;box-shadow:0 0 8px <%= t.color %>40"></span>
+            <strong><%= t.name %></strong>
+            <span class="text-muted small"><code><%= t.code %></code></span>
+            <% if (!t.active) { %><span class="status-badge" style="background:#dc3545">已停用</span><% } %>
+          </div>
+          <div class="d-flex gap-1">
+            <button class="btn btn-ico btn-light" title="编辑类型" onclick="openTypeEdit(<%= t.id %>)"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-ico btn-light" title="新增字段" onclick="openFieldCreate(<%= t.id %>)"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-ico btn-outline-danger" title="删除类型" onclick="delType(<%= t.id %>)"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead>
+                <tr><th>字段名称</th><th>类型</th><th>必填</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr>
+              </thead>
+              <tbody>
+                <% const fs = fieldsByType[t.id] || []; %>
+                <% if (fs.length === 0) { %>
+                  <tr><td colspan="6" class="empty-tip"><i class="bi bi-journal-text"></i>暂无字段，点击右上角「+」新增</td></tr>
+                <% } %>
+                <% fs.forEach(f => { %>
+                  <tr>
+                    <td><%= f.label %></td>
+                    <td>
+                      <%= {text:'单行文本', textarea:'多行文本', number:'数字', date:'日期', select:'下拉选择', phone:'手机号'}[f.field_type] || f.field_type %>
+                    </td>
+                    <td><%= f.required ? '是' : '否' %></td>
+                    <td><%= f.sort %></td>
+                    <td>
+                      <% if (f.active) { %>
+                        <span class="status-badge" style="background:#198754">启用</span>
+                      <% } else { %>
+                        <span class="status-badge" style="background:#dc3545">停用</span>
+                      <% } %>
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-ico btn-light" title="编辑字段" onclick="openFieldEdit(<%= f.id %>)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-ico btn-light" title="<%= f.active ? '停用' : '启用' %>" onclick="toggleField(<%= f.id %>, <%= f.active ? 'false' : 'true' %>)"><i class="bi bi-eye<%= f.active ? '-slash' : '' %>"></i></button>
+                      <button class="btn btn-ico btn-outline-danger" title="删除字段" onclick="delField(<%= f.id %>)"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+    <% if (types.length === 0) { %>
+      <div class="text-center text-muted py-5">暂无案件类型</div>
+    <% } %>
+  </div>
+
+  <!-- ============ 状态管理 ============ -->
+  <div class="tab-pane fade" id="tabStatuses">
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" onclick="openStatusCreate()"><i class="bi bi-plus-lg"></i> 新增状态</button>
+    </div>
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th>状态名称</th><th>分类</th><th>颜色</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr></thead>
+            <tbody>
+              <% statuses.forEach(s => { %>
+                <tr>
+                  <td><span class="status-badge" style="background:<%= s.color %>"><%= s.name %></span></td>
+                  <td><%= {pending:'待处理', processing:'处理中', litigation:'诉讼中', closed:'已结案', archived:'已归档'}[s.category] || s.category %></td>
+                  <td><code><%= s.color %></code></td>
+                  <td><%= s.sort %></td>
+                  <td>
+                    <% if (s.active) { %>
+                      <span class="status-badge" style="background:#198754">启用</span>
+                    <% } else { %>
+                      <span class="status-badge" style="background:#dc3545">停用</span>
+                    <% } %>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-ico btn-light" title="编辑" onclick="openStatusEdit(<%= s.id %>)"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delStatus(<%= s.id %>)"><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 品牌与主题 ============ -->
+  <div class="tab-pane fade" id="tabBrand">
+    <div class="row g-4">
+      <!-- 公司品牌 -->
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-building"></i> 公司品牌</div>
+          <div class="card-body">
+            <form id="brandForm" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label class="form-label">公司/系统名称 <span class="text-danger">*</span></label>
+                <input type="text" name="company_name" id="inpCompanyName" class="form-control" placeholder="如：某某法律服务有限公司" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Logo</label>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                  <div id="logoPreview" class="border rounded p-2 d-flex align-items-center justify-content-center" style="width:80px;height:80px;background:rgba(15,23,42,.5);border-color:rgba(59,130,246,.15)!important">
+                    <% if (settings.company_logo) { %>
+                      <img src="/uploads/logo/<%= settings.company_logo %>" alt="Logo" style="max-width:100%;max-height:100%">
+                    <% } else { %>
+                      <i class="bi bi-image text-muted" style="font-size:2rem"></i>
+                    <% } %>
+                  </div>
+                  <div>
+                    <input type="file" name="file" id="inpLogo" class="form-control" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                    <div class="form-text">建议正方形，PNG/JPG/SVG/WebP，不超过 500KB</div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="uploadLogo()"><i class="bi bi-upload"></i> 上传 Logo</button>
+                  </div>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> 保存品牌设置</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主题设置 -->
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-palette"></i> 主题设置</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">部署域名 <span class="text-danger">*</span></label>
+              <input type="url" name="app_url" id="inpAppUrl" class="form-control" placeholder="如：https://case.example.com">
+              <div class="form-text">用于生成签署链接、下载链接等绝对 URL。部署到服务器后必须填写（不含末尾斜杠）。</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">提醒提前天数</label>
+              <input type="number" name="reminder_advance_days" id="inpReminderAdvance" class="form-control" min="0" max="30" value="3">
+              <div class="form-text">工作台「待办提醒」展示今天到期、已逾期以及未来该天数内到期的流程提醒。</div>
+            </div>
+            <div class="form-text small mb-3"><i class="bi bi-info-circle"></i> 主题切换请使用页面右下角预设配色方案，或在侧边栏底部点击「切换主题」按钮。</div>
+            <button type="button" class="btn btn-primary" id="btnSaveBrandUrl"><i class="bi bi-save"></i> 保存设置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 预设配色方案 -->
+    <div class="card mt-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-palette2"></i> 预设主题方案</span>
+        <small class="text-muted">点击卡片即可应用为全局默认主题</small>
+      </div>
+      <div class="card-body">
+        <div class="row g-3" id="presetColors">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 合同模板 ============ -->
+  <div class="tab-pane fade" id="tabContracts">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> 合同模板</h5>
+      <button class="btn btn-primary" onclick="openContractTemplateCreate()"><i class="bi bi-plus-lg"></i> 上传模板</button>
+    </div>
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th>模板名称</th><th>适用类型</th><th>PDF文件</th><th>签名位置数</th><th>状态</th><th class="text-end">操作</th></tr></thead>
+            <tbody id="templateList">
+              <% if (templates && templates.length) { %>
+                <% templates.forEach(t => { %>
+                  <tr>
+                    <td><%= t.name %></td>
+                    <td><%= t.type_name || '通用' %></td>
+                    <td><%- t.pdf_path ? '<span class="badge bg-success">已上传</span>' : '<span class="badge bg-warning">缺失</span>' %></td>
+                    <td><% const sp = typeof t.sign_positions === 'string' ? (() => { try { return JSON.parse(t.sign_positions); } catch (e) { return []; } })() : (Array.isArray(t.sign_positions) ? t.sign_positions : []); %><%= sp.length %></td>
+                    <td><%- t.active ? '<span class="badge bg-success">启用</span>' : '<span class="badge bg-danger">停用</span>' %></td>
+                    <td class="text-end">
+                      <button class="btn btn-ico btn-outline-primary" title="可视化编辑位置/文本" onclick="location.href='/settings/templates/<%= t.id %>/edit'"><i class="bi bi-pencil-square"></i></button>
+                      <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delContractTemplate(<%= t.id %>, '<%= t.name.replace(/[\\'"<>]/g, '') %>')"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="6" class="text-center text-muted py-4">暂无模板，点击「上传模板」添加</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 案件类型弹窗 ============ -->
+<div class="modal fade" id="typeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="typeForm">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="typeModalTitle">新增案件类型</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="type_id" id="tId">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">编码（大写字母）</label>
+              <input type="text" name="code" id="tCode" class="form-control text-uppercase" maxlength="6" placeholder="如 JT">
+            </div>
+            <div class="col-6">
+              <label class="form-label">类型名称</label>
+              <input type="text" name="name" id="tName" class="form-control" placeholder="如 交通事故">
+            </div>
+            <div class="col-6">
+              <label class="form-label">颜色</label>
+              <input type="color" name="color" id="tColor" class="form-control form-control-color" value="#0d6efd">
+            </div>
+            <div class="col-6">
+              <label class="form-label">排序</label>
+              <input type="number" name="sort" id="tSort" class="form-control" value="0">
+            </div>
+            <div class="col-12" id="tActiveWrap" style="display:none">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="tActive" name="active" value="1" checked>
+                <label class="form-check-label" for="tActive">启用该类型</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 字段弹窗 ============ -->
+<div class="modal fade" id="fieldModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="fieldForm">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="fieldModalTitle">新增字段</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="field_id" id="fId">
+          <input type="hidden" name="case_type_id" id="fTypeId">
+          <div class="mb-3">
+            <label class="form-label">字段名称 <span class="text-danger">*</span></label>
+            <input type="text" name="label" id="fLabel" class="form-control" placeholder="如：事故时间">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">字段类型</label>
+            <select name="field_type" id="fFieldType" class="form-select">
+              <option value="text">单行文本</option>
+              <option value="textarea">多行文本</option>
+              <option value="number">数字</option>
+              <option value="date">日期</option>
+              <option value="select">下拉选择</option>
+              <option value="phone">手机号</option>
+            </select>
+          </div>
+          <div class="mb-3" id="fOptionsWrap">
+            <label class="form-label">下拉选项（用逗号分隔）</label>
+            <input type="text" name="options" id="fOptions" class="form-control" placeholder="如：住院,门诊,未就医">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">占位提示</label>
+            <input type="text" name="placeholder" id="fPlaceholder" class="form-control">
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">排序（小的在前）</label>
+              <input type="number" name="sort" id="fSort" class="form-control" value="0">
+            </div>
+            <div class="col-6 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="fRequired" name="required" value="1">
+                <label class="form-check-label" for="fRequired">必填</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 状态弹窗 ============ -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="statusFormModal">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="statusModalTitle">新增状态</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="status_id" id="stId">
+          <div class="mb-3">
+            <label class="form-label">状态名称 <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="stName" class="form-control" placeholder="如：理赔中">
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">分类（用于看板统计）</label>
+              <select name="category" id="stCategory" class="form-select">
+                <option value="pending">待处理</option>
+                <option value="processing">处理中</option>
+                <option value="litigation">诉讼中</option>
+                <option value="closed">已结案</option>
+                <option value="archived">已归档</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">颜色</label>
+              <input type="color" name="color" id="stColor" class="form-control form-control-color" value="#0d6efd">
+            </div>
+            <div class="col-6">
+              <label class="form-label">排序</label>
+              <input type="number" name="sort" id="stSort" class="form-control" value="0">
+            </div>
+            <div class="col-6 d-flex align-items-end pb-1" id="stActiveWrap">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="stActive" name="active" value="1" checked>
+                <label class="form-check-label" for="stActive">启用</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 合同模板弹窗 ============ -->
+<div class="modal fade" id="contractTemplateModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="contractTemplateForm" enctype="multipart/form-data">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="ctTitle">上传合同模板</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="template_id" id="ctId">
+          <div class="mb-3">
+            <label class="form-label">模板名称 <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" placeholder="如：交通事故调解协议书" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">适用案件类型</label>
+            <select name="case_type_id" class="form-select">
+              <option value="">通用（不限类型）</option>
+              <% types.forEach(t => { %>
+                <option value="<%= t.id %>"><%= t.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">合同文件 <span class="text-danger">*</span></label>
+            <input type="file" name="file" class="form-control" accept=".pdf,.doc,.docx" required>
+            <div class="form-text">支持 PDF 或 Word（.doc/.docx）。上传后可点击模板行的「铅笔」按钮，用可视化编辑器拖拽设置签名位置与文本。</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">签名位置配置（JSON，可选）</label>
+            <textarea name="sign_positions" class="form-control" rows="4" placeholder='[{"page":1,"x":100,"y":600,"width":180,"height":60,"party_role":"原告","label":"受害人签名"}]'></textarea>
+            <div class="form-text">page: 页码(从1开始), x/y: 左下角坐标(点), width/height: 签名框尺寸, party_role: 对应当事人角色, label: 显示标签</div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-upload"></i> 上传</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  const TYPES = <%- safeJson(types) %>;
+  const FIELDS = <%- safeJson(Object.values(fieldsByType).flat()) %>;
+  const STATUSES = <%- safeJson(statuses) %>;
+  const SETTINGS = <%- safeJson(settings) %>;
+
+  /* ---- 预设配色（来自 themes.js 的 window.UI_THEMES，统一成套高对比主题） ---- */
+  const PRESETS = window.UI_THEMES || [];
+  function renderPresets() {
+    const box = document.getElementById('presetColors');
+    if (!box) return;
+    const cur = window.uiTheme ? window.uiTheme.currentKey() : '';
+    box.innerHTML = PRESETS.map(p => `
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <button type="button" class="btn w-100 p-3 text-start preset-card ${p.key === cur ? 'active' : ''} ${p.mode === 'dark' ? 'is-dark' : 'is-light'}"
+                data-ui-theme="${p.key}" style="--p:${p.primary};--s:${p.sidebar};--bg:${p.bg}">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="preset-swatch" style="background:${p.primary};box-shadow:0 0 0 3px ${p.sidebar}"></span>
+            <span class="fw-semibold">${p.name}</span>
+            ${p.key === cur ? '<i class="bi bi-check2-circle ms-auto text-success"></i>' : ''}
+          </div>
+          <div class="small opacity-80">${p.desc}</div>
+          <div class="preset-strip" style="background:${p.bg}"></div>
+        </button>
+      </div>
+    `).join('');
+  }
+  async function applyPreset(key) {
+    if (!window.uiTheme) return;
+    const saveGlobal = true; /* 设置页里的预设按钮一直是管理员上下文 → 落库为全局 */
+    try {
+      await window.uiTheme.quickApply(key, { save: saveGlobal });
+      applyThemeVars();
+      renderPresets();
+    } catch (err) { /* toast 已处理 */ }
+  }
+  renderPresets();
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('#presetColors [data-ui-theme]');
+    if (!b) return;
+    e.preventDefault();
+    await applyPreset(b.dataset.uiTheme);
+  });
+
+  /* ---- 品牌设置 ---- */
+  /* ---- 主题设置：仅保存部署域名 ---- */
+  document.getElementById('btnSaveBrandUrl').addEventListener('click', async () => {
+    try {
+      await postJSON('/api/settings', {
+        app_url: document.getElementById('inpAppUrl').value.trim(),
+        reminder_advance_days: document.getElementById('inpReminderAdvance').value.trim() || '3',
+      });
+      toast('设置已保存', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+  document.getElementById('brandForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await postJSON('/api/settings', { company_name: document.getElementById('inpCompanyName').value });
+      toast('品牌名称已保存', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+
+  async function uploadLogo() {
+    const f = document.getElementById('inpLogo').files[0];
+    if (!f) return toast('请先选择文件', 'warning');
+    const fd = new FormData();
+    fd.append('file', f);
+    try {
+      const data = await postForm('/api/settings/logo', fd);
+      if (data.ok) {
+        document.getElementById('logoPreview').innerHTML = `<img src="/uploads/logo/${data.logo}?t=${Date.now()}" style="max-width:100%;max-height:100%">`;
+        toast('Logo 已上传', 'success');
+      } else toast(data.error, 'danger');
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 应用 CSS 变量到页面（预设点击后由 themes.js 接管，这里仅回填存储当前预设 key） ---- */
+  function applyThemeVars() {
+    if (window.applyThemeContrast) window.applyThemeContrast();
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('inpCompanyName').value = SETTINGS.company_name || '';
+    document.getElementById('inpAppUrl').value = SETTINGS.app_url || '';
+    document.getElementById('inpReminderAdvance').value = SETTINGS.reminder_advance_days || '3';
+  });
+
+  /* ---- 案件类型 ---- */
+  function openTypeCreate() {
+    document.getElementById('typeForm').reset();
+    document.getElementById('tId').value = '';
+    document.getElementById('typeModalTitle').textContent = '新增案件类型';
+    document.getElementById('tCode').disabled = false;
+    document.getElementById('tColor').value = '#0d6efd';
+    document.getElementById('tActiveWrap').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('typeModal')).show();
+  }
+  function openTypeEdit(id) {
+    const t = TYPES.find(x => x.id === id);
+    document.getElementById('typeForm').reset();
+    document.getElementById('tId').value = id;
+    document.getElementById('typeModalTitle').textContent = '编辑案件类型';
+    document.getElementById('tCode').value = t.code;
+    document.getElementById('tCode').disabled = true;
+    document.getElementById('tName').value = t.name;
+    document.getElementById('tColor').value = t.color;
+    document.getElementById('tSort').value = t.sort;
+    document.getElementById('tActive').checked = t.active;
+    document.getElementById('tActiveWrap').style.display = '';
+    new bootstrap.Modal(document.getElementById('typeModal')).show();
+  }
+  document.getElementById('typeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('tId').value;
+    const body = { name: document.getElementById('tName').value, color: document.getElementById('tColor').value, sort: document.getElementById('tSort').value };
+    try {
+      if (id) {
+        body.active = document.getElementById('tActive').checked ? '1' : '0';
+        await postJSON('/api/types/' + id + '/update', body);
+      } else {
+        body.code = document.getElementById('tCode').value;
+        await postJSON('/api/types/create', body);
+      }
+      toast('已保存', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message || '操作失败', 'danger'); }
+  });
+  async function delType(id) {
+    const t = TYPES.find(x => x.id === id);
+    if (!(await confirmBox('删除案件类型「' + t.name + '」？<br>注意：该类型下还有案件时无法删除。', '删除类型'))) return;
+    try { await postJSON('/api/types/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 字段 ---- */
+  function openFieldCreate(typeId) {
+    document.getElementById('fieldForm').reset();
+    document.getElementById('fId').value = '';
+    document.getElementById('fTypeId').value = typeId;
+    document.getElementById('fFieldType').value = 'text';
+    document.getElementById('fOptionsWrap').style.display = 'none';
+    document.getElementById('fieldModalTitle').textContent = '新增字段';
+    new bootstrap.Modal(document.getElementById('fieldModal')).show();
+  }
+  function openFieldEdit(id) {
+    const f = FIELDS.find(x => x.id === id);
+    document.getElementById('fieldForm').reset();
+    document.getElementById('fId').value = id;
+    document.getElementById('fTypeId').value = f.case_type_id;
+    document.getElementById('fLabel').value = f.label;
+    document.getElementById('fFieldType').value = f.field_type;
+    let opts = '';
+    try { opts = (JSON.parse(f.options || '[]') || []).map(o => o.label).join(','); } catch (e) {}
+    document.getElementById('fOptions').value = opts;
+    document.getElementById('fPlaceholder').value = f.placeholder || '';
+    document.getElementById('fSort').value = f.sort;
+    document.getElementById('fRequired').checked = f.required;
+    document.getElementById('fOptionsWrap').style.display = f.field_type === 'select' ? '' : 'none';
+    document.getElementById('fieldModalTitle').textContent = '编辑字段';
+    new bootstrap.Modal(document.getElementById('fieldModal')).show();
+  }
+  document.getElementById('fFieldType').addEventListener('change', () => {
+    document.getElementById('fOptionsWrap').style.display = document.getElementById('fFieldType').value === 'select' ? '' : 'none';
+  });
+  document.getElementById('fieldForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('fId').value;
+    const ftype = document.getElementById('fFieldType').value;
+    const body = {
+      label: document.getElementById('fLabel').value,
+      field_type: ftype,
+      options: document.getElementById('fOptions').value,
+      placeholder: document.getElementById('fPlaceholder').value,
+      sort: document.getElementById('fSort').value,
+      required: document.getElementById('fRequired').checked ? '1' : '0',
+    };
+    try {
+      if (id) await postJSON('/api/fields/' + id + '/update', body);
+      else {
+        body.case_type_id = document.getElementById('fTypeId').value;
+        await postJSON('/api/fields/create', body);
+      }
+      toast('已保存', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+  async function toggleField(id, active) {
+    try { await postJSON('/api/fields/' + id + '/toggle', { active: active ? '1' : '0' }); location.reload(); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+  async function delField(id) {
+    const f = FIELDS.find(x => x.id === id);
+    if (!(await confirmBox('删除字段「' + f.label + '」？<br>该字段在案件里已填写的数据也会一并删除。', '删除字段'))) return;
+    try { await postJSON('/api/fields/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 状态 ---- */
+  function openStatusCreate() {
+    document.getElementById('statusFormModal').reset();
+    document.getElementById('stId').value = '';
+    document.getElementById('statusModalTitle').textContent = '新增状态';
+    document.getElementById('stColor').value = '#0d6efd';
+    document.getElementById('stActiveWrap').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('statusModal')).show();
+  }
+  function openStatusEdit(id) {
+    const s = STATUSES.find(x => x.id === id);
+    document.getElementById('statusFormModal').reset();
+    document.getElementById('stId').value = id;
+    document.getElementById('stName').value = s.name;
+    document.getElementById('stCategory').value = s.category;
+    document.getElementById('stColor').value = s.color;
+    document.getElementById('stSort').value = s.sort;
+    document.getElementById('stActive').checked = s.active;
+    document.getElementById('stActiveWrap').style.display = '';
+    document.getElementById('statusModalTitle').textContent = '编辑状态';
+    new bootstrap.Modal(document.getElementById('statusModal')).show();
+  }
+  document.getElementById('statusFormModal').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('stId').value;
+    const body = { name: document.getElementById('stName').value, category: document.getElementById('stCategory').value, color: document.getElementById('stColor').value, sort: document.getElementById('stSort').value };
+    try {
+      if (id) { body.active = document.getElementById('stActive').checked ? '1' : '0'; await postJSON('/api/statuses/' + id + '/update', body); }
+      else await postJSON('/api/statuses/create', body);
+      toast('已保存', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+  async function delStatus(id) {
+    const s = STATUSES.find(x => x.id === id);
+    if (!(await confirmBox('删除状态「' + s.name + '」？<br>注意：还有案件处于该状态时无法删除。', '删除状态'))) return;
+    try { await postJSON('/api/statuses/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 合同模板 ---- */
+  const TEMPLATES = <%- safeJson(templates || []) %>;
+  function openContractTemplateCreate() {
+    document.getElementById('contractTemplateForm').reset();
+    document.getElementById('ctId').value = '';
+    document.getElementById('ctTitle').textContent = '上传合同模板';
+    new bootstrap.Modal(document.getElementById('contractTemplateModal')).show();
+  }
+  async function delContractTemplate(id, name) {
+    if (!(await confirmBox('删除合同模板「' + name + '」？<br>已关联的合同将保留但无法再使用此模板。', '删除模板'))) return;
+    try { await postJSON('/api/contract-templates/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+  document.getElementById('contractTemplateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await postForm('/api/contract-templates', fd);
+      toast('模板已上传', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('contractTemplateModal')).hide();
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { btn.disabled = false; toast(err.message, 'danger'); }
+  });
+</script>
