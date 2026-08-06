@@ -310,14 +310,24 @@ async function ensureTemplatePdfs() {
       fontkit = require('@pdf-lib/fontkit');
       const fontCandidates = [
         'C:/Windows/Fonts/simhei.ttf',
+        'C:/Windows/Fonts/simsun.ttc',
         'C:/Windows/Fonts/msyh.ttc',
+        '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
         '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
       ];
-      const found = fontCandidates.find(f => fs.existsSync(f));
-      if (found) {
-        const doc = await PDFDocument.create();
-        doc.registerFontkit(fontkit);
-        cjkFont = await doc.embedFont(fs.readFileSync(found));
+      for (const found of fontCandidates) {
+        if (!fs.existsSync(found)) continue;
+        try {
+          const buf = fs.readFileSync(found);
+          const probe = fontkit.create(buf);
+          // .ttc 集合字体没有 layout 方法，embed 后在 drawText/save 时抛
+          // "this.font.layout is not a function"，必须跳过，只用单字体 .ttf/.otf
+          if (typeof probe.layout !== 'function') continue;
+          const doc = await PDFDocument.create();
+          doc.registerFontkit(fontkit);
+          cjkFont = await doc.embedFont(buf);
+          break;
+        } catch (e) { cjkFont = null; }
       }
     } catch (e) { cjkFont = null; }
 

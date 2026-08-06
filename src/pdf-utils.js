@@ -1,21 +1,31 @@
 const fs = require('fs');
 const { rgb } = require('pdf-lib');
 
-// 在 pdfDoc 中加载中文字体（找不到字体时返回 null，调用方跳过中文绘制）
+// 在 pdfDoc 中加载中文字体（找不到可用字体时返回 null，调用方跳过中文绘制）
 async function embedCjkFont(pdfDoc) {
   try {
     const fontkit = require('@pdf-lib/fontkit');
     const candidates = [
       'C:/Windows/Fonts/simhei.ttf',
-      'C:/Windows/Fonts/msyh.ttc',
       'C:/Windows/Fonts/simsun.ttc',
+      'C:/Windows/Fonts/msyh.ttc',
+      '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
       '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
       '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
     ];
-    const found = candidates.find((f) => fs.existsSync(f));
-    if (!found) return null;
-    pdfDoc.registerFontkit(fontkit);
-    return await pdfDoc.embedFont(fs.readFileSync(found));
+    for (const f of candidates) {
+      if (!fs.existsSync(f)) continue;
+      try {
+        const buf = fs.readFileSync(f);
+        const probe = fontkit.create(buf);
+        // .ttc 集合字体（TrueTypeCollection）没有 layout 方法，pdf-lib 在 drawText/save 时会抛
+        // "this.font.layout is not a function"，必须跳过，只用单字体 .ttf/.otf
+        if (typeof probe.layout !== 'function') continue;
+        pdfDoc.registerFontkit(fontkit);
+        return await pdfDoc.embedFont(buf);
+      } catch (e) { /* 尝试下一个候选字体 */ }
+    }
+    return null;
   } catch (e) {
     return null;
   }
