@@ -6,7 +6,7 @@ const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
 const { hasPermission } = require('../src/permissions');
 const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo } = require('../src/util');
-const { convertWordToPdf } = require('../src/convert');
+const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 
 const router = express.Router();
@@ -435,9 +435,10 @@ router.get('/attachments/:id/preview', async (req, res, next) => {
     const isImage = mime.startsWith('image/');
     const isPdf = mime === 'application/pdf' || lower.endsWith('.pdf');
     const isWord = mime.includes('wordprocessing') || mime === 'application/msword' || /\.(docx?|wps|rtf)$/.test(lower);
+    const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
 
-    if (isImage || isPdf || isWord) {
-      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, layout: false });
+    if (isImage || isPdf || isWord || isExcel) {
+      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, isExcel, layout: false });
     } else {
       // 其他类型直接内联流式传输，浏览器若支持则预览，否则下载
       serveAttachment(req, res, true).catch(next);
@@ -459,16 +460,18 @@ router.get('/attachments/:id/preview-file', async (req, res, next) => {
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件已被删除' });
 
     const lower = att.original_name.toLowerCase();
-    const isWord = (att.mime_type || '').includes('wordprocessing') || att.mime_type === 'application/msword' || /\.(docx?|wps|rtf)$/.test(lower);
+    const isOffice = (att.mime_type || '').includes('wordprocessing') || att.mime_type === 'application/msword'
+      || (att.mime_type || '').includes('spreadsheet') || att.mime_type === 'application/vnd.ms-excel'
+      || /\.(docx?|wps|rtf|xlsx?|csv)$/.test(lower);
 
     let servePath = fp;
     let mime = att.mime_type || 'application/octet-stream';
 
-    if (isWord) {
+    if (isOffice) {
       const cached = path.join(UPLOAD_DIR, att.stored_name + '.preview.pdf');
       if (!fs.existsSync(cached)) {
         try {
-          await convertWordToPdf(fp, cached);
+          await convertOfficeToPdf(fp, cached);
         } catch (e) {
           return serveAttachment(req, res, true).catch(next);
         }
@@ -1162,7 +1165,7 @@ router.post('/contract-templates', requirePermission('contracts.manage'), upload
       fs.renameSync(req.file.path, wordPath);
       pdfName = `${base}.pdf`;
       try {
-        await convertWordToPdf(wordPath, path.join(contractsDir, pdfName));
+        await convertOfficeToPdf(wordPath, path.join(contractsDir, pdfName));
         fs.unlinkSync(wordPath);
       } catch (e) {
         fs.unlinkSync(wordPath);

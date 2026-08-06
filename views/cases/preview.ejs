@@ -31,9 +31,9 @@
       <img class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
     <% } else { %>
       <iframe class="preview-pdf" src="/api/attachments/<%= att.id %>/preview-file"></iframe>
-      <% if (isWord) { %>
+      <% if (isWord || isExcel) { %>
       <div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;z-index:200">
-        <i class="bi bi-arrow-repeat"></i> Word 已转为 PDF 预览，首次打开可能需要几秒
+        <i class="bi bi-arrow-repeat"></i> 文档已转为 PDF 预览，首次打开可能需要几秒
       </div>
       <% } %>
     <% } %>
