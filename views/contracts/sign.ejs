@@ -177,7 +177,9 @@
           wrap.appendChild(overlay);
         }
       } catch (err) {
-        container.innerHTML = '<div class="p-4 text-center"><p class="text-muted">合同预览加载失败</p><a class="btn btn-outline-primary" href="/sign/<%= token %>/pdf" target="_blank">在新窗口打开合同</a></div>';
+        console.error('[sign] PDF 预览失败:', err);
+        const msg = (err && err.message ? err.message : String(err)).replace(/</g, '&lt;');
+        container.innerHTML = '<div class="p-4 text-center"><p class="text-muted">合同预览加载失败：' + msg + '</p><a class="btn btn-outline-primary" href="/sign/<%= token %>/pdf" target="_blank">在新窗口打开合同</a></div>';
       }
     }
     renderPdfPreview();
