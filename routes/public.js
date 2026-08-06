@@ -55,7 +55,12 @@ router.get('/sign/:token', async (req, res, next) => {
     }
 
     const positions = parseJsonArray(sig.sign_positions);
-    const myPos = positions.find(p => p.party_role === sig.party_role) || positions[0] || {};
+    // 签署记录按位置顺序创建：优先用创建序号对应位置，其次按角色匹配
+    const sigIds = (await pool.query(`SELECT id FROM contract_signatures WHERE contract_id=$1 ORDER BY id ASC`, [sig.contract_id])).rows.map(r => r.id);
+    const posIdx = sigIds.indexOf(sig.id);
+    const myPos = (posIdx >= 0 && positions[posIdx])
+      ? positions[posIdx]
+      : (positions.find(p => p.party_role && p.party_role === sig.party_role) || positions[0] || {});
 
     res.render('contracts/sign', {
       token,
@@ -80,7 +85,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     }
 
     const sig = (await pool.query(
-      `SELECT cs.*, c.id AS contract_id, c.template_id, c.pdf_path, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
+      `SELECT cs.*, c.id AS contract_id, c.template_id, c.pdf_path AS contract_pdf, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
        FROM contract_signatures cs
        JOIN contracts c ON c.id = cs.contract_id
        JOIN contract_templates ct ON ct.id = c.template_id
@@ -112,16 +117,28 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     const signPath = path.join(signDir, signFile);
     fs.writeFileSync(signPath, signBuf);
 
-    // 用 pdf-lib 在合同工作稿（或模板）PDF 上绘制签名，生成最终 PDF
+    // 用 pdf-lib 在合同当前合成稿（已叠加历史签名）上绘制签名，生成最新 PDF
     const { PDFDocument, rgb } = require('pdf-lib');
-    const basePath = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
+    let basePath;
+    if (sig.contract_pdf && fs.existsSync(path.join(UPLOAD_DIR, 'contracts', 'signed', sig.contract_pdf))) {
+      // 已有历史签名，叠加到最新合成稿上
+      basePath = path.join(UPLOAD_DIR, 'contracts', 'signed', sig.contract_pdf);
+    } else {
+      // 首次签署：以工作稿（含预填文本）或模板为底
+      basePath = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
+    }
     if (!fs.existsSync(basePath)) return res.status(500).json({ error: '模板 PDF 不存在' });
 
     const templateBytes = fs.readFileSync(basePath);
     const pdfDoc = await PDFDocument.load(templateBytes);
     const pages = pdfDoc.getPages();
     const positions = parseJsonArray(sig.sign_positions);
-    const myPos = positions.find(p => p.party_role === sig.party_role) || positions[0] || {};
+    // 签署记录按位置顺序创建：优先用创建序号对应位置，其次按角色匹配
+    const sigIds = (await pool.query(`SELECT id FROM contract_signatures WHERE contract_id=$1 ORDER BY id ASC`, [sig.contract_id])).rows.map(r => r.id);
+    const posIdx = sigIds.indexOf(sig.id);
+    const myPos = (posIdx >= 0 && positions[posIdx])
+      ? positions[posIdx]
+      : (positions.find(p => p.party_role && p.party_role === sig.party_role) || positions[0] || {});
 
     // 尝试加载中文字体用于绘制签名下方文字
     const cjkFont = await embedCjkFont(pdfDoc);
@@ -154,13 +171,27 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     );
 
     // 检查是否全部签署完成
-    const allSigs = (await pool.query(`SELECT id, status FROM contract_signatures WHERE contract_id=$1`, [sig.contract_id])).rows;
-    const allSigned = allSigs.every(s => s.status === 'signed');
+    // 每签一次都把最新合成稿记录到 contracts.pdf_path，供下一位签署人继续叠加签名
+    await pool.query(`UPDATE contracts SET pdf_path=$1 WHERE id=$2`, [signedFile, sig.contract_id]);
+
+    // 找下一位待签署当事人（按创建顺序），用于同一设备连续签署
+    const next = (await pool.query(
+      `SELECT sign_token, party_name, party_role FROM contract_signatures
+       WHERE contract_id=$1 AND status='pending' ORDER BY id ASC LIMIT 1`, [sig.contract_id]
+    )).rows[0];
+    const allSigned = !next;
     if (allSigned) {
-      await pool.query(`UPDATE contracts SET pdf_path=$1, status='signed', completed_at=now() WHERE id=$2`, [signedFile, sig.contract_id]);
+      await pool.query(`UPDATE contracts SET status='signed', completed_at=now() WHERE id=$2`, [signedFile, sig.contract_id]);
     }
 
-    res.json({ ok: true, signed: true, all_signed: allSigned, redirect: `/sign/${token}/done` });
+    res.json({
+      ok: true, signed: true, all_signed: allSigned,
+      signed_party_name: sig.party_name,
+      next_token: next ? next.sign_token : null,
+      next_party_name: next ? next.party_name : null,
+      next_party_role: next ? next.party_role : null,
+      redirect: `/sign/${token}/done`
+    });
   } catch (e) { next(e); }
 });
 
@@ -169,14 +200,19 @@ router.get('/sign/:token/pdf', signReadLimiter, async (req, res, next) => {
   try {
     const { token } = req.params;
     const sig = (await pool.query(
-      `SELECT cs.id, cs.status, c.work_pdf_path, ct.pdf_path AS template_path
+      `SELECT cs.id, cs.status, c.pdf_path, c.work_pdf_path, ct.pdf_path AS template_path
        FROM contract_signatures cs
        JOIN contracts c ON c.id = cs.contract_id
        JOIN contract_templates ct ON ct.id = c.template_id
        WHERE cs.sign_token = $1`, [token]
     )).rows[0];
     if (!sig || sig.status === 'expired') return res.status(404).send('链接无效');
-    const fp = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
+    let fp;
+    if (sig.pdf_path && fs.existsSync(path.join(UPLOAD_DIR, 'contracts', 'signed', sig.pdf_path))) {
+      fp = path.join(UPLOAD_DIR, 'contracts', 'signed', sig.pdf_path);
+    } else {
+      fp = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
+    }
     if (!fs.existsSync(fp)) return res.status(404).send('模板文件不存在');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');

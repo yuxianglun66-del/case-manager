@@ -1185,6 +1185,19 @@ router.post('/contract-templates/:id/delete', requirePermission('contracts.manag
   } catch (e) { next(e); }
 });
 
+// 重命名模板
+router.post('/contract-templates/:id/rename', requirePermission('contracts.manage'), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: '模板名称必填' });
+    const tpl = (await pool.query(`SELECT id FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
+    if (!tpl) return res.status(404).json({ error: '模板不存在' });
+    await pool.query(`UPDATE contract_templates SET name = $1 WHERE id = $2`, [name, id]);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // 可视化编辑器：保存签名位置与文本字段（仅管理员）
 router.post('/contract-templates/:id/positions', requirePermission('contracts.manage'), async (req, res, next) => {
   try {
@@ -1238,20 +1251,41 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
     );
     const contract = ins.rows[0];
 
-    // 为每个当事人生成签署令牌
+    // 为每个签名位置生成签署记录：优先按角色匹配当事人，未匹配的位置用框标签作为签署人
     const signPositions = parseJsonArray(tpl.sign_positions);
     const crypto = require('crypto');
-    for (let i = 0; i < parties.length; i++) {
-      const p = parties[i];
-      const pos = signPositions[i] || {};
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const insertSig = (partyId, partyName, partyRole) => {
       const token = crypto.randomBytes(32).toString('hex');
-      // M5: 签署令牌7天有效
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await pool.query(
+      return pool.query(
         `INSERT INTO contract_signatures (contract_id, party_id, party_name, party_role, sign_token, status, expires_at)
          VALUES ($1,$2,$3,$4,$5,'pending',$6)`,
-        [contract.id, p.id, p.name, p.role || pos.party_role || '', token, expiresAt]
+        [contract.id, partyId, partyName, partyRole, token, expiresAt]
       );
+    };
+    if (!signPositions.length) {
+      // 模板未配置签名位置：按选择的当事人逐个生成
+      for (const p of parties) await insertSig(p.id, p.name, p.role || '');
+    } else {
+      // 按位置顺序分配当事人：先按角色精确匹配，再按剩余顺序补位
+      const used = new Set();
+      const slotParty = signPositions.map((pos) => {
+        const byRole = parties.find(pp => !used.has(pp.id) && pos.party_role && pos.party_role === pp.role);
+        if (byRole) { used.add(byRole.id); return byRole; }
+        const any = parties.find(pp => !used.has(pp.id));
+        if (any) { used.add(any.id); return any; }
+        return null;
+      });
+      for (let i = 0; i < signPositions.length; i++) {
+        const pos = signPositions[i] || {};
+        const p = slotParty[i];
+        if (p) {
+          await insertSig(p.id, p.name, p.role || pos.party_role || '');
+        } else {
+          const name = pos.label || pos.party_role || '待签署';
+          await insertSig(null, name, pos.party_role || name);
+        }
+      }
     }
 
     // 预填充文本：把模板的文本字段绘制到 PDF 副本上，作为合同工作稿

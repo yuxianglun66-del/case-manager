@@ -567,6 +567,10 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
   background: rgba(15, 23, 42, .8);
   color: #f8fafc;
 }
+.form-select option {
+  color: #e2e8f0;
+  background: #0f172a;
+}
 .form-control::placeholder { color: var(--content-faint); }
 .form-label { font-weight: 600; font-size: 13px; color: var(--content-muted); margin-bottom: 6px; }
 .form-text { font-size: 12px; color: var(--content-faint); }

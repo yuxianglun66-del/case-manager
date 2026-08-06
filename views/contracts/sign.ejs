@@ -123,12 +123,13 @@
         });
         const data = await res.json();
         if (data.ok) {
-          if (data.all_signed) {
-            showToast('签署完成，所有当事人已签署', 'success');
+          if (data.next_token) {
+            showToast('「' + (data.signed_party_name || '') + '」已签署，继续为「' + data.next_party_name + '」签署', 'success');
+            setTimeout(() => location.href = '/sign/' + data.next_token, 1200);
           } else {
-            showToast('签署成功，等待其他当事人签署', 'success');
+            showToast('签署完成，所有当事人已签署', 'success');
+            setTimeout(() => location.href = '/sign/' + token + '/done', 1000);
           }
-          setTimeout(() => location.href = '/sign/' + token + '/done', 1000);
         } else {
           showToast(data.error || '签署失败', 'danger');
           btn.disabled = false; btn.innerHTML = '<i class="bi bi-pen"></i> 确认签署';

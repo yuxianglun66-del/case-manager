@@ -217,6 +217,7 @@
                     <td><%- t.active ? '<span class="badge bg-success">启用</span>' : '<span class="badge bg-danger">停用</span>' %></td>
                     <td class="text-end">
                       <button class="btn btn-ico btn-outline-primary" title="可视化编辑位置/文本" onclick="location.href='/settings/templates/<%= t.id %>/edit'"><i class="bi bi-pencil-square"></i></button>
+                      <button class="btn btn-ico btn-outline-secondary" title="重命名" onclick="renameContractTemplate(<%= t.id %>, '<%= t.name.replace(/[\\'"<>]/g, '') %>')"><i class="bi bi-pen"></i></button>
                       <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delContractTemplate(<%= t.id %>, '<%= t.name.replace(/[\\'"<>]/g, '') %>')"><i class="bi bi-trash"></i></button>
                     </td>
                   </tr>
@@ -678,6 +679,20 @@
     if (!(await confirmBox('删除合同模板「' + name + '」？<br>已关联的合同将保留但无法再使用此模板。', '删除模板'))) return;
     try { await postJSON('/api/contract-templates/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
     catch (err) { toast(err.message, 'danger'); }
+  }
+  function renameContractTemplate(id, name) {
+    const html = '<div class="mb-2"><label class="form-label">模板名称</label><input type="text" class="form-control" id="ctRenameInput" value="' + name.replace(/"/g, '&quot;') + '" maxlength="100"></div>';
+    const mb = modalBox('重命名模板', html, { okText: '保存' });
+    mb.show();
+    mb.okBtn.addEventListener('click', async () => {
+      const v = document.getElementById('ctRenameInput').value.trim();
+      if (!v) return toast('名称不能为空', 'warning');
+      mb.okBtn.disabled = true;
+      try {
+        await postJSON('/api/contract-templates/' + id + '/rename', { name: v });
+        mb.close(); toast('已重命名', 'success'); setTimeout(() => location.reload(), 300);
+      } catch (err) { mb.okBtn.disabled = false; toast(err.message, 'danger'); }
+    });
   }
   document.getElementById('contractTemplateForm').addEventListener('submit', async (e) => {
     e.preventDefault();
