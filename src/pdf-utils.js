@@ -4,7 +4,7 @@ const { rgb } = require('pdf-lib');
 // 在 pdfDoc 中加载中文字体（找不到字体时返回 null，调用方跳过中文绘制）
 async function embedCjkFont(pdfDoc) {
   try {
-    const fontkit = require('fontkit');
+    const fontkit = require('@pdf-lib/fontkit');
     const candidates = [
       'C:/Windows/Fonts/simhei.ttf',
       'C:/Windows/Fonts/msyh.ttc',

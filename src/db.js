@@ -307,7 +307,7 @@ async function ensureTemplatePdfs() {
     let cjkFont = null;
     let fontkit = null;
     try {
-      fontkit = require('fontkit');
+      fontkit = require('@pdf-lib/fontkit');
       const fontCandidates = [
         'C:/Windows/Fonts/simhei.ttf',
         'C:/Windows/Fonts/msyh.ttc',
