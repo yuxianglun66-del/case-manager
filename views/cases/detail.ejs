@@ -34,8 +34,16 @@
             <div class="info-value"><%= caseData.client_name || '—' %></div>
           </div>
           <div class="info-item">
-            <div class="info-label"><i class="bi bi-person-badge"></i> 负责员工</div>
+            <div class="info-label"><i class="bi bi-person-badge"></i> 服务人员</div>
             <div class="info-value"><%= caseData.assignee_name || '—' %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-person-check"></i> 签单人员</div>
+            <div class="info-value"><%= caseData.sign_staff_name || '—' %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label"><i class="bi bi-calendar-check"></i> 签单日期</div>
+            <div class="info-value"><%= caseData.sign_date ? new Date(caseData.sign_date).toLocaleDateString('zh-CN') : '—' %></div>
           </div>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-calendar-plus"></i> 创建时间</div>

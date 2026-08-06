@@ -124,6 +124,8 @@ router.get('/cases', async (req, res, next) => {
     const typeId = parseInt(req.query.type, 10) || null;
     const statusId = parseInt(req.query.status, 10) || null;
     const assigneeId = parseInt(req.query.assignee, 10) || null;
+    const dateFrom = (req.query.date_from || '').trim();
+    const dateTo = (req.query.date_to || '').trim();
 
     const where = [];
     const params = [];
@@ -131,6 +133,8 @@ router.get('/cases', async (req, res, next) => {
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
     if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`c.assignee_id = $${params.length}`); }
+    if (dateFrom) { params.push(dateFrom); where.push(`c.sign_date >= $${params.length}`); }
+    if (dateTo) { params.push(dateTo); where.push(`c.sign_date <= $${params.length}`); }
     if (!canViewAll(user)) { params.push(user.id); where.push(`c.assignee_id = $${params.length}`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -142,14 +146,17 @@ router.get('/cases', async (req, res, next) => {
     params.push(per, offset);
     const { rows: cases } = await pool.query(
       `SELECT c.id, c.case_no, c.title, c.client_name, c.updated_at, c.next_action, c.reminder_at, c.fee_agreement, c.fee_details,
+              c.sign_date, c.sign_staff_id,
               t.name AS type_name, t.color AS type_color, t.code AS type_code,
               s.name AS status_name, s.color AS status_color,
               u.display_name AS assignee_name,
+              us.display_name AS sign_staff_name,
               (SELECT COUNT(*)::int FROM attachments a WHERE a.case_id = c.id) AS file_count
        FROM cases c
        LEFT JOIN case_types t ON t.id = c.case_type_id
        LEFT JOIN statuses s ON s.id = c.status_id
        LEFT JOIN users u ON u.id = c.assignee_id
+       LEFT JOIN users us ON us.id = c.sign_staff_id
        ${whereSql}
        ORDER BY c.updated_at DESC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -165,7 +172,7 @@ router.get('/cases', async (req, res, next) => {
     res.render('cases/list', {
       title: '案件管理',
       cases, types, statuses, staff,
-      filters: { kw, type: typeId, status: statusId, assignee: assigneeId },
+      filters: { kw, type: typeId, status: statusId, assignee: assigneeId, date_from: dateFrom, date_to: dateTo },
       page: cur, totalPages, total: count.rows[0].n,
     });
   } catch (e) { next(e); }
@@ -199,6 +206,7 @@ router.get('/cases/new', async (req, res, next) => {
       caseData: null,
       caseTypeId: parseInt(req.query.type, 10) || (types.length > 0 ? types[0].id : null),
       types, staff, statuses,
+      staffAll: (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows,
       fieldsByType,
       values: {},
       errors: null,
@@ -232,12 +240,19 @@ router.get('/cases/:id/edit', async (req, res, next) => {
     const values = {};
     fieldVals.forEach((v) => { values[v.field_id] = v.value; });
 
+    // sign_date 为 DATE 类型，格式化为 YYYY-MM-DD 便于表单回显
+    if (c.sign_date) {
+      const d = new Date(c.sign_date);
+      c.sign_date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
     res.render('cases/form', {
       title: '编辑案件',
       mode: 'edit',
       caseData: c,
       caseTypeId: c.case_type_id,
       types, staff, statuses,
+      staffAll: (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows,
       fieldsByType: { [c.case_type_id]: fields },
       values, errors: null,
     });
@@ -251,11 +266,13 @@ router.get('/cases/:id', async (req, res, next) => {
     const id = parseInt(req.params.id, 10);
     const c = (await pool.query(
       `SELECT c.*, u.display_name AS assignee_name,
+              us.display_name AS sign_staff_name,
               t.name AS type_name, t.color AS type_color, t.code AS type_code,
               s.name AS status_name, s.color AS status_color,
               cu.display_name AS creator_name
        FROM cases c
        LEFT JOIN users u ON u.id = c.assignee_id
+       LEFT JOIN users us ON us.id = c.sign_staff_id
        LEFT JOIN case_types t ON t.id = c.case_type_id
        LEFT JOIN statuses s ON s.id = c.status_id
        LEFT JOIN users cu ON cu.id = c.created_by

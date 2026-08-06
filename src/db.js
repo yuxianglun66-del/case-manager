@@ -207,6 +207,11 @@ ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS hospital_dept VARCHAR(100);
 ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS gender VARCHAR(10);
 ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS age INT;
 ALTER TABLE attachments ADD COLUMN IF NOT EXISTS remark VARCHAR(200);
+
+-- 签单信息：签单人员（系统内员工）+ 签单日期
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_staff_id INT REFERENCES users(id);
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_date DATE;
+CREATE INDEX IF NOT EXISTS idx_cases_sign_date ON cases(sign_date);
 `;
 
 const SEED_TYPES = [

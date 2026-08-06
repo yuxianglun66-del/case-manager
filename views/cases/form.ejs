@@ -32,7 +32,7 @@
           <input type="text" name="client_name" class="form-control" placeholder="姓名" value="<%= caseData ? (caseData.client_name || '') : '' %>">
         </div>
         <div class="col-6 col-md-3">
-          <label class="form-label">负责员工</label>
+          <label class="form-label">服务人员</label>
           <% if (can('cases.assign')) { %>
             <select name="assignee_id" class="form-select">
               <option value="">未分配</option>
@@ -44,6 +44,19 @@
             <input type="text" class="form-control" value="<%= user.display_name %>" disabled>
             <input type="hidden" name="assignee_id" value="<%= user.id %>">
           <% } %>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">签单人员</label>
+          <select name="sign_staff_id" class="form-select">
+            <option value="">未分配</option>
+            <% staffAll.forEach(s => { %>
+              <option value="<%= s.id %>" <%= caseData && caseData.sign_staff_id === s.id ? 'selected' : '' %>><%= s.display_name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">签单日期</label>
+          <input type="date" name="sign_date" class="form-control" value="<%= caseData ? (caseData.sign_date || '') : '' %>">
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">当前状态</label>

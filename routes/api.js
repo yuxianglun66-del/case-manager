@@ -61,6 +61,8 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     const statusId = parseInt(req.body.status_id, 10) || null;
     const nextAction = (req.body.next_action || '').trim() || null;
     const reminderAt = req.body.reminder_at ? new Date(req.body.reminder_at) : null;
+    const signStaffId = parseInt(req.body.sign_staff_id, 10) || null;
+    const signDate = (req.body.sign_date || '').trim() || null;
 
     if (!title || !typeId) {
       await client.query('ROLLBACK');
@@ -84,9 +86,9 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     const feeAgreement = (req.body.fee_agreement || '').trim() || null;
     const feeDetails = (req.body.fee_details || '').trim() || null;
     const ins = await client.query(
-      `INSERT INTO cases (case_no, case_type_id, title, client_name, assignee_id, status_id, status_at, created_by, next_action, reminder_at, fee_agreement, fee_details)
-       VALUES ($1,$2,$3,$4,$5,$6, now(), $7, $8, $9, $10, $11) RETURNING id`,
-      [caseNo, typeId, title, clientName || null, assigneeId, statusId, user.id, nextAction, reminderAt, feeAgreement, feeDetails]
+      `INSERT INTO cases (case_no, case_type_id, title, client_name, assignee_id, status_id, status_at, created_by, next_action, reminder_at, fee_agreement, fee_details, sign_staff_id, sign_date)
+       VALUES ($1,$2,$3,$4,$5,$6, now(), $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+      [caseNo, typeId, title, clientName || null, assigneeId, statusId, user.id, nextAction, reminderAt, feeAgreement, feeDetails, signStaffId, signDate]
     );
     const caseId = ins.rows[0].id;
 
@@ -121,6 +123,8 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     const statusId = parseInt(req.body.status_id, 10) || null;
     const nextAction = (req.body.next_action || '').trim() || null;
     const reminderAt = req.body.reminder_at ? new Date(req.body.reminder_at) : null;
+    const signStaffId = parseInt(req.body.sign_staff_id, 10) || null;
+    const signDate = (req.body.sign_date || '').trim() || null;
 
     if (!title || !typeId) { await client.query('ROLLBACK'); return res.status(400).json({ error: '请填写案件名称并选择案件类型' }); }
 
@@ -142,9 +146,10 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     await client.query(
       `UPDATE cases SET title=$1, client_name=$2, case_type_id=$3, assignee_id=$4, status_id=$5,
               status_at = CASE WHEN status_id IS DISTINCT FROM $5 THEN now() ELSE status_at END,
-              updated_at = now(), next_action=$7, reminder_at=$8, fee_agreement=$9, fee_details=$10
+              updated_at = now(), next_action=$7, reminder_at=$8, fee_agreement=$9, fee_details=$10,
+              sign_staff_id=$11, sign_date=$12
        WHERE id=$6`,
-      [title, clientName || null, typeId, assigneeId, statusId, id, nextAction, reminderAt, feeAgreement, feeDetails]
+      [title, clientName || null, typeId, assigneeId, statusId, id, nextAction, reminderAt, feeAgreement, feeDetails, signStaffId, signDate]
     );
 
     await client.query(`DELETE FROM case_field_values WHERE case_id = $1 AND field_id NOT IN (
