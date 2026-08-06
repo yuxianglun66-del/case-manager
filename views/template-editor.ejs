@@ -24,11 +24,6 @@
   <div class="col-lg-9">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
-        <div class="btn-group btn-group-sm" role="group">
-          <button type="button" class="btn btn-outline-primary active" data-tool="select"><i class="bi bi-mouse2"></i> 选择</button>
-          <button type="button" class="btn btn-outline-primary" data-tool="sig"><i class="bi bi-pen"></i> 添加签名框</button>
-          <button type="button" class="btn btn-outline-primary" data-tool="txt"><i class="bi bi-type"></i> 添加文本</button>
-        </div>
         <span class="text-muted small" id="toolHint">点击选择框体，拖拽移动，右下角调整大小；Delete 删除</span>
       </div>
       <div class="card-body editor-canvas">
@@ -39,7 +34,15 @@
   </div>
   <div class="col-lg-3">
     <div class="card sticky-top" style="top:12px;z-index:5">
-      <div class="card-header py-2"><i class="bi bi-sliders"></i> 属性设置</div>
+      <div class="card-header py-2"><i class="bi bi-pen"></i> 工具</div>
+      <div class="card-body py-2">
+        <div class="btn-group btn-group-sm d-flex" role="group">
+          <button type="button" class="btn btn-outline-primary active" data-tool="select"><i class="bi bi-mouse2"></i> 选择</button>
+          <button type="button" class="btn btn-outline-primary" data-tool="sig"><i class="bi bi-pen"></i> 签名框</button>
+          <button type="button" class="btn btn-outline-primary" data-tool="txt"><i class="bi bi-type"></i> 文本</button>
+        </div>
+      </div>
+      <div class="card-header py-2 border-top"><i class="bi bi-sliders"></i> 属性设置</div>
       <div class="card-body" id="propPanel">
         <p class="text-muted small mb-0">在左侧选择一个框体进行编辑。</p>
       </div>

@@ -1255,12 +1255,13 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
     const signPositions = parseJsonArray(tpl.sign_positions);
     const crypto = require('crypto');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // 单链接多人签署：整份合同共用一个签署令牌，当事人与代理人在同一链接内依次签字
+    const contractToken = crypto.randomBytes(32).toString('hex');
     const insertSig = (partyId, partyName, partyRole) => {
-      const token = crypto.randomBytes(32).toString('hex');
       return pool.query(
         `INSERT INTO contract_signatures (contract_id, party_id, party_name, party_role, sign_token, status, expires_at)
          VALUES ($1,$2,$3,$4,$5,'pending',$6)`,
-        [contract.id, partyId, partyName, partyRole, token, expiresAt]
+        [contract.id, partyId, partyName, partyRole, contractToken, expiresAt]
       );
     };
     if (!signPositions.length) {

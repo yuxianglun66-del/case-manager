@@ -18,9 +18,11 @@
     .pdf-page img { width:100%; height:auto; display:block; }
     .pdf-page canvas { width:100%; height:auto; display:block; }
     .sign-overlay { position:absolute; border:2px dashed #0d6efd; background:rgba(13,110,253,.05); pointer-events:none; }
+    .sign-overlay.active { border:2px solid #dc3545; background:rgba(220,53,69,.12); box-shadow:0 0 0 2px rgba(220,53,69,.5); }
+    .sign-overlay .ov-label { position:absolute; left:-1px; top:-22px; background:#dc3545; color:#fff; font-size:11px; padding:1px 6px; border-radius:4px; white-space:nowrap; }
     .sign-canvas-wrap { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e0e0e0; padding:16px; box-shadow:0 -2px 10px rgba(0,0,0,.05); z-index:200; }
     .sign-canvas { border:1px solid #ccc; background:#fafafa; border-radius:8px; touch-action:none; width:100%; max-width:100%; height:160px; }
-    .btn-sign { width:100%; padding:14px; font-size:1.1rem; font-weight:600; border-radius:10px; }
+    .btn-sign { padding:14px; font-size:1.1rem; font-weight:600; border-radius:10px; }
     .toast-bottom { position:fixed; bottom:100px; left:16px; right:16px; z-index:300; }
     @media (min-width: 768px) {
       .sign-canvas-wrap { position:static; box-shadow:none; border-top:none; padding:24px; }
@@ -29,12 +31,12 @@
   </style>
 </head>
 <body>
-  <div class="sign-header d-flex justify-content-between align-items-center">
+  <div class="sign-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <h5><%= contractTitle %></h5>
-      <small><%= partyName %> · <%= partyRole %></small>
+      <small id="stepLabel">正在为「…」签署（1/N）</small>
     </div>
-    <span class="badge bg-primary">请在下方签名</span>
+    <div id="signerChips" class="d-flex flex-wrap gap-1"></div>
   </div>
 
   <div class="pdf-container" id="pdfContainer">
@@ -45,21 +47,37 @@
 
   <div class="sign-canvas-wrap">
     <div class="mb-2 d-flex justify-content-between align-items-center">
-      <label class="mb-0 fw-semibold"><%= partyRole %>：<%= partyName %></label>
+      <label class="mb-0 fw-semibold" id="signerLabel">签署人</label>
       <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearCanvas()"><i class="bi bi-eraser"></i> 清空</button>
     </div>
     <canvas class="sign-canvas" id="signCanvas"></canvas>
-    <div class="mt-3 d-grid">
-      <button class="btn btn-primary btn-sign" id="btnSubmit" onclick="submitSign()"><i class="bi bi-pen"></i> 确认签署</button>
+    <div class="mt-3 d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sign flex-shrink-0" style="max-width:130px" id="btnPrev" onclick="prevStep()"><i class="bi bi-arrow-left"></i> 上一位</button>
+      <button class="btn btn-primary btn-sign" id="btnNext" onclick="nextStep()"><i class="bi bi-pen"></i> 确认签署</button>
     </div>
   </div>
 
   <script>
     const token = '<%= token %>';
+    const signers = <%- safeJson(signers || []) %>;
+    const toSign = <%- safeJson(toSign || []) %>;
     const canvas = document.getElementById('signCanvas');
     const ctx = canvas.getContext('2d');
     let drawing = false, lastX = 0, lastY = 0;
-    let signPosition = <%- safeJson(signPosition) %>;
+    let step = 0;
+    const sigs = new Array(toSign.length).fill(null);
+    const overlays = [];
+
+    // 签署人状态徽章
+    (function buildChips() {
+      const chips = document.getElementById('signerChips');
+      signers.forEach((s, i) => {
+        const el = document.createElement('span');
+        el.className = 'badge rounded-pill ' + (s.status === 'signed' ? 'bg-success' : 'bg-secondary');
+        el.textContent = s.party_name + (s.status === 'signed' ? ' 已签' : ' 待签');
+        chips.appendChild(el);
+      });
+    })();
 
     // 高 DPI 适配（resize 时保留已画签名，避免移动端地址栏收展清空画布）
     function resizeCanvas() {
@@ -101,7 +119,6 @@
 
     function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function canvasToBase64() { return canvas.toDataURL('image/png'); }
-
     function isCanvasEmpty() {
       const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       for (let i = 3; i < d.length; i += 4) {
@@ -109,47 +126,78 @@
       }
       return true;
     }
+    function drawDataUrl(dataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, rect.width, rect.height);
+      };
+      img.src = dataUrl;
+    }
+
+    function highlightOverlay(i) {
+      overlays.forEach((o, idx) => {
+        o.classList.toggle('active', idx === i);
+        const lbl = o.querySelector('.ov-label');
+        if (lbl) lbl.style.display = idx === i ? 'block' : 'none';
+      });
+    }
+
+    function updateStepUI() {
+      const s = toSign[step];
+      if (!s) return;
+      document.getElementById('signerLabel').textContent = (s.party_role ? s.party_role + '：' : '') + s.party_name;
+      document.getElementById('stepLabel').textContent = '正在为「' + s.party_name + '」签署（' + (step + 1) + '/' + toSign.length + '）';
+      document.getElementById('btnPrev').style.visibility = step > 0 ? 'visible' : 'hidden';
+      const last = step === toSign.length - 1;
+      document.getElementById('btnNext').innerHTML = last ? '<i class="bi bi-check-lg"></i> 提交签署' : '<i class="bi bi-arrow-right"></i> 下一位';
+      highlightOverlay(step);
+      if (sigs[step]) drawDataUrl(sigs[step]); else clearCanvas();
+    }
+
+    function nextStep() {
+      if (isCanvasEmpty()) { showToast('请先在框内签名', 'warning'); return; }
+      sigs[step] = canvasToBase64();
+      if (step < toSign.length - 1) { step++; updateStepUI(); }
+      else submitSign();
+    }
+    function prevStep() {
+      if (step > 0) { step--; updateStepUI(); }
+    }
 
     async function submitSign() {
-      if (isCanvasEmpty()) { showToast('请先签名'); return; }
-      const dataUrl = canvasToBase64();
-      const btn = document.getElementById('btnSubmit');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></i>提交中...';
+      const btn = document.getElementById('btnNext');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>提交中...';
       try {
+        const payload = { signatures: sigs.map((b64, i) => ({ sig_id: toSign[i].id, signature_base64: b64 })) };
         const res = await fetch('/sign/' + token, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signature_base64: dataUrl })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.ok) {
-          if (data.next_token) {
-            showToast('「' + (data.signed_party_name || '') + '」已签署，继续为「' + data.next_party_name + '」签署', 'success');
-            setTimeout(() => location.href = '/sign/' + data.next_token, 1200);
-          } else {
-            showToast('签署完成，所有当事人已签署', 'success');
-            setTimeout(() => location.href = '/sign/' + token + '/done', 1000);
-          }
+          showToast('签署完成，所有当事人已签署', 'success');
+          setTimeout(() => location.href = data.redirect || ('/sign/' + token + '/done'), 1200);
         } else {
           showToast(data.error || '签署失败', 'danger');
-          btn.disabled = false; btn.innerHTML = '<i class="bi bi-pen"></i> 确认签署';
+          btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> 提交签署';
         }
       } catch (err) {
         showToast('网络错误：' + err.message, 'danger');
-        btn.disabled = false; btn.innerHTML = '<i class="bi bi-pen"></i> 确认签署';
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> 提交签署';
       }
     }
 
     function showToast(msg, type='info') {
       const el = document.createElement('div');
-      const bg = type === 'danger' ? '#dc3545' : type === 'success' ? '#198754' : '#0d6efd';
+      const bg = type === 'danger' ? '#dc3545' : type === 'success' ? '#198754' : type === 'warning' ? '#f59e0b' : '#0d6efd';
       el.style.cssText = 'position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);z-index:9999;background:' + bg + ';color:#fff;padding:14px 24px;border-radius:10px;font-size:1rem;box-shadow:0 4px 16px rgba(0,0,0,.35);text-align:center;max-width:82%;pointer-events:none';
       el.textContent = msg;
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 3000);
     }
-
-    function onPdfLoaded() { /* 已由 PDF.js 画布渲染替代 */ }
 
     async function renderPdfPreview() {
       const container = document.getElementById('pdfPages');
@@ -173,21 +221,30 @@
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          const ctx = canvas.getContext('2d');
-          await page.render({ canvasContext: ctx, viewport }).promise;
+          const ctx2 = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx2, viewport }).promise;
           wrap.appendChild(canvas);
           container.appendChild(wrap);
         }
-        if (signPosition && signPosition.page && container.children[signPosition.page - 1]) {
-          const wrap = container.children[signPosition.page - 1];
+        // 为每个待签署位置绘制占位框
+        toSign.forEach((s, i) => {
+          const p = s.position || {};
+          if (!p.page || !container.children[p.page - 1]) return;
+          const wrap = container.children[p.page - 1];
           const overlay = document.createElement('div');
           overlay.className = 'sign-overlay';
-          overlay.style.left = (signPosition.x || 0) + 'px';
-          overlay.style.top = (signPosition.y || 0) + 'px';
-          overlay.style.width = (signPosition.width || 180) + 'px';
-          overlay.style.height = (signPosition.height || 60) + 'px';
+          overlay.style.left = (p.x || 0) + 'px';
+          overlay.style.top = (p.y || 0) + 'px';
+          overlay.style.width = (p.width || 180) + 'px';
+          overlay.style.height = (p.height || 60) + 'px';
+          const lbl = document.createElement('span');
+          lbl.className = 'ov-label';
+          lbl.textContent = '请在此签名';
+          overlay.appendChild(lbl);
           wrap.appendChild(overlay);
-        }
+          overlays.push(overlay);
+        });
+        if (toSign.length) updateStepUI();
       } catch (err) {
         console.error('[sign] PDF 预览失败:', err);
         const msg = (err && err.message ? err.message : String(err)).replace(/</g, '&lt;');

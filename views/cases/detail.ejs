@@ -793,13 +793,15 @@
     mb.show();
     mb.okBtn.addEventListener('click', () => mb.close());
     if (c.status === 'sent') {
-      let links = '<hr><div class="text-start small">签署链接：</div>';
-      c.signatures.forEach(s=>{
-        links += `<div class="input-group input-group-sm mt-1"><input class="form-control form-control-sm" readonly value="${getAppUrl()}/sign/${s.sign_token}"><button class="btn btn-outline-secondary btn-sm" onclick="copySignLink(this)" data-token="${s.sign_token}">复制</button></div>`;
-      });
-      const extra = document.createElement('div');
-      extra.innerHTML = links;
-      mb.body.appendChild(extra);
+      const t = c.signatures && c.signatures[0] && c.signatures[0].sign_token;
+      if (t) {
+        let links = '<hr><div class="text-start small">签署链接：</div>';
+        links += `<div class="input-group input-group-sm mt-1"><input class="form-control form-control-sm" readonly value="${getAppUrl()}/sign/${t}"><button class="btn btn-outline-secondary btn-sm" onclick="copySignLink(this)" data-token="${t}">复制</button></div>`;
+        links += '<div class="text-muted small mt-1">把此链接发给当事人，当事人与代理人在同一页面依次签名后一次性提交。</div>';
+        const extra = document.createElement('div');
+        extra.innerHTML = links;
+        mb.body.appendChild(extra);
+      }
     }
   }
   async function copySignLink(btn) {

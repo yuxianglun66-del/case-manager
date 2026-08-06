@@ -184,6 +184,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL
 -- M5: 签署令牌过期时间
 ALTER TABLE contract_signatures ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
+-- 单链接多人签署：同一合同的所有签署记录共用同一个 sign_token（去掉原 UNIQUE 约束）
+ALTER TABLE contract_signatures DROP CONSTRAINT IF EXISTS contract_signatures_sign_token_key;
+
 -- 安全问题（忘记密码）
 ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(200);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer VARCHAR(200);
