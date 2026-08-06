@@ -33,11 +33,20 @@ async function embedCjkFont(pdfDoc) {
   }
 }
 
-// 文本占位符替换：{title}/{case_no}/{client_name}/{date}
-function fillTemplateText(text, data = {}) {
+// 文本占位符替换：{title}/{case_no}/{client_name}/{date} 案件级，{name}/{id_card}... 当事人级（无数据留空）
+function fillTemplateText(text, data = {}, party = null) {
   const dateStr = new Date().toLocaleDateString('zh-CN');
   const m = { '{title}': data.title || '', '{case_no}': data.case_no || '', '{client_name}': data.client_name || '', '{date}': dateStr };
-  return String(text == null ? '' : text).replace(/\{(title|case_no|client_name|date)\}/g, (k) => m[k] || '');
+  let out = String(text == null ? '' : text).replace(/\{(title|case_no|client_name|date)\}/g, (k) => m[k] || '');
+  if (!out.includes('{')) return out;
+  const p = party || {};
+  const pv = {
+    name: p.name, id_card: p.id_card, phone: p.phone, address: p.address,
+    gender: p.gender === 'male' ? '男' : p.gender === 'female' ? '女' : (p.gender || ''),
+    age: p.age != null ? String(p.age) : '', contact_person: p.contact_person,
+    contact_phone: p.contact_phone, injury_info: p.injury_info, hospital_dept: p.hospital_dept, remark: p.remark
+  };
+  return out.replace(/\{(name|id_card|phone|address|gender|age|contact_person|contact_phone|injury_info|hospital_dept|remark)\}/g, (k) => pv[k.slice(1, -1)] || '');
 }
 
 // 在 pdfDoc 上绘制文本字段（坐标：PDF 点，原点左下角；与签名框一致）
@@ -45,10 +54,15 @@ function stampTextFields(pdfDoc, textFields, data = {}, cjkFont) {
   if (!textFields || !textFields.length) return false;
   const pages = pdfDoc.getPages();
   let drawn = 0;
+  const partyByRole = {};
+  const parties = Array.isArray(data.parties) ? data.parties : [];
+  for (const p of parties) if (p && p.role) partyByRole[p.role] = p;
   for (const tf of textFields) {
     const page = pages[tf.page - 1];
     if (!page) continue;
-    const text = fillTemplateText(tf.text, data);
+    // 关联当事人：指定角色则匹配选中当事人，否则用第一位；无匹配时占位符替换为空
+    const party = tf.party_role ? (partyByRole[tf.party_role] || null) : (parties[0] || null);
+    const text = fillTemplateText(tf.text, data, party);
     if (!text) continue;
     const size = tf.size || 12;
     const x = tf.x || 72;

@@ -69,6 +69,8 @@
   .ed-page.resizing { user-select: none; }
   .ed-box.creating { z-index: 30; }
   #toolHint { min-height: 1.2em; }
+  .var-chip { cursor: pointer; font-size: 11px; padding: 1px 6px; border: 1px solid #334155; border-radius: 4px; color: #7dd3fc; user-select: none; }
+  .var-chip:hover { background: #1e293b; border-color: #0ea5e9; }
 </style>
 
 <script src="/vendor/pdfjs/pdf.min.js"></script>
@@ -215,6 +217,21 @@
           <textarea id="ppText" class="form-control" rows="3">${esc(b.text)}</textarea>
         </div>
         <div class="mb-2">
+          <label class="form-label">关联当事人（不选则用第一位签署当事人）</label>
+          <input id="ppRole" class="form-control" list="roleList" value="${escAttr(b.party_role || '')}">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">当事人变量（点击插入，签署时自动填入当事人资料，无数据则留空）</label>
+          <div class="d-flex flex-wrap gap-1">
+            <span class="var-chip" data-var="{name}">姓名</span>
+            <span class="var-chip" data-var="{id_card}">身份证号</span>
+            <span class="var-chip" data-var="{address}">家庭地址</span>
+            <span class="var-chip" data-var="{phone}">电话</span>
+            <span class="var-chip" data-var="{gender}">性别</span>
+            <span class="var-chip" data-var="{age}">年龄</span>
+          </div>
+        </div>
+        <div class="mb-2">
           <label class="form-label">字号</label>
           <input id="ppSize" type="number" class="form-control" value="${b.size || 12}" min="6" max="72">
         </div>`}
@@ -242,6 +259,12 @@
       applyProps(b);
       renderAll();
     }));
+    panel.querySelectorAll('.var-chip').forEach(chip => chip.addEventListener('click', () => {
+      const t = panel.querySelector('#ppText');
+      if (!t) return;
+      t.value += chip.dataset.var;
+      t.focus();
+    }));
   }
   function applyProps(b) {
     const g = id => document.getElementById(id);
@@ -250,7 +273,7 @@
     b.w = parseFloat(g('ppW')?.value) || b.w;
     b.h = parseFloat(g('ppH')?.value) || b.h;
     if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; }
-    else { b.text = g('ppText')?.value || ''; b.size = parseInt(g('ppSize')?.value, 10) || 12; }
+    else { b.text = g('ppText')?.value || ''; b.size = parseInt(g('ppSize')?.value, 10) || 12; b.party_role = g('ppRole')?.value || ''; }
   }
 
   // ---- 拖拽交互 ----
@@ -353,7 +376,7 @@
   // 保存
   document.getElementById('btnSave').addEventListener('click', async () => {
     const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label }));
-    const text_fields = boxes.filter(b => b.kind === 'txt').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), text: b.text, size: b.size }));
+    const text_fields = boxes.filter(b => b.kind === 'txt').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), text: b.text, size: b.size, party_role: b.party_role || '' }));
     const btn = document.getElementById('btnSave');
     btn.disabled = true;
     try {

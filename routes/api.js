@@ -1302,7 +1302,8 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
             const ok = stampTextFields(pdfDoc, textFields, {
               title: contract.title,
               case_no: c.case_no,
-              client_name: c.client_name
+              client_name: c.client_name,
+              parties
             }, cjkFont);
             if (ok) {
               const pdfBytes = await pdfDoc.save();
