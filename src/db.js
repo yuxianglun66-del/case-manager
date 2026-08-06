@@ -309,6 +309,7 @@ async function ensureTemplatePdfs() {
     try {
       fontkit = require('@pdf-lib/fontkit');
       const fontCandidates = [
+        path.join(__dirname, '..', 'assets', 'fonts', 'DroidSansFallbackFull.ttf'),
         'C:/Windows/Fonts/simhei.ttf',
         'C:/Windows/Fonts/simsun.ttc',
         'C:/Windows/Fonts/msyh.ttc',

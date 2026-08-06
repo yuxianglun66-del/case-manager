@@ -134,10 +134,9 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const x = myPos.x || 100;
       const y = myPos.y || (page.getHeight() - 100); // pdf-lib 坐标原点左下角
       page.drawImage(signImage, { x, y: page.getHeight() - y - drawHeight, width: drawWidth, height: drawHeight });
-      // 可选：在签名下方写姓名和日期（需要中文字体）
+      // 在签名下方画签署日期（需要中文字体）
       if (cjkFont) {
-        page.drawText(`${sig.party_name}`, { x: x + 5, y: page.getHeight() - y - drawHeight - 18, size: 10, font: cjkFont, color: rgb(0, 0, 0) });
-        page.drawText(`${new Date().toLocaleDateString('zh-CN')}`, { x: x + 5, y: page.getHeight() - y - drawHeight - 32, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
+        page.drawText(`${new Date().toLocaleDateString('zh-CN')}`, { x: x + 5, y: page.getHeight() - y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
       }
     }
 

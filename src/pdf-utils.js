@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { rgb } = require('pdf-lib');
 
 // 在 pdfDoc 中加载中文字体（找不到可用字体时返回 null，调用方跳过中文绘制）
@@ -6,6 +7,7 @@ async function embedCjkFont(pdfDoc) {
   try {
     const fontkit = require('@pdf-lib/fontkit');
     const candidates = [
+      path.join(__dirname, '..', 'assets', 'fonts', 'DroidSansFallbackFull.ttf'),
       'C:/Windows/Fonts/simhei.ttf',
       'C:/Windows/Fonts/simsun.ttc',
       'C:/Windows/Fonts/msyh.ttc',
