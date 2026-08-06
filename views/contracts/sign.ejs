@@ -13,8 +13,9 @@
     .sign-header h5 { margin:0; font-size:1rem; color:#333; }
     .sign-header small { color:#999; font-size:.75rem; }
     .pdf-container { position:relative; height:calc(100vh - 60px); overflow:auto; background:#ddd; padding:16px; }
-    .pdf-page { background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.1); margin:0 auto 16px; max-width:100%; }
+    .pdf-page { background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.1); margin:0 auto 16px; max-width:100%; position:relative; }
     .pdf-page img { width:100%; height:auto; display:block; }
+    .pdf-page canvas { width:100%; height:auto; display:block; }
     .sign-overlay { position:absolute; border:2px dashed #0d6efd; background:rgba(13,110,253,.05); pointer-events:none; }
     .sign-canvas-wrap { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e0e0e0; padding:16px; box-shadow:0 -2px 10px rgba(0,0,0,.05); z-index:200; }
     .sign-canvas { border:1px solid #ccc; background:#fafafa; border-radius:8px; touch-action:none; width:100%; max-width:100%; height:160px; }
@@ -36,8 +37,8 @@
   </div>
 
   <div class="pdf-container" id="pdfContainer">
-    <div class="pdf-page" id="pdfPage">
-      <iframe id="pdfFrame" src="/sign/<%= token %>/pdf" style="width:100%;height:100%;border:none;min-height:60vh" onload="onPdfLoaded()"></iframe>
+    <div class="pdf-pages" id="pdfPages">
+      <div class="text-center text-muted p-4" id="pdfLoading"><span class="spinner-border spinner-border-sm me-2"></span>正在加载合同...</div>
     </div>
   </div>
 
@@ -140,12 +141,46 @@
       setTimeout(() => el.remove(), 2500);
     }
 
-    function onPdfLoaded() {
-      // 模板配置了签名位置时，可在此高亮提示（可选）
-      if (signPosition && signPosition.page === 1) {
-        // 预留：可在 PDF 上标注签名区域
+    function onPdfLoaded() { /* 已由 PDF.js 画布渲染替代 */ }
+
+    async function renderPdfPreview() {
+      const container = document.getElementById('pdfPages');
+      try {
+        const pdfjsLib = await import('/vendor/pdfjs/pdf.min.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
+        const pdf = await pdfjsLib.getDocument({ url: '/sign/<%= token %>/pdf' }).promise;
+        container.innerHTML = '';
+        const maxWidth = Math.min(container.clientWidth || 800, 1000);
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const vp1 = page.getViewport({ scale: 1 });
+          const scale = Math.min(maxWidth / vp1.width, 2.5);
+          const viewport = page.getViewport({ scale });
+          const wrap = document.createElement('div');
+          wrap.className = 'pdf-page';
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          wrap.appendChild(canvas);
+          container.appendChild(wrap);
+        }
+        if (signPosition && signPosition.page && container.children[signPosition.page - 1]) {
+          const wrap = container.children[signPosition.page - 1];
+          const overlay = document.createElement('div');
+          overlay.className = 'sign-overlay';
+          overlay.style.left = (signPosition.x || 0) + 'px';
+          overlay.style.top = (signPosition.y || 0) + 'px';
+          overlay.style.width = (signPosition.width || 180) + 'px';
+          overlay.style.height = (signPosition.height || 60) + 'px';
+          wrap.appendChild(overlay);
+        }
+      } catch (err) {
+        container.innerHTML = '<div class="p-4 text-center"><p class="text-muted">合同预览加载失败</p><a class="btn btn-outline-primary" href="/sign/<%= token %>/pdf" target="_blank">在新窗口打开合同</a></div>';
       }
     }
+    renderPdfPreview();
   </script>
 </body>
 </html>
