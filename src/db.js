@@ -179,59 +179,31 @@ CREATE INDEX IF NOT EXISTS idx_signatures_token ON contract_signatures(sign_toke
 CREATE INDEX IF NOT EXISTS idx_signatures_party ON contract_signatures(party_id);
 
 -- C4: 强制首次登录修改密码
-DO $$ BEGIN
-  ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- M5: 签署令牌过期时间
-DO $$ BEGIN
-  ALTER TABLE contract_signatures ADD COLUMN expires_at TIMESTAMPTZ;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+ALTER TABLE contract_signatures ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
 -- 安全问题（忘记密码）
-DO $$ BEGIN
-  ALTER TABLE users ADD COLUMN security_question VARCHAR(200);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE users ADD COLUMN security_answer VARCHAR(200);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer VARCHAR(200);
 
 -- 可视化编辑器：模板文本字段 + 合同预填充 PDF
-DO $$ BEGIN
-  ALTER TABLE contract_templates ADD COLUMN text_fields JSONB DEFAULT '[]';
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE contracts ADD COLUMN work_pdf_path VARCHAR(200);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE cases ADD COLUMN next_action TEXT;
-  ALTER TABLE cases ADD COLUMN reminder_at TIMESTAMPTZ;
-  ALTER TABLE cases ADD COLUMN fee_agreement TEXT;
-  ALTER TABLE cases ADD COLUMN fee_details TEXT;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE cases ADD COLUMN reminder_ack_at TIMESTAMPTZ;
-  ALTER TABLE cases ADD COLUMN reminder_ack_by INT REFERENCES users(id);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE case_parties ADD COLUMN injury_info TEXT;
-  ALTER TABLE case_parties ADD COLUMN hospital_dept VARCHAR(100);
-  ALTER TABLE case_parties ADD COLUMN gender VARCHAR(10);
-  ALTER TABLE case_parties ADD COLUMN age INT;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-DO $$ BEGIN
-  ALTER TABLE attachments ADD COLUMN remark VARCHAR(200);
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+ALTER TABLE contract_templates ADD COLUMN IF NOT EXISTS text_fields JSONB DEFAULT '[]';
+ALTER TABLE contracts ADD COLUMN IF NOT EXISTS work_pdf_path VARCHAR(200);
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS next_action TEXT;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_at TIMESTAMPTZ;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS fee_agreement TEXT;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS fee_details TEXT;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_at TIMESTAMPTZ;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_by INT REFERENCES users(id);
+
+-- 案件当事人扩展字段（注意：这些字段不得再写进上方 CREATE TABLE，否则迁移会提前撞 duplicate_column）
+ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS injury_info TEXT;
+ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS hospital_dept VARCHAR(100);
+ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS gender VARCHAR(10);
+ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS age INT;
+ALTER TABLE attachments ADD COLUMN IF NOT EXISTS remark VARCHAR(200);
 `;
 
 const SEED_TYPES = [
