@@ -68,9 +68,11 @@
   #toolHint { min-height: 1.2em; }
 </style>
 
+<script src="/vendor/pdfjs/pdf.min.js"></script>
+
 <script type="module">
-  import * as pdfjsLib from '/vendor/pdfjs/pdf.min.mjs';
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
+  const pdfjsLib = window.pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
 
   const TEMPLATE_ID = <%= tpl.id %>;
   const initSigns = <%- safeJson(initSigns) %>;

@@ -6,6 +6,7 @@
   <title>电子签署 - <%= contractTitle %></title>
   <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <script src="/vendor/pdfjs/pdf.min.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif; background:#f5f6fa; min-height:100vh; }
@@ -146,9 +147,12 @@
     async function renderPdfPreview() {
       const container = document.getElementById('pdfPages');
       try {
-        const pdfjsLib = await import('/vendor/pdfjs/pdf.min.mjs');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.mjs';
-        const pdf = await pdfjsLib.getDocument({ url: '/sign/<%= token %>/pdf' }).promise;
+        const pdfjsLib = window.pdfjsLib;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
+        const resp = await fetch('/sign/<%= token %>/pdf');
+        if (!resp.ok) throw new Error('合同文件响应 ' + resp.status);
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
         container.innerHTML = '';
         const maxWidth = Math.min(container.clientWidth || 800, 1000);
         for (let i = 1; i <= pdf.numPages; i++) {
