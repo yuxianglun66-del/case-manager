@@ -1295,7 +1295,7 @@ router.get('/cases/:id/contracts', async (req, res, next) => {
     if (!c || !canViewCase(req.session.user, c)) return res.status(403).json({ error: '无权访问' });
     const { rows } = await pool.query(
       `SELECT c.*, ct.name AS template_name,
-              (SELECT json_agg(json_build_object('id', cs.id, 'party_name', cs.party_name, 'party_role', cs.party_role, 'status', cs.status, 'signed_at', cs.signed_at))
+              (SELECT json_agg(json_build_object('id', cs.id, 'party_name', cs.party_name, 'party_role', cs.party_role, 'status', cs.status, 'signed_at', cs.signed_at, 'sign_token', cs.sign_token))
                FROM contract_signatures cs WHERE cs.contract_id = c.id) AS signatures
        FROM contracts c
        LEFT JOIN contract_templates ct ON ct.id = c.template_id
