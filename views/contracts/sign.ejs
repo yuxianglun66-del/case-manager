@@ -61,17 +61,22 @@
     let drawing = false, lastX = 0, lastY = 0;
     let signPosition = <%- safeJson(signPosition) %>;
 
-    // 高 DPI 适配
+    // 高 DPI 适配（resize 时保留已画签名，避免移动端地址栏收展清空画布）
     function resizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.lineWidth = 2 * dpr;
+      if (!rect.width || !rect.height) return;
+      const temp = document.createElement('canvas');
+      temp.width = canvas.width; temp.height = canvas.height;
+      temp.getContext('2d').drawImage(canvas, 0, 0);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#1a1a2e';
+      ctx.drawImage(temp, 0, 0, temp.width, temp.height, 0, 0, rect.width, rect.height);
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
@@ -136,10 +141,11 @@
 
     function showToast(msg, type='info') {
       const el = document.createElement('div');
-      el.className = `toast align-items-center text-white bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0 show`;
-      el.role = 'alert'; el.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div></div>`;
+      const bg = type === 'danger' ? '#dc3545' : type === 'success' ? '#198754' : '#0d6efd';
+      el.style.cssText = 'position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);z-index:9999;background:' + bg + ';color:#fff;padding:14px 24px;border-radius:10px;font-size:1rem;box-shadow:0 4px 16px rgba(0,0,0,.35);text-align:center;max-width:82%;pointer-events:none';
+      el.textContent = msg;
       document.body.appendChild(el);
-      setTimeout(() => el.remove(), 2500);
+      setTimeout(() => el.remove(), 3000);
     }
 
     function onPdfLoaded() { /* 已由 PDF.js 画布渲染替代 */ }
@@ -154,11 +160,12 @@
         const bytes = new Uint8Array(await resp.arrayBuffer());
         const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
         container.innerHTML = '';
+        const dpr = window.devicePixelRatio || 1;
         const maxWidth = Math.min(container.clientWidth || 800, 1000);
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const vp1 = page.getViewport({ scale: 1 });
-          const scale = Math.min(maxWidth / vp1.width, 2.5);
+          const scale = Math.min((maxWidth / vp1.width) * dpr, 3);
           const viewport = page.getViewport({ scale });
           const wrap = document.createElement('div');
           wrap.className = 'pdf-page';
