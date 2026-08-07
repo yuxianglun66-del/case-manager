@@ -276,7 +276,7 @@ async function loadUser(req, res, next) {
         req.session.user = rows[0];
         req.session.role = rows[0].role;
         res.locals.user = rows[0];
-        res.locals.admin = rows[0].role === 'admin';
+        res.locals.admin = rows[0].role === 'admin' || rows[0].role === 'super_admin';
         setLocalsPerms(rows[0], res);
         return next();
       }
@@ -298,7 +298,7 @@ async function loadUser(req, res, next) {
       req.session.user = rows[0];
       req.session.role = rows[0].role;
       res.locals.user = rows[0];
-      res.locals.admin = rows[0].role === 'admin';
+      res.locals.admin = rows[0].role === 'admin' || rows[0].role === 'super_admin';
       setLocalsPerms(rows[0], res);
     } else {
       req.session.destroy(() => {});
