@@ -8,6 +8,7 @@ const { hasPermission } = require('../src/permissions');
 const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo } = require('../src/util');
 const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
+const { ZipArchive } = require('archiver');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -484,6 +485,29 @@ router.get('/attachments/:id/preview-file', async (req, res, next) => {
     res.setHeader('Content-Type', mime);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     fs.createReadStream(servePath).pipe(res);
+  } catch (e) { next(e); }
+});
+
+/* 整案附件打包下载 zip */
+router.get('/cases/:id/attachments/zip', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const c = await getCaseForPermission(req);
+    if (!c || !canViewCase(req.session.user, c)) return res.status(403).json({ error: '无权操作' });
+    const files = (await pool.query(
+      `SELECT a.id, a.original_name, a.stored_name FROM attachments a WHERE a.case_id = $1 ORDER BY a.created_at ASC, a.id ASC`, [id]
+    )).rows;
+    const zip = new ZipArchive({ zlib: { level: 6 } });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent((c.case_no || 'case' + id) + '_附件.zip')}`);
+    zip.on('error', (err) => next(err));
+    zip.pipe(res);
+    for (const f of files) {
+      const fp = path.join(UPLOAD_DIR, f.stored_name);
+      if (!fs.existsSync(fp)) continue;
+      zip.append(fs.createReadStream(fp), { name: path.basename(f.original_name) });
+    }
+    await zip.finalize();
   } catch (e) { next(e); }
 });
 

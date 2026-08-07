@@ -1,6 +1,19 @@
 <%
   const roleColors = { 原告:'#4361ee', 被告:'#dc3545', 第三人:'#0ea5e9', 伤者:'#f59e0b', 用人单位:'#6f42c1', 保险公司:'#0d9488', 肇事方:'#ef4444', 受害人:'#e11d48', 其他:'#64748b' };
   const roleColor = r => roleColors[r] || '#64748b';
+  const isImg = (a) => {
+    const m = String(a.mime_type || '').toLowerCase();
+    const n = String(a.original_name || '').toLowerCase();
+    return m.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp|svg)$/.test(n);
+  };
+  const attGroups = {};
+  const imgList = [];
+  for (const a of attachments) {
+    const k = (a.remark || '').trim() || '未分类';
+    if (!attGroups[k]) attGroups[k] = [];
+    attGroups[k].push(a);
+    if (isImg(a)) imgList.push({ id: a.id, name: a.original_name });
+  }
 %>
 <div class="page-head">
   <div>
@@ -225,8 +238,37 @@
   </div>
 
     <!-- ============ 附件 ============ -->
+    <style>
+      .att-group { border:1px solid rgba(59,130,246,.15); border-radius:10px; margin-bottom:10px; background:rgba(15,23,42,.35); }
+      .att-group > summary { list-style:none; cursor:pointer; padding:8px 12px; display:flex; align-items:center; gap:8px; font-weight:600; color:#e2e8f0; }
+      .att-group > summary::-webkit-details-marker { display:none; }
+      .att-group > summary::before { content:'\f4fe'; font-family:'bootstrap-icons'; font-size:.85rem; color:#818cf8; transition:transform .15s; }
+      .att-group[open] > summary::before { content:'\f2ea'; }
+      .att-group-count { background:rgba(99,102,241,.15); color:#a5b4fc; }
+      .att-group-body { padding:0 12px 12px; }
+      .att-thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; margin-bottom:10px; }
+      .att-thumb { position:relative; display:block; aspect-ratio:1/1; border-radius:8px; overflow:hidden; border:1px solid rgba(59,130,246,.2); background:#0f172a; }
+      .att-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+      .att-thumb-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:6px; background:rgba(15,23,42,.55); }
+      .att-thumb:hover .att-thumb-actions { display:flex; }
+      .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; }
+      .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); }
+      .lb-close { position:absolute; top:14px; right:18px; font-size:1.6rem; color:#e2e8f0; cursor:pointer; padding:6px; }
+      .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.08); border:none; color:#e2e8f0; font-size:2rem; width:52px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+      .lb-nav:hover { background:rgba(255,255,255,.18); }
+      .lb-prev { left:12px; } .lb-next { right:12px; }
+      .lb-info { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#cbd5e1; font-size:.9rem; display:flex; align-items:center; justify-content:center; gap:12px; }
+      .lb-dl { color:#93c5fd; text-decoration:none; }
+      @media (max-width:576px) { .att-thumbs { grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); } .lb-nav { width:40px; height:48px; font-size:1.4rem; } }
+    </style>
+
     <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-paperclip"></i> 附件（<%= attachments.length %>）</div>
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-paperclip"></i> 附件（<%= attachments.length %>）</span>
+        <% if (attachments.length) { %>
+        <a class="btn btn-sm btn-outline-primary" href="/api/cases/<%= caseData.id %>/attachments/zip"><i class="bi bi-download"></i> 打包下载</a>
+        <% } %>
+      </div>
       <div class="card-body">
         <div class="mb-3">
           <% if (can('attachments.manage')) { %>
@@ -239,30 +281,67 @@
           <% } %>
         </div>
         <div id="fileList">
-          <% attachments.forEach(a => { %>
-            <div class="file-item d-flex align-items-center gap-2 mb-2" id="file-<%= a.id %>">
-              <i class="bi bi-file-earmark-text fs-4" style="color:#4361ee"></i>
-              <div class="flex-grow-1 text-truncate">
-                <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="text-decoration-none fw-semibold"><%= a.original_name %></a>
-                <% if (a.remark) { %><span class="badge rounded-pill ms-1" style="background:rgba(99,102,241,.15);color:#818cf8;font-size:11px"><%= a.remark %></span><% } %>
-                <div class="text-muted small">
-                  <i class="bi bi-database"></i> <%= (a.size / 1024).toFixed(1) %> KB · <i class="bi bi-person"></i> <%= a.uploader_name || '' %> · <i class="bi bi-clock"></i> <%= new Date(a.created_at).toLocaleString('zh-CN') %>
-                </div>
-              </div>
-              <div class="d-flex gap-1 flex-shrink-0">
-                <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="btn btn-ico btn-light" title="预览"><i class="bi bi-eye"></i></a>
-                <a href="/api/attachments/<%= a.id %>/download" class="btn btn-ico btn-light" title="下载"><i class="bi bi-download"></i></a>
-                <% if (can('attachments.manage')) { %>
-                <button class="btn btn-ico btn-light" title="替换文件" onclick="replaceFile(<%= a.id %>, '<%= a.original_name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-arrow-repeat"></i></button>
-                <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delFile(<%= a.id %>)"><i class="bi bi-trash"></i></button>
-                <% } %>
-              </div>
-            </div>
-          <% }) %>
           <% if (attachments.length === 0) { %>
             <div class="empty-tip"><i class="bi bi-paperclip"></i>暂无附件</div>
+          <% } else { %>
+            <% let gIdx = 0; %>
+            <% for (const [gKey, gAtts] of Object.entries(attGroups)) { %>
+            <details class="att-group" <%= gIdx === 0 ? 'open' : '' %>>
+              <summary><%= gKey %><span class="badge rounded-pill att-group-count"><%= gAtts.length %></span></summary>
+              <div class="att-group-body">
+                <% const gImgs = gAtts.filter(isImg); %>
+                <% if (gImgs.length) { %>
+                <div class="att-thumbs">
+                  <% gImgs.forEach(gi => { %>
+                  <a class="att-thumb" href="javascript:void(0)" onclick="lbOpen(<%= imgList.findIndex(x => x.id === gi.id) %>)" title="<%= gi.original_name.replace(/["'<>]/g, '') %>">
+                    <img src="/api/attachments/<%= gi.id %>/file" loading="lazy" alt="">
+                    <% if (can('attachments.manage')) { %>
+                    <span class="att-thumb-actions">
+                      <button class="btn btn-ico btn-light" title="替换文件" onclick="event.stopPropagation(); replaceFile(<%= gi.id %>, '<%= gi.original_name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-arrow-repeat"></i></button>
+                      <button class="btn btn-ico btn-outline-danger" title="删除" onclick="event.stopPropagation(); delFile(<%= gi.id %>)"><i class="bi bi-trash"></i></button>
+                    </span>
+                    <% } %>
+                  </a>
+                  <% }) %>
+                </div>
+                <% } %>
+                <% gAtts.filter(a => !isImg(a)).forEach(a => { %>
+                <div class="file-item d-flex align-items-center gap-2 mb-2" id="file-<%= a.id %>">
+                  <i class="bi bi-file-earmark-text fs-4" style="color:#4361ee"></i>
+                  <div class="flex-grow-1 text-truncate">
+                    <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="text-decoration-none fw-semibold"><%= a.original_name %></a>
+                    <div class="text-muted small">
+                      <i class="bi bi-database"></i> <%= (a.size / 1024).toFixed(1) %> KB · <i class="bi bi-person"></i> <%= a.uploader_name || '' %> · <i class="bi bi-clock"></i> <%= new Date(a.created_at).toLocaleString('zh-CN') %>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-1 flex-shrink-0">
+                    <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="btn btn-ico btn-light" title="预览"><i class="bi bi-eye"></i></a>
+                    <a href="/api/attachments/<%= a.id %>/download" class="btn btn-ico btn-light" title="下载"><i class="bi bi-download"></i></a>
+                    <% if (can('attachments.manage')) { %>
+                    <button class="btn btn-ico btn-light" title="替换文件" onclick="replaceFile(<%= a.id %>, '<%= a.original_name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delFile(<%= a.id %>)"><i class="bi bi-trash"></i></button>
+                    <% } %>
+                  </div>
+                </div>
+                <% }) %>
+              </div>
+            </details>
+            <% gIdx++; %>
+            <% } %>
           <% } %>
         </div>
+      </div>
+    </div>
+
+    <!-- 图片灯箱 -->
+    <div id="lightbox" class="lightbox" style="display:none">
+      <div class="lb-close" onclick="lbClose()"><i class="bi bi-x-lg"></i></div>
+      <button class="lb-nav lb-prev" onclick="lbNav(-1)"><i class="bi bi-chevron-left"></i></button>
+      <img id="lbImg" src="" alt="">
+      <button class="lb-nav lb-next" onclick="lbNav(1)"><i class="bi bi-chevron-right"></i></button>
+      <div class="lb-info">
+        <span id="lbInfo"></span>
+        <a id="lbDl" class="lb-dl" href="" target="_blank"><i class="bi bi-download"></i> 下载</a>
       </div>
     </div>
 
@@ -849,4 +928,35 @@
       setTimeout(()=>location.reload(),400);
     } catch(err) { toast(err.message,'danger'); }
   }
+
+  /* ---------- 图片灯箱 ---------- */
+  const LB_LIST = <%- JSON.stringify(imgList) %>;
+  let LB_IDX = -1;
+  function lbOpen(i) {
+    if (!LB_LIST.length || !LB_LIST[i]) return;
+    LB_IDX = i;
+    const a = LB_LIST[i];
+    document.getElementById('lbImg').src = '/api/attachments/' + a.id + '/file';
+    document.getElementById('lbInfo').textContent = (i + 1) + ' / ' + LB_LIST.length + ' · ' + (a.name || '');
+    document.getElementById('lbDl').href = '/api/attachments/' + a.id + '/download';
+    document.getElementById('lightbox').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function lbClose() {
+    document.getElementById('lightbox').style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  function lbNav(d) {
+    if (!LB_LIST.length) return;
+    lbOpen((LB_IDX + d + LB_LIST.length) % LB_LIST.length);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('lightbox').style.display === 'none') return;
+    if (e.key === 'Escape') lbClose();
+    else if (e.key === 'ArrowLeft') lbNav(-1);
+    else if (e.key === 'ArrowRight') lbNav(1);
+  });
+  document.getElementById('lightbox').addEventListener('click', (e) => {
+    if (e.target.id === 'lightbox') lbClose();
+  });
 </script>
