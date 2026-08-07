@@ -975,8 +975,8 @@ router.get('/cases/export/csv', requirePermission('cases.import_export'), async 
     if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
-    if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`c.assignee_id = $${params.length}`); }
-    if (!canViewAll) { params.push(user.id); where.push(`c.assignee_id = $${params.length}`); }
+    if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
+    if (!canViewAll) { params.push(user.id); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const { rows: cases } = await pool.query(
@@ -1021,8 +1021,8 @@ router.get('/cases/export/xlsx', requirePermission('cases.import_export'), async
     if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
-    if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`c.assignee_id = $${params.length}`); }
-    if (!canViewAll) { params.push(user.id); where.push(`c.assignee_id = $${params.length}`); }
+    if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
+    if (!canViewAll) { params.push(user.id); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const { rows: cases } = await pool.query(

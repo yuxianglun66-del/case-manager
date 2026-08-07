@@ -132,10 +132,10 @@ router.get('/cases', async (req, res, next) => {
     if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
-    if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`c.assignee_id = $${params.length}`); }
+    if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
     if (dateFrom) { params.push(dateFrom); where.push(`c.sign_date >= $${params.length}`); }
     if (dateTo) { params.push(dateTo); where.push(`c.sign_date <= $${params.length}`); }
-    if (!canViewAll(user)) { params.push(user.id); where.push(`c.assignee_id = $${params.length}`); }
+    if (!canViewAll(user)) { params.push(user.id); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const count = await pool.query(`SELECT COUNT(*)::int AS n FROM cases c ${whereSql}`, params);
@@ -166,7 +166,7 @@ router.get('/cases', async (req, res, next) => {
     const types = (await pool.query(`SELECT id, name FROM case_types WHERE active = TRUE ORDER BY sort`)).rows;
     const statuses = (await pool.query(`SELECT id, name FROM statuses WHERE active = TRUE ORDER BY sort`)).rows;
     const staff = canViewAll(user)
-      ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE AND role='staff' ORDER BY display_name`)).rows
+      ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows
       : [];
 
     res.render('cases/list', {
