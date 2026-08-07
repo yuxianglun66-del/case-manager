@@ -45,12 +45,6 @@
             <div class="info-label"><i class="bi bi-calendar-check"></i> 签单日期</div>
             <div class="info-value"><%= caseData.sign_date ? new Date(caseData.sign_date).toLocaleDateString('zh-CN') : '—' %></div>
           </div>
-          <% if (caseData.remark) { %>
-          <div class="info-item" style="grid-column:1/-1">
-            <div class="info-label"><i class="bi bi-chat-left-text"></i> 备注</div>
-            <div class="info-value" style="white-space:pre-wrap"><%= caseData.remark %></div>
-          </div>
-          <% } %>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-calendar-plus"></i> 创建时间</div>
             <div class="info-value"><%= new Date(caseData.created_at).toLocaleString('zh-CN') %></div>

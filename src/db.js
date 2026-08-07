@@ -212,9 +212,6 @@ ALTER TABLE attachments ADD COLUMN IF NOT EXISTS remark VARCHAR(200);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_staff_id INT REFERENCES users(id);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_date DATE;
 CREATE INDEX IF NOT EXISTS idx_cases_sign_date ON cases(sign_date);
-
--- 迁移 NocoBase 数据：案件备注（约 80 个额外字段整理为文本放这里）
-ALTER TABLE cases ADD COLUMN IF NOT EXISTS remark TEXT;
 `;
 
 const SEED_TYPES = [
