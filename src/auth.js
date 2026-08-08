@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../src/db');
 const { hasPermission, ROLES } = require('./permissions');
+const { audit } = require('./audit');
 const isProd = process.env.NODE_ENV === 'production';
 
 // 密码复杂度：至少 8 位，且必须同时包含字母和数字
@@ -57,6 +58,7 @@ function createAuthRouter(loginLimiter) {
         // 保留 CSRF token
         if (oldSession.csrfToken) req.session.csrfToken = oldSession.csrfToken;
         console.log('[auth] login success, userId=', user.id, 'must_change_password=', user.must_change_password);
+        audit(req, 'login', { entity_type: 'user', entity_id: user.id, detail: `用户 ${user.display_name} 登录系统` });
         req.session.save((saveErr) => {
           if (saveErr) { console.error('[auth] session save error:', saveErr); }
           // C4: 首次登录必须修改密码
@@ -121,6 +123,7 @@ function createAuthRouter(loginLimiter) {
       const hash = await bcrypt.hash(new_password, 10);
       await pool.query(`UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2`, [hash, req.session.userId]);
       req.session.user.must_change_password = false;
+      try { await audit({ session: req.session, ip: req.ip }, '修改密码', { entity_type: 'user', entity_id: req.session.userId, detail: '用户修改了自己的登录密码' }); } catch {}
       res.render('change-password', { title: '修改密码', success: true, mustChange: false, csrfToken: req.session.csrfToken || '', layout: false });
     } catch (e) {
       console.error('[auth] change-password error:', e.message);

@@ -195,6 +195,11 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     }
     await pool.query(`UPDATE contracts SET pdf_path=$1, status='signed', completed_at=now() WHERE id=$2`, [signedFile, first.contract_id]);
 
+    try {
+      const { audit } = require('../src/audit');
+      await audit({ session: { user: null }, ip: req.ip }, '签署合同', { entity_type: 'contract', entity_id: first.contract_id, detail: (targets.map(t => t.rec.party_name).filter(Boolean).join('、') || '当事人') + ' 完成签署' });
+    } catch {}
+
     res.json({
       ok: true, signed: true, all_signed: true,
       signed_party_names: targets.map(t => t.rec.party_name),

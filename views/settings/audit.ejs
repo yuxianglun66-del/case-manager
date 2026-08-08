@@ -1,0 +1,121 @@
+<div class="page-head">
+  <div>
+    <h1>操作日志</h1>
+    <div class="lead">记录系统登录与全部人员数据变更操作（仅超级管理员可见）</div>
+  </div>
+</div>
+
+<form class="card mb-3" method="get" action="/settings/audit">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label mb-1">操作用户</label>
+        <select class="form-select form-select-sm" name="user_id">
+          <option value="">全部用户</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= String(q.user_id) === String(u.id) ? 'selected' : '' %>><%= u.display_name %>（<%= u.username %>）</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1">操作类型</label>
+        <input type="text" class="form-control form-control-sm" name="action" value="<%= q.action %>" placeholder="如：登录 / 新增案件">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1">开始日期</label>
+        <input type="date" class="form-control form-control-sm" name="date_from" value="<%= q.date_from %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1">结束日期</label>
+        <input type="date" class="form-control form-control-sm" name="date_to" value="<%= q.date_to %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label mb-1">关键词</label>
+        <input type="text" class="form-control form-control-sm" name="keyword" value="<%= q.keyword %>" placeholder="搜索详情/用户">
+      </div>
+      <div class="col-md-1 d-flex gap-2">
+        <button class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i> 查询</button>
+        <a class="btn btn-light btn-sm" href="/settings/audit"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-journal-text"></i> 日志列表（共 <%= total %> 条）</span>
+    <a class="btn btn-sm btn-light" href="/settings/audit"><i class="bi bi-arrow-clockwise"></i> 刷新</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle" style="min-width: 900px;">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>用户</th>
+            <th>操作</th>
+            <th>对象</th>
+            <th style="min-width: 320px;">详情</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (logs && logs.length) { %>
+            <% logs.forEach(l => { %>
+              <tr>
+                <td class="text-nowrap small text-muted"><%= new Date(l.created_at).toLocaleString('zh-CN') %></td>
+                <td class="text-nowrap"><%= l.display_name || '<span class="text-muted">外部/未知</span>' %></td>
+                <td class="text-nowrap"><span class="badge text-bg-light border"><%= l.action %></span></td>
+                <td class="text-nowrap small">
+                  <span class="text-muted"><%= l.entity_type || '—' %></span>
+                  <% if (l.entity_id != null) { %><span class="badge text-bg-secondary ms-1"><%= l.entity_id %></span><% } %>
+                </td>
+                <td>
+                  <div class="small"><%= l.detail || '' %></div>
+                  <% if (l.before_data || l.after_data) { %>
+                    <div class="small text-muted mt-1">
+                      <a href="javascript:void(0)" class="toggle-diff text-decoration-none" data-target="diff-<%= l.id %>"><i class="bi bi-arrow-left-right"></i> 查看变更</a>
+                    </div>
+                    <div id="diff-<%= l.id %>" class="diff-box mt-1" style="display:none;">
+                      <% if (l.before_data) { %><div class="mb-1"><span class="text-danger fw-bold">改前：</span><code class="diff-code"><%= l.before_data %></code></div><% } %>
+                      <% if (l.after_data) { %><div><span class="text-success fw-bold">改后：</span><code class="diff-code"><%= l.after_data %></code></div><% } %>
+                    </div>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          <% } else { %>
+            <tr><td colspan="5" class="text-center text-muted py-4">暂无日志记录</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% if (totalPages > 1) { %>
+    <div class="card-footer">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 justify-content-center">
+          <% const qs = (p) => { const sp = new URLSearchParams(); if (q.user_id) sp.set('user_id', q.user_id); if (q.action) sp.set('action', q.action); if (q.date_from) sp.set('date_from', q.date_from); if (q.date_to) sp.set('date_to', q.date_to); if (q.keyword) sp.set('keyword', q.keyword); sp.set('page', p); return sp.toString(); }; %>
+          <li class="page-item <%= page <= 1 ? 'disabled' : '' %>"><a class="page-link" href="/settings/audit?<%= qs(page - 1) %>">&laquo;</a></li>
+          <% for (let p = Math.max(1, page - 2); p <= Math.min(totalPages, page + 2); p++) { %>
+            <li class="page-item <%= p === page ? 'active' : '' %>"><a class="page-link" href="/settings/audit?<%= qs(p) %>"><%= p %></a></li>
+          <% } %>
+          <li class="page-item <%= page >= totalPages ? 'disabled' : '' %>"><a class="page-link" href="/settings/audit?<%= qs(page + 1) %>">&raquo;</a></li>
+        </ul>
+      </nav>
+    </div>
+  <% } %>
+</div>
+
+<style>
+  .diff-box { background: #f8f9fa; border: 1px dashed #dee2e6; border-radius: 6px; padding: 6px 8px; }
+  .diff-code { display: block; white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.5; }
+</style>
+
+<script>
+  document.querySelectorAll('.toggle-diff').forEach(el => {
+    el.addEventListener('click', () => {
+      const box = document.getElementById(el.dataset.target);
+      if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
+    });
+  });
+</script>

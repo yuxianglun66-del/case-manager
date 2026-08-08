@@ -182,6 +182,7 @@
         <% } %>
         <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
           <a href="/settings/backup" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-database-fill-down"></i><span>备份与恢复</span></a>
+          <a href="/settings/audit" class="<%= _active === 'audit' ? 'active' : '' %>"><i class="bi bi-journal-text"></i><span>操作日志</span></a>
         <% } %>
       </nav>
       <div class="sidebar-footer">

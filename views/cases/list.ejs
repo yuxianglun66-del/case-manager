@@ -44,7 +44,7 @@
       </div>
       <% if (can('cases.view_all') && staff.length) { %>
       <div class="col-6 col-md-3 col-lg-2">
-        <label class="form-label mb-1">负责人</label>
+        <label class="form-label mb-1">服务人员</label>
         <select name="assignee" class="form-select">
           <option value="">全部人员</option>
           <% staff.forEach(s => { %>
@@ -80,7 +80,7 @@
             <th>类型</th>
             <th>状态</th>
             <th class="hide-mobile">客户</th>
-            <th class="hide-mobile">负责人</th>
+            <th class="hide-mobile">服务人员</th>
             <th class="hide-mobile">签单人员</th>
             <th class="hide-mobile">签单日期</th>
             <th class="text-center"><i class="bi bi-paperclip"></i></th>
@@ -143,7 +143,7 @@
         <div class="modal-body">
           <div class="alert alert-info small mb-3">
             <i class="bi bi-info-circle"></i> 请先下载<a href="/api/cases/import/template" class="ms-1">模板文件</a>，按格式填写后上传。<br>
-            必填列：case_type_code（类型代码）、title（案件名称）、client_name（客户）、assignee_username（负责人账号，可选）、status_name（状态名称）。
+            必填列：case_type_code（类型代码）、title（案件名称）、client_name（客户）、assignee_username（服务人员账号，可选）、status_name（状态名称）。
           </div>
           <div class="mb-3">
             <label class="form-label">选择 CSV 文件</label>

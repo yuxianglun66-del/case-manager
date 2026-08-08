@@ -408,4 +408,44 @@ router.get('/settings/backup', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/* ---------- 操作日志（仅超级管理员） ---------- */
+router.get('/settings/audit', async (req, res, next) => {
+  try {
+    if (!req.session.user || req.session.user.role !== 'super_admin') {
+      return res.status(403).render('error', {
+        title: '无权访问',
+        message: '仅超级管理员可查看操作日志。',
+        user: req.session.user
+      });
+    }
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+
+    const conds = [];
+    const params = [];
+    const { user_id, action, date_from, date_to, keyword } = req.query;
+    if (user_id) { params.push(parseInt(user_id, 10)); conds.push(`user_id = $${params.length}`); }
+    if (action) { params.push(String(action)); conds.push(`action = $${params.length}`); }
+    if (date_from) { params.push(String(date_from)); conds.push(`created_at >= $${params.length}::date`); }
+    if (date_to) { params.push(String(date_to)); conds.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`); }
+    if (keyword) { params.push(`%${String(keyword)}%`); conds.push(`(detail ILIKE $${params.length} OR display_name ILIKE $${params.length})`); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+    const countRow = (await pool.query(`SELECT COUNT(*)::int AS n FROM audit_logs ${where}`, params)).rows[0];
+    const total = countRow.n;
+    const rows = (await pool.query(
+      `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    )).rows;
+    const users = (await pool.query(`SELECT id, display_name, username FROM users ORDER BY display_name`)).rows;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    res.render('settings/audit', {
+      title: '操作日志', logs: rows, users, total, page, limit, totalPages,
+      q: { user_id: user_id || '', action: action || '', date_from: date_from || '', date_to: date_to || '', keyword: keyword || '' },
+    });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

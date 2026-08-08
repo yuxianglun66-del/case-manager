@@ -212,6 +212,23 @@ ALTER TABLE attachments ADD COLUMN IF NOT EXISTS remark VARCHAR(200);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_staff_id INT REFERENCES users(id);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_date DATE;
 CREATE INDEX IF NOT EXISTS idx_cases_sign_date ON cases(sign_date);
+
+-- 操作日志：登录 + 所有数据变更（含变更前后内容），仅超管可查看
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INT,
+  display_name VARCHAR(100),
+  action VARCHAR(50) NOT NULL,
+  entity_type VARCHAR(50),
+  entity_id INT,
+  detail TEXT,
+  before_data JSONB,
+  after_data JSONB,
+  ip VARCHAR(50),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 `;
 
 const SEED_TYPES = [

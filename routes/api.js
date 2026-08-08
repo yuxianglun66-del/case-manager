@@ -9,6 +9,7 @@ const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForP
 const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 const { ZipArchive } = require('archiver');
+const { audit } = require('../src/audit');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -105,6 +106,7 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
 
     await addHistory(client, caseId, 'created', user.id, { statusId, note: '创建案件' });
     await client.query('COMMIT');
+    await audit(req, '创建案件', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + caseNo + '「' + title + '」', after: { case_no: caseNo, title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate } });
     res.json({ ok: true, id: caseId, case_no: caseNo });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -176,6 +178,7 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
 
     await addHistory(client, id, 'edit', user.id, { statusId, note: '更新案件信息' });
     await client.query('COMMIT');
+    await audit(req, '更新案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + title + '」', before: { title: req.caseRow.title, client_name: req.caseRow.client_name, assignee_id: req.caseRow.assignee_id, status_id: req.caseRow.status_id, sign_staff_id: req.caseRow.sign_staff_id, sign_date: req.caseRow.sign_date, next_action: req.caseRow.next_action, fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate, next_action: nextAction, fee_agreement: feeAgreement, fee_details: feeDetails } });
     res.json({ ok: true, id });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -202,6 +205,7 @@ router.post('/cases/:id/status', requirePermission('cases.edit'), needCase, asyn
       note: note || `状态变更为「${st.name}」`,
     });
     await client.query('COMMIT');
+    await audit(req, '变更状态', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 状态变更为「' + st.name + '」' + (note ? '（' + note + '）' : ''), before: { status_id: req.caseRow.status_id }, after: { status_id: statusId } });
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -228,6 +232,7 @@ router.post('/cases/:id/delete', requirePermission('cases.delete'), needCase, as
     }
     for (const c of contracts) { removeFile(c.pdf_path); removeFile(c.work_pdf_path); }
     for (const s of sigs) { removeFile(s.signature_image_path); }
+    await audit(req, '删除案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」' });
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -244,6 +249,7 @@ router.post('/cases/:id/next-action', requirePermission('cases.remind'), needCas
       `UPDATE cases SET next_action=$1, reminder_at=$2, reminder_ack_at=NULL, reminder_ack_by=NULL, updated_at=now() WHERE id=$3`,
       [nextAction, reminderAt, id]
     );
+    await audit(req, '更新下一步流程', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + ' 下一步：' + (nextAction || '（空）'), before: { next_action: req.caseRow.next_action, reminder_at: req.caseRow.reminder_at }, after: { next_action: nextAction, reminder_at: reminderAt } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -257,6 +263,7 @@ router.post('/cases/:id/reminder/ack', needCase, async (req, res, next) => {
       `UPDATE cases SET reminder_ack_at=now(), reminder_ack_by=$1, updated_at=now() WHERE id=$2`,
       [req.session.user.id, id]
     );
+    await audit(req, '确认提醒', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -272,6 +279,7 @@ router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (r
       `UPDATE cases SET fee_agreement=$1, fee_details=$2, updated_at=now() WHERE id=$3`,
       [feeAgreement, feeDetails, id]
     );
+    await audit(req, '更新费用信息', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no, before: { fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { fee_agreement: feeAgreement, fee_details: feeDetails } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -315,6 +323,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     }
     await addHistory(client, req.caseRow.id, 'attachment', user.id, { note: `上传附件 ${files.length} 个` });
     await client.query('COMMIT');
+    await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
     res.json({ ok: true, files: list });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -362,6 +371,7 @@ router.post('/attachments/:id/replace', requirePermission('attachments.manage'),
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     const oldCache = oldPath + '.preview.pdf';
     if (fs.existsSync(oldCache)) fs.unlinkSync(oldCache);
+    await audit(req, '替换附件', { entity_type: 'attachment', entity_id: id, detail: '附件「' + att.original_name + '」→「' + Buffer.from(req.file.originalname, 'latin1').toString('utf8') + '」', before: { original_name: att.original_name, size: att.size }, after: { original_name: Buffer.from(req.file.originalname, 'latin1').toString('utf8'), size: req.file.size } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -385,6 +395,7 @@ router.post('/attachments/:id/delete', requirePermission('attachments.manage'), 
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
     const cachePath = fp + '.preview.pdf';
     if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+    await audit(req, '删除附件', { entity_type: 'attachment', entity_id: id, detail: '附件「' + att.original_name + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -539,10 +550,11 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     const dup = (await pool.query(`SELECT id FROM users WHERE username = $1`, [username])).rows;
     if (dup.length) return res.status(400).json({ error: '用户名已存在' });
     const hash = await bcrypt.hash(password, 10);
-    await pool.query(
-      `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer) VALUES ($1,$2,$3,$4,$5,$6)`,
+    const ins = await pool.query(
+      `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
       [username, hash, displayName, role, securityQuestion || null, securityAnswer || null]
     );
+    await audit(req, '新增用户', { entity_type: 'user', entity_id: ins.rows[0].id, detail: '用户名 ' + username + '（' + displayName + '，' + (role === 'admin' ? '管理员' : '服务人员') + '）', after: { username, display_name: displayName, role } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -572,6 +584,7 @@ router.post('/users/:id/update', requirePermission('system.users'), async (req, 
       `UPDATE users SET display_name=$1, role=$2, active=$3 WHERE id=$4`,
       [displayName, role, active, id]
     );
+    await audit(req, '更新用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' → ' + displayName + '（角色：' + (role === 'admin' ? '管理员' : '服务人员') + '，' + (active ? '启用' : '停用') + '）', before: { display_name: target.display_name, role: target.role, active: target.active }, after: { display_name: displayName, role, active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -582,13 +595,14 @@ router.post('/users/:id/reset', requirePermission('system.users'), async (req, r
     const password = req.body.password || '';
     const pwErr = validatePasswordStrength(password);
     if (pwErr) return res.status(400).json({ error: pwErr });
-    const target = (await pool.query(`SELECT role FROM users WHERE id = $1`, [id])).rows[0];
+    const target = (await pool.query(`SELECT role, display_name FROM users WHERE id = $1`, [id])).rows[0];
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
       return res.status(403).json({ error: '仅超级管理员可重置管理员账号密码' });
     }
     const hash = await bcrypt.hash(password, 10);
     await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, id]);
+    await audit(req, '重置密码', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -599,13 +613,14 @@ router.post('/users/:id/security-question', requirePermission('system.users'), a
     const question = (req.body.security_question || '').trim();
     const answer = (req.body.security_answer || '').trim();
     if (!question || !answer) return res.status(400).json({ error: '安全问题和答案都不能为空' });
-    const target = (await pool.query(`SELECT role FROM users WHERE id = $1`, [id])).rows[0];
+    const target = (await pool.query(`SELECT role, display_name FROM users WHERE id = $1`, [id])).rows[0];
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
       return res.status(403).json({ error: '仅超级管理员可修改管理员账号的安全问题' });
     }
     const answerHash = await bcrypt.hash(answer, 10);
     await pool.query(`UPDATE users SET security_question = $1, security_answer = $2 WHERE id = $3`, [question, answerHash, id]);
+    await audit(req, '修改安全问题', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' 问题：' + question });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -614,12 +629,13 @@ router.post('/users/:id/delete', requirePermission('system.users'), async (req, 
   try {
     const id = parseInt(req.params.id, 10);
     if (id === req.session.user.id) return res.status(400).json({ error: '不能删除自己' });
-    const target = (await pool.query(`SELECT role FROM users WHERE id = $1`, [id])).rows[0];
+    const target = (await pool.query(`SELECT role, display_name FROM users WHERE id = $1`, [id])).rows[0];
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
       return res.status(403).json({ error: '仅超级管理员可停用管理员账号' });
     }
     await pool.query(`UPDATE users SET active = FALSE WHERE id = $1`, [id]);
+    await audit(req, '停用用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -631,7 +647,7 @@ router.post('/users/:id/remove', requirePermission('system.users'), async (req, 
     await client.query('BEGIN');
     const id = parseInt(req.params.id, 10);
     if (id === req.session.user.id) return res.status(400).json({ error: '不能删除自己' });
-    const target = (await client.query(`SELECT id, role FROM users WHERE id = $1`, [id])).rows[0];
+    const target = (await client.query(`SELECT id, role, display_name FROM users WHERE id = $1`, [id])).rows[0];
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if (target.role === 'super_admin') return res.status(400).json({ error: '超级管理员账号不可删除' });
     if (target.role === 'admin' && req.session.user.role !== 'super_admin') {
@@ -656,6 +672,7 @@ router.post('/users/:id/remove', requirePermission('system.users'), async (req, 
     await client.query(`UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = $1`, [id]);
     await client.query(`UPDATE contracts SET initiator_id = NULL WHERE initiator_id = $1`, [id]);
     await client.query(`DELETE FROM users WHERE id = $1`, [id]);
+    await audit(req, '删除用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' + (reassignTo ? '，案件已指派给 ' + reassignTo : '') });
     await client.query('COMMIT');
     res.json({ ok: true });
   } catch (e) {
@@ -676,6 +693,7 @@ router.post('/roles/permissions', requirePermission('system.roles'), async (req,
     }
     const { setPermissions } = require('../src/permissions');
     await setPermissions(role, permissions);
+    await audit(req, '更新角色权限', { entity_type: 'role', entity_id: role, detail: '角色「' + (role === 'admin' ? '管理员' : '服务人员') + '」权限：' + (permissions.length ? permissions.join('、') : '（全部移除）') });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -694,6 +712,7 @@ router.post('/types/create', requirePermission('system.settings'), async (req, r
       `INSERT INTO case_types (code, name, color) VALUES ($1,$2,$3) RETURNING id`,
       [code, name, color]
     );
+    await audit(req, '新增案件类型', { entity_type: 'case_type', entity_id: ins.rows[0].id, detail: '编码 ' + code + '「' + name + '」', after: { code, name, color } });
     res.json({ ok: true, id: ins.rows[0].id });
   } catch (e) { next(e); }
 });
@@ -706,7 +725,10 @@ router.post('/types/:id/update', requirePermission('system.settings'), async (re
     const sort = parseInt(req.body.sort, 10) || 0;
     const active = req.body.active === '1';
     if (!name) return res.status(400).json({ error: '类型名称不能为空' });
+    const old = (await pool.query(`SELECT code, name, color, active FROM case_types WHERE id=$1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '类型不存在' });
     await pool.query(`UPDATE case_types SET name=$1, color=$2, sort=$3, active=$4 WHERE id=$5`, [name, color, sort, active, id]);
+    await audit(req, '编辑案件类型', { entity_type: 'case_type', entity_id: id, detail: '类型「' + old.name + '」→「' + name + '」', before: { name: old.name, color: old.color, active: old.active }, after: { name, color, active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -716,7 +738,9 @@ router.post('/types/:id/delete', requirePermission('system.settings'), async (re
     const id = parseInt(req.params.id, 10);
     const cnt = (await pool.query(`SELECT COUNT(*)::int AS n FROM cases WHERE case_type_id = $1`, [id])).rows[0].n;
     if (cnt > 0) return res.status(400).json({ error: `该类型下还有 ${cnt} 起案件，无法删除。可将类型设为停用。` });
+    const old = (await pool.query(`SELECT code, name FROM case_types WHERE id = $1`, [id])).rows[0];
     await pool.query(`DELETE FROM case_types WHERE id = $1`, [id]);
+    if (old) await audit(req, '删除案件类型', { entity_type: 'case_type', entity_id: id, detail: '类型「' + old.name + '」（' + old.code + '）' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -742,6 +766,7 @@ router.post('/fields/create', requirePermission('system.settings'), async (req, 
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [typeId, label, fieldType, options, required, placeholder || null, sort]
     );
+    await audit(req, '新增动态字段', { entity_type: 'field', entity_id: ins.rows[0].id, detail: '字段「' + label + '」（类型 ' + fieldType + '）', after: { label, field_type: fieldType, case_type_id: typeId, required } });
     res.json({ ok: true, id: ins.rows[0].id });
   } catch (e) { next(e); }
 });
@@ -754,7 +779,10 @@ router.post('/fields/:id/update', requirePermission('system.settings'), async (r
     const placeholder = (req.body.placeholder || '').trim();
     const sort = parseInt(req.body.sort, 10) || 999;
     if (!label) return res.status(400).json({ error: '字段名称不能为空' });
+    const old = (await pool.query(`SELECT label, required FROM case_fields WHERE id=$1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '字段不存在' });
     await pool.query(`UPDATE case_fields SET label=$1, required=$2, placeholder=$3, sort=$4 WHERE id=$5`, [label, required, placeholder || null, sort, id]);
+    await audit(req, '编辑动态字段', { entity_type: 'field', entity_id: id, detail: '字段「' + old.label + '」→「' + label + '」', before: { label: old.label, required: old.required }, after: { label, required } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -763,7 +791,10 @@ router.post('/fields/:id/toggle', requirePermission('system.settings'), async (r
   try {
     const id = parseInt(req.params.id, 10);
     const active = req.body.active === '1';
+    const old = (await pool.query(`SELECT label, active FROM case_fields WHERE id=$1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '字段不存在' });
     await pool.query(`UPDATE case_fields SET active=$1 WHERE id=$2`, [active, id]);
+    await audit(req, '切换字段启用', { entity_type: 'field', entity_id: id, detail: '字段「' + old.label + '」' + (active ? '启用' : '停用'), before: { active: old.active }, after: { active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -771,8 +802,10 @@ router.post('/fields/:id/toggle', requirePermission('system.settings'), async (r
 router.post('/fields/:id/delete', requirePermission('system.settings'), async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const old = (await pool.query(`SELECT label FROM case_fields WHERE id=$1`, [id])).rows[0];
     await pool.query(`DELETE FROM case_field_values WHERE field_id = $1`, [id]);
     await pool.query(`DELETE FROM case_fields WHERE id = $1`, [id]);
+    if (old) await audit(req, '删除动态字段', { entity_type: 'field', entity_id: id, detail: '字段「' + old.label + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -788,7 +821,8 @@ router.post('/statuses/create', requirePermission('system.settings'), async (req
     const color = (req.body.color || '#0d6efd').trim();
     if (!name) return res.status(400).json({ error: '状态名称必填' });
     if (!CATEGORY_LABELS[category]) return res.status(400).json({ error: '状态分类不正确' });
-    await pool.query(`INSERT INTO statuses (name, category, color) VALUES ($1,$2,$3)`, [name, category, color]);
+    const ins = await pool.query(`INSERT INTO statuses (name, category, color) VALUES ($1,$2,$3) RETURNING id`, [name, category, color]);
+    await audit(req, '新增状态', { entity_type: 'status', entity_id: ins.rows[0].id, detail: '状态「' + name + '」（' + (CATEGORY_LABELS[category] || category) + '）', after: { name, category, color } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -802,7 +836,10 @@ router.post('/statuses/:id/update', requirePermission('system.settings'), async 
     const sort = parseInt(req.body.sort, 10) || 0;
     const active = req.body.active === '1';
     if (!name) return res.status(400).json({ error: '状态名称必填' });
+    const old = (await pool.query(`SELECT name, category, active FROM statuses WHERE id=$1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '状态不存在' });
     await pool.query(`UPDATE statuses SET name=$1, category=$2, color=$3, sort=$4, active=$5 WHERE id=$6`, [name, category, color, sort, active, id]);
+    await audit(req, '编辑状态', { entity_type: 'status', entity_id: id, detail: '状态「' + old.name + '」→「' + name + '」', before: { name: old.name, category: old.category, active: old.active }, after: { name, category, active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -812,8 +849,10 @@ router.post('/statuses/:id/delete', requirePermission('system.settings'), async 
     const id = parseInt(req.params.id, 10);
     const cnt = (await pool.query(`SELECT COUNT(*)::int AS n FROM cases WHERE status_id = $1`, [id])).rows[0].n;
     if (cnt > 0) return res.status(400).json({ error: `还有 ${cnt} 起案件处于该状态，无法删除。可将状态设为停用。` });
+    const old = (await pool.query(`SELECT name FROM statuses WHERE id = $1`, [id])).rows[0];
     await pool.query(`DELETE FROM case_history WHERE status_id = $1`, [id]);
     await pool.query(`DELETE FROM statuses WHERE id = $1`, [id]);
+    if (old) await audit(req, '删除状态', { entity_type: 'status', entity_id: id, detail: '状态「' + old.name + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -845,6 +884,8 @@ router.post('/settings', requirePermission('system.settings'), async (req, res, 
         }
       }
       await client.query('COMMIT');
+      const changed = Object.keys(req.body).filter((k) => allowed.includes(k));
+      await audit(req, '更新应用设置', { entity_type: 'system', entity_id: 'settings', detail: '修改项：' + (changed.length ? changed.join('、') : '（无）') });
       res.json({ ok: true });
     } catch (e) {
       await client.query('ROLLBACK');
@@ -874,6 +915,7 @@ router.post('/settings/logo', requirePermission('system.settings'), upload.singl
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [stored]
     );
+    await audit(req, '更换Logo', { entity_type: 'system', entity_id: 'logo', detail: '新文件 ' + stored });
     res.json({ ok: true, logo: stored });
   } catch (e) { next(e); }
 });
@@ -910,6 +952,7 @@ router.get('/backup/download/:file', requireSuperAdmin, async (req, res, next) =
 router.post('/backup/create', requireSuperAdmin, async (req, res, next) => {
   try {
     const r = await runBackup();
+    await audit(req, '创建备份', { entity_type: 'backup', entity_id: r.file, detail: '备份文件 ' + r.file + '（' + r.size + ' 字节）' });
     res.json({ ok: true, file: r.file, size: r.size });
   } catch (e) { next(e); }
 });
@@ -919,6 +962,7 @@ router.post('/backup/restore', requireSuperAdmin, async (req, res, next) => {
     const file = String(req.body.file || '').trim();
     if (!file) return res.status(400).json({ error: '未指定备份文件' });
     await restoreBackup(file);
+    await audit(req, '恢复备份', { entity_type: 'backup', entity_id: file, detail: '从备份文件 ' + file + ' 恢复' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -928,6 +972,7 @@ router.post('/backup/delete', requireSuperAdmin, async (req, res, next) => {
     const file = String(req.body.file || '').trim();
     if (!file) return res.status(400).json({ error: '未指定备份文件' });
     deleteBackup(file);
+    await audit(req, '删除备份', { entity_type: 'backup', entity_id: file, detail: '备份文件 ' + file });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -941,6 +986,7 @@ router.get('/backup/settings', requireSuperAdmin, async (req, res, next) => {
 router.post('/backup/settings', requireSuperAdmin, async (req, res, next) => {
   try {
     const s = await saveBackupSettings(req.body);
+    await audit(req, '更新备份设置', { entity_type: 'backup', entity_id: 'settings', detail: '备份策略配置变更' });
     res.json({ ok: true, settings: s });
   } catch (e) { next(e); }
 });
@@ -969,6 +1015,7 @@ router.post('/cases/:id/parties', requirePermission('parties.manage'), async (re
       [c.id, name, role, gender || null, age ? parseInt(age) : null, id_card || null, phone || null, address || null, contact_person || null, contact_phone || null, injury_info || null, hospital_dept || null, remark || null, parseInt(sort) || 0]
     );
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `新增当事人：${name} (${role})` });
+    await audit(req, '新增当事人', { entity_type: 'party', entity_id: ins.rows[0].id, detail: '案号 ' + c.case_no + '「' + c.title + '」新增当事人 ' + name + '（' + role + '）', after: { name, role, gender: gender || null, id_card: id_card || null, phone: phone || null } });
     res.json({ ok: true, party: ins.rows[0] });
   } catch (e) { next(e); }
 });
@@ -980,12 +1027,14 @@ router.post('/cases/:id/parties/:pid', requirePermission('parties.manage'), asyn
     const pid = parseInt(req.params.pid, 10);
     const { name, role, gender, age, id_card, phone, address, contact_person, contact_phone, injury_info, hospital_dept, remark, sort } = req.body;
     if (!name || !role) return res.status(400).json({ error: '姓名和角色必填' });
+    const old = (await pool.query(`SELECT name, role, gender, id_card, phone FROM case_parties WHERE id=$1 AND case_id=$2`, [pid, c.id])).rows[0];
     await pool.query(
       `UPDATE case_parties SET name=$1, role=$2, gender=$3, age=$4, id_card=$5, phone=$6, address=$7, contact_person=$8, contact_phone=$9, injury_info=$10, hospital_dept=$11, remark=$12, sort=$13
        WHERE id=$14 AND case_id=$15`,
       [name, role, gender || null, age ? parseInt(age) : null, id_card || null, phone || null, address || null, contact_person || null, contact_phone || null, injury_info || null, hospital_dept || null, remark || null, parseInt(sort) || 0, pid, c.id]
     );
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `编辑当事人：${name} (${role})` });
+    await audit(req, '编辑当事人', { entity_type: 'party', entity_id: pid, detail: '案号 ' + c.case_no + '「' + c.title + '」编辑当事人 ' + name + '（' + role + '）', before: { name: old && old.name, role: old && old.role }, after: { name, role } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -998,6 +1047,7 @@ router.post('/cases/:id/parties/:pid/delete', requirePermission('parties.manage'
     const old = (await pool.query(`SELECT name, role FROM case_parties WHERE id=$1 AND case_id=$2`, [pid, c.id])).rows[0];
     await pool.query(`DELETE FROM case_parties WHERE id=$1 AND case_id=$2`, [pid, c.id]);
     if (old) await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `删除当事人：${old.name} (${old.role})` });
+    if (old) await audit(req, '删除当事人', { entity_type: 'party', entity_id: pid, detail: '案号 ' + c.case_no + '「' + c.title + '」删除当事人 ' + old.name + '（' + old.role + '）' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1185,6 +1235,7 @@ router.post('/cases/import', requirePermission('cases.import_export'), upload.si
         );
         await addHistory(client, ins.rows[0].id, 'created', user.id, { note: 'CSV 导入创建' });
         await client.query('COMMIT');
+        await audit(req, '导入创建案件', { entity_type: 'case', entity_id: ins.rows[0].id, detail: 'CSV 导入创建案号 ' + caseNo + '「' + title + '」' });
         results.success++;
       } catch (e) {
         await client.query('ROLLBACK');
@@ -1242,6 +1293,7 @@ router.post('/contract-templates', requirePermission('contracts.manage'), upload
       `INSERT INTO contract_templates (name, case_type_id, pdf_path, sign_positions, text_fields) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
       [name, case_type_id || null, `contracts/${pdfName}`, sign_positions || '[]', text_fields || '[]']
     );
+    await audit(req, '新增合同模板', { entity_type: 'template', entity_id: ins.rows[0].id, detail: '模板「' + name + '」' });
     res.json({ ok: true, template: ins.rows[0] });
   } catch (e) { next(e); }
 });
@@ -1249,12 +1301,13 @@ router.post('/contract-templates', requirePermission('contracts.manage'), upload
 router.post('/contract-templates/:id/delete', requirePermission('contracts.manage'), async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const tpl = (await pool.query(`SELECT pdf_path FROM contract_templates WHERE id = $1`, [id])).rows[0];
+    const tpl = (await pool.query(`SELECT name, pdf_path FROM contract_templates WHERE id = $1`, [id])).rows[0];
     if (tpl?.pdf_path) {
       const fp = path.join(UPLOAD_DIR, tpl.pdf_path);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
     }
     await pool.query(`UPDATE contract_templates SET active = FALSE WHERE id = $1`, [id]);
+    if (tpl) await audit(req, '删除合同模板', { entity_type: 'template', entity_id: id, detail: '模板「' + tpl.name + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1265,9 +1318,10 @@ router.post('/contract-templates/:id/rename', requirePermission('contracts.manag
     const id = parseInt(req.params.id, 10);
     const name = String(req.body.name || '').trim();
     if (!name) return res.status(400).json({ error: '模板名称必填' });
-    const tpl = (await pool.query(`SELECT id FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
+    const tpl = (await pool.query(`SELECT id, name FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
     if (!tpl) return res.status(404).json({ error: '模板不存在' });
     await pool.query(`UPDATE contract_templates SET name = $1 WHERE id = $2`, [name, id]);
+    await audit(req, '重命名合同模板', { entity_type: 'template', entity_id: id, detail: '模板「' + tpl.name + '」→「' + name + '」', before: { name: tpl.name }, after: { name } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1279,12 +1333,13 @@ router.post('/contract-templates/:id/positions', requirePermission('contracts.ma
     const { sign_positions, text_fields } = req.body;
     if (!Array.isArray(sign_positions)) return res.status(400).json({ error: 'sign_positions 必须是数组' });
     if (!Array.isArray(text_fields)) return res.status(400).json({ error: 'text_fields 必须是数组' });
-    const tpl = (await pool.query(`SELECT id FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
+    const tpl = (await pool.query(`SELECT id, name FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
     if (!tpl) return res.status(404).json({ error: '模板不存在' });
     await pool.query(
       `UPDATE contract_templates SET sign_positions=$1, text_fields=$2 WHERE id=$3`,
       [JSON.stringify(sign_positions), JSON.stringify(text_fields), id]
     );
+    await audit(req, '编辑模板位置', { entity_type: 'template', entity_id: id, detail: '模板「' + tpl.name + '」签名位置/文本字段已更新' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1394,6 +1449,7 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
     }
 
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `发起合同签署：${title}` });
+    await audit(req, '发起合同', { entity_type: 'contract', entity_id: contract.id, detail: '案号 ' + c.case_no + '「' + c.title + '」发起签署：' + title });
     res.json({ ok: true, contract });
   } catch (e) { next(e); }
 });
@@ -1445,6 +1501,7 @@ router.post('/cases/:caseId/contracts/:id/revoke', requirePermission('contracts.
     await pool.query(`UPDATE contracts SET status='revoked' WHERE id = $1`, [contractId]);
     await pool.query(`UPDATE contract_signatures SET status='expired' WHERE contract_id = $1 AND status='pending'`, [contractId]);
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `撤回合同：${contract.title}` });
+    await audit(req, '撤回合同', { entity_type: 'contract', entity_id: contractId, detail: '案号 ' + c.case_no + ' 撤回签署：' + contract.title });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1468,6 +1525,7 @@ router.post('/cases/:caseId/contracts/:id/delete', async (req, res, next) => {
     removeFile(contract.work_pdf_path);
     for (const s of sigs) removeFile(s.signature_image_path);
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `删除合同：${contract.title}` });
+    await audit(req, '删除合同', { entity_type: 'contract', entity_id: contractId, detail: '案号 ' + c.case_no + ' 删除合同：' + contract.title });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1484,6 +1542,7 @@ router.post('/cases/:id/history/:hid/delete', async (req, res, next) => {
     const h = (await pool.query(`SELECT * FROM case_history WHERE id = $1 AND case_id = $2`, [hid, c.id])).rows[0];
     if (!h) return res.status(404).json({ error: '进度记录不存在' });
     await pool.query(`DELETE FROM case_history WHERE id = $1`, [hid]);
+    await audit(req, '删除进度记录', { entity_type: 'history', entity_id: hid, detail: '案号 ' + c.case_no + '「' + c.title + '」删除进度记录：' + (h.note || '') });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
