@@ -891,12 +891,36 @@
       }
     }
   }
+  function copyToClipboard(text) {
+    return new Promise((resolve) => {
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.top = '-1000px';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          let ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(ta);
+          if (ok) return resolve(true);
+        } catch (e) {}
+        try { window.prompt('复制链接：', text); return resolve(true); } catch (e) { resolve(false); }
+      };
+      if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => resolve(true)).catch(() => fallback());
+      } else {
+        fallback();
+      }
+    });
+  }
   async function copySignLink(btn) {
-    try {
-      const url = btn.dataset.token ? getAppUrl() + '/sign/' + btn.dataset.token : btn.value;
-      await navigator.clipboard.writeText(url);
-      toast('链接已复制', 'success');
-    } catch (err) { toast('复制失败', 'danger'); }
+    const url = btn.dataset.token ? getAppUrl() + '/sign/' + btn.dataset.token : btn.value;
+    const ok = await copyToClipboard(url);
+    toast(ok ? '链接已复制' : '复制失败', ok ? 'success' : 'danger');
   }
   async function revokeContract(id) {
     if (!(await confirmBox('确定撤回该合同？已签署的当事人将保留记录。', '撤回合同'))) return;
