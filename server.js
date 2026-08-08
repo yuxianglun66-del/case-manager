@@ -72,6 +72,8 @@ const globalLimiter = rateLimit({
   skip: (req) => req.method === 'GET' && (
     req.path.startsWith('/css/') || req.path.startsWith('/js/') ||
     req.path.startsWith('/vendor/') || req.path.startsWith('/uploads/') ||
+    req.path.startsWith('/icons/') || req.path === '/sw.js' ||
+    req.path === '/manifest.json' ||
     req.path.startsWith('/favicon') || req.path === '/favicon.ico'
   ),
 });
@@ -172,6 +174,12 @@ app.use(async (req, res, next) => {
 app.locals.MAX_MB = require('./src/util').MAX_MB;
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Service Worker 禁止缓存，确保新版本及时生效
+app.get('/sw.js', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  next();
+});
 
 // 上传文件静态访问（logo 等）
 const _uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');

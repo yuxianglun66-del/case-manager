@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网络连接已断开</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #060a14, #0b1120 40%, #0f172a 100%);
+      color: #e6edf7; padding: 24px;
+    }
+    .box { text-align: center; max-width: 320px; }
+    img.icon { width: 72px; height: 72px; border-radius: 18px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(13,110,253,.35); }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p { font-size: 14px; color: rgba(226,232,240,.72); line-height: 1.6; margin-bottom: 24px; }
+    button {
+      width: 100%; padding: 12px; font-size: 15px; color: #fff;
+      background: #0d6efd; border: none; border-radius: 10px; cursor: pointer;
+    }
+    button:active { opacity: .85; }
+    a { display: inline-block; margin-top: 14px; font-size: 13px; color: rgba(226,232,240,.6); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <img class="icon" src="/icons/icon-192.png" alt="">
+    <h1>网络连接已断开</h1>
+    <p>请检查网络后重试。已缓存的页面仍可离线查看。</p>
+    <button onclick="location.reload()">重新连接</button>
+    <a href="/dashboard">返回案件管理系统</a>
+  </div>
+</body>
+</html>
