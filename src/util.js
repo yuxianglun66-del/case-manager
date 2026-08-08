@@ -81,7 +81,15 @@ function validateUploadedFiles(req, res, next) {
 }
 
 const storage = multer.diskStorage({
-  destination: process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'),
+  destination: (req, file, cb) => {
+    let dir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    // 附件按案件编号独立文件夹存放
+    if (req && req.caseRow) {
+      dir = path.join(dir, caseFolder(req.caseRow));
+    }
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`);
@@ -132,4 +140,12 @@ async function generateCaseNo(client, caseTypeId, code) {
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
-module.exports = { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, isAllowedExt, getCaseForPermission, generateCaseNo, MAX_MB, ALLOWED_EXT };
+// 案件文件夹名：以案件编号命名（不可变、唯一、纯安全字符）
+function caseFolder(row) {
+  const raw = (row && row.case_no) ? String(row.case_no) : '';
+  let s = raw.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[.\s]+/, '').slice(0, 60);
+  if (!s || s === '.' || s === '..') s = 'case';
+  return s;
+}
+
+module.exports = { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, isAllowedExt, getCaseForPermission, generateCaseNo, caseFolder, MAX_MB, ALLOWED_EXT };

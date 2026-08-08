@@ -4,9 +4,19 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../src/db');
 const { embedCjkFont } = require('../src/pdf-utils');
+const { caseFolder } = require('../src/util');
 
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+
+// 已签署 PDF 路径解析：兼容旧（contracts/signed/ 前缀）与新（案件文件夹相对路径）存储
+function resolveSignedPdf(p) {
+  if (!p) return null;
+  const newPath = path.join(UPLOAD_DIR, p);
+  if (fs.existsSync(newPath)) return newPath;
+  const oldPath = path.join(UPLOAD_DIR, 'contracts', 'signed', p);
+  return fs.existsSync(oldPath) ? oldPath : null;
+}
 
 // S5: 公开签署接口限流（提交签名 30 次/15分钟/IP；预览/下载轻量限制）
 const signSubmitLimiter = rateLimit({
@@ -102,7 +112,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     }
 
     const sigs = (await pool.query(
-      `SELECT cs.*, c.id AS contract_id, c.template_id, c.pdf_path AS contract_pdf, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
+      `SELECT cs.*, c.id AS contract_id, c.case_no, c.template_id, c.pdf_path AS contract_pdf, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
        FROM contract_signatures cs
        JOIN contracts c ON c.id = cs.contract_id
        JOIN contract_templates ct ON ct.id = c.template_id
@@ -135,9 +145,9 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
 
     const { PDFDocument, rgb } = require('pdf-lib');
     let basePath;
-    if (first.contract_pdf && fs.existsSync(path.join(UPLOAD_DIR, 'contracts', 'signed', first.contract_pdf))) {
+    if (first.contract_pdf && resolveSignedPdf(first.contract_pdf)) {
       // 已有历史签名，叠加到最新合成稿上
-      basePath = path.join(UPLOAD_DIR, 'contracts', 'signed', first.contract_pdf);
+      basePath = resolveSignedPdf(first.contract_pdf);
     } else {
       // 首次签署：以工作稿（含预填文本）或模板为底
       basePath = path.join(UPLOAD_DIR, first.work_pdf_path || first.template_path);
@@ -181,7 +191,8 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     if (!savedFiles.length) return res.status(400).json({ error: '签名位置无效' });
 
     const pdfBytes = await pdfDoc.save();
-    const signedDir = path.join(UPLOAD_DIR, 'contracts', 'signed');
+    const folder = caseFolder({ case_no: first.case_no });
+    const signedDir = path.join(UPLOAD_DIR, folder);
     if (!fs.existsSync(signedDir)) fs.mkdirSync(signedDir, { recursive: true });
     const signedFile = `signed_${first.contract_id}_${nowTs}.pdf`;
     fs.writeFileSync(path.join(signedDir, signedFile), pdfBytes);
@@ -193,7 +204,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
         [f.file, req.ip, req.headers['user-agent'], f.id]
       );
     }
-    await pool.query(`UPDATE contracts SET pdf_path=$1, status='signed', completed_at=now() WHERE id=$2`, [signedFile, first.contract_id]);
+    await pool.query(`UPDATE contracts SET pdf_path=$1, status='signed', completed_at=now() WHERE id=$2`, [`${folder}/${signedFile}`, first.contract_id]);
 
     try {
       const { audit } = require('../src/audit');
@@ -221,8 +232,8 @@ router.get('/sign/:token/pdf', signReadLimiter, async (req, res, next) => {
     )).rows[0];
     if (!sig || sig.status === 'expired') return res.status(404).send('链接无效');
     let fp;
-    if (sig.pdf_path && fs.existsSync(path.join(UPLOAD_DIR, 'contracts', 'signed', sig.pdf_path))) {
-      fp = path.join(UPLOAD_DIR, 'contracts', 'signed', sig.pdf_path);
+    if (sig.pdf_path && resolveSignedPdf(sig.pdf_path)) {
+      fp = resolveSignedPdf(sig.pdf_path);
     } else {
       fp = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
     }
@@ -244,8 +255,8 @@ router.get('/sign/:token/download', signReadLimiter, async (req, res, next) => {
     )).rows[0];
     if (!sig) return res.status(404).send('链接无效');
     if (!sig.pdf_path || sig.contract_status !== 'signed') return res.status(404).send('合同尚未完成签署');
-    const fp = path.join(UPLOAD_DIR, 'contracts', 'signed', sig.pdf_path);
-    if (!fs.existsSync(fp)) return res.status(404).send('文件不存在');
+    const fp = resolveSignedPdf(sig.pdf_path);
+    if (!fp) return res.status(404).send('文件不存在');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(sig.title + '.pdf')}`);
     res.setHeader('Content-Type', 'application/pdf');
     fs.createReadStream(fp).pipe(res);

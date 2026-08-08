@@ -224,6 +224,13 @@ app.use((err, req, res, next) => {
 async function start() {
   await initDb();
   await require('./src/permissions').loadPermissions();
+  // 附件按案件文件夹存储：启动时执行一次性迁移
+  try {
+    const r = await require('./src/storage').migrateFilesToCaseFolders();
+    if (r.migrated) console.log(`[storage] 已将 ${r.moved} 个历史文件迁移到案件编号文件夹`);
+  } catch (e) {
+    console.error('[storage] 文件迁移失败:', e.message);
+  }
   const server = app.listen(PORT, () => {
     console.log(`[app] 案件管理系统已启动，端口 ${PORT} [${isProd ? '生产' : '开发'}模式]`);
   });

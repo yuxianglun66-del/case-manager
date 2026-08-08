@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
 const { hasPermission } = require('../src/permissions');
-const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo } = require('../src/util');
+const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 const { ZipArchive } = require('archiver');
@@ -15,6 +15,14 @@ const router = express.Router();
 router.use(requireLogin);
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+
+// 删除存储文件：兼容新（案件文件夹相对路径）与旧（contracts/signed/ 前缀）两种存储位置
+function removeStoredFile(p) {
+  if (!p) return;
+  for (const fp of [path.join(UPLOAD_DIR, p), path.join(UPLOAD_DIR, 'contracts', 'signed', p)]) {
+    if (fs.existsSync(fp)) { try { fs.unlinkSync(fp); } catch {} }
+  }
+}
 
 // JSONB 字段可能是字符串也可能是已解析对象，统一解析为数组
 function parseJsonArray(v, fallback = []) {
@@ -225,13 +233,12 @@ router.post('/cases/:id/delete', requirePermission('cases.delete'), needCase, as
     )).rows;
     await client.query(`DELETE FROM cases WHERE id = $1`, [id]);
     await client.query('COMMIT');
-    const removeFile = (p) => { if (!p) return; const fp = path.join(UPLOAD_DIR, p); if (fs.existsSync(fp)) { try { fs.unlinkSync(fp); } catch {} } };
     for (const f of files) {
-      removeFile(f.stored_name);
-      removeFile(f.stored_name + '.preview.pdf');
+      removeStoredFile(f.stored_name);
+      removeStoredFile(f.stored_name + '.preview.pdf');
     }
-    for (const c of contracts) { removeFile(c.pdf_path); removeFile(c.work_pdf_path); }
-    for (const s of sigs) { removeFile(s.signature_image_path); }
+    for (const c of contracts) { removeStoredFile(c.pdf_path); removeStoredFile(c.work_pdf_path); }
+    for (const s of sigs) { removeStoredFile(s.signature_image_path); }
     await audit(req, '删除案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」' });
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -317,7 +324,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
       const ins = await client.query(
         `INSERT INTO attachments (case_id, original_name, stored_name, mime_type, size, uploaded_by, remark)
          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-        [req.caseRow.id, fixedName, f.filename, mime, f.size, user.id, remark || null]
+        [req.caseRow.id, fixedName, caseFolder(req.caseRow) + '/' + f.filename, mime, f.size, user.id, remark || null]
       );
       list.push({ id: ins.rows[0].id, original_name: fixedName, remark });
     }
@@ -344,6 +351,14 @@ router.post('/attachments/:id/replace', requirePermission('attachments.manage'),
     }
 
     const oldPath = path.join(UPLOAD_DIR, att.stored_name);
+    // 新文件先落到根目录，再移动到该案件文件夹
+    const folder = caseFolder(caseRow);
+    const newRel = folder + '/' + req.file.filename;
+    const newPath = path.join(UPLOAD_DIR, newRel);
+    if (path.join(UPLOAD_DIR, req.file.filename) !== newPath) {
+      fs.mkdirSync(path.dirname(newPath), { recursive: true });
+      fs.renameSync(path.join(UPLOAD_DIR, req.file.filename), newPath);
+    }
     // 同理兜底 mime
     let mime = req.file.mimetype || 'application/octet-stream';
     if (mime === 'application/octet-stream') {
@@ -362,7 +377,7 @@ router.post('/attachments/:id/replace', requirePermission('attachments.manage'),
     }
     await pool.query(
       `UPDATE attachments SET original_name=$1, stored_name=$2, mime_type=$3, size=$4 WHERE id=$5`,
-      [Buffer.from(req.file.originalname, 'latin1').toString('utf8'), req.file.filename, mime, req.file.size, id]
+      [Buffer.from(req.file.originalname, 'latin1').toString('utf8'), newRel, mime, req.file.size, id]
     );
     await pool.query(
       `INSERT INTO case_history (case_id, action, note, operator_id) VALUES ($1,'attachment',$2,$3)`,
@@ -1448,9 +1463,11 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
             if (ok) {
               const pdfBytes = await pdfDoc.save();
               const workFile = `work_${contract.id}_${Date.now()}.pdf`;
-              const workPath = path.join(UPLOAD_DIR, 'contracts', workFile);
+              const folder = caseFolder(c);
+              const workPath = path.join(UPLOAD_DIR, folder, workFile);
+              fs.mkdirSync(path.dirname(workPath), { recursive: true });
               fs.writeFileSync(workPath, pdfBytes);
-              await pool.query(`UPDATE contracts SET work_pdf_path = $1 WHERE id = $2`, [`contracts/${workFile}`, contract.id]);
+              await pool.query(`UPDATE contracts SET work_pdf_path = $1 WHERE id = $2`, [`${folder}/${workFile}`, contract.id]);
             }
           } else {
             console.warn('[contracts] 未找到中文字体，跳过文本预填充');
@@ -1492,7 +1509,9 @@ router.get('/contracts/:id/download', async (req, res, next) => {
     const caseRow = await getCaseForPermission({ params: { id: c.case_id } });
     if (!caseRow || !canViewCase(req.session.user, caseRow)) return res.status(403).json({ error: '无权下载' });
     if (!c.pdf_path) return res.status(404).json({ error: '合同尚未完成签署' });
-    const fp = path.join(UPLOAD_DIR, 'contracts', 'signed', c.pdf_path);
+    // 兼容旧路径（contracts/signed/ 前缀）与新路径（案件文件夹）
+    let fp = path.join(UPLOAD_DIR, c.pdf_path);
+    if (!fs.existsSync(fp)) fp = path.join(UPLOAD_DIR, 'contracts', 'signed', c.pdf_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(c.title + '.pdf')}`);
     res.setHeader('Content-Type', 'application/pdf');
@@ -1531,10 +1550,9 @@ router.post('/cases/:caseId/contracts/:id/delete', async (req, res, next) => {
     if (!contract) return res.status(404).json({ error: '合同不存在' });
     const sigs = (await pool.query(`SELECT signature_image_path FROM contract_signatures WHERE contract_id = $1`, [contractId])).rows;
     await pool.query(`DELETE FROM contracts WHERE id = $1`, [contractId]);
-    const removeFile = (p) => { if (!p) return; const fp = path.join(UPLOAD_DIR, p); if (fs.existsSync(fp)) { try { fs.unlinkSync(fp); } catch {} } };
-    removeFile(contract.pdf_path);
-    removeFile(contract.work_pdf_path);
-    for (const s of sigs) removeFile(s.signature_image_path);
+    removeStoredFile(contract.pdf_path);
+    removeStoredFile(contract.work_pdf_path);
+    for (const s of sigs) removeStoredFile(s.signature_image_path);
     await addHistory(pool, c.id, 'edit', req.session.user.id, { note: `删除合同：${contract.title}` });
     await audit(req, '删除合同', { entity_type: 'contract', entity_id: contractId, detail: '案号 ' + c.case_no + ' 删除合同：' + contract.title });
     res.json({ ok: true });
