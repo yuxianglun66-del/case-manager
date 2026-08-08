@@ -624,6 +624,48 @@ router.post('/users/:id/delete', requirePermission('system.users'), async (req, 
   } catch (e) { next(e); }
 });
 
+/* ---------- 账号彻底删除（名下案件/附件保留，可指派给其他用户） ---------- */
+router.post('/users/:id/remove', requirePermission('system.users'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const id = parseInt(req.params.id, 10);
+    if (id === req.session.user.id) return res.status(400).json({ error: '不能删除自己' });
+    const target = (await client.query(`SELECT id, role FROM users WHERE id = $1`, [id])).rows[0];
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+    if (target.role === 'super_admin') return res.status(400).json({ error: '超级管理员账号不可删除' });
+    if (target.role === 'admin' && req.session.user.role !== 'super_admin') {
+      return res.status(403).json({ error: '仅超级管理员可删除管理员账号' });
+    }
+    let reassignTo = null;
+    const raw = req.body.reassign_to;
+    if (raw !== undefined && raw !== null && raw !== '' && raw !== 'null') {
+      reassignTo = parseInt(raw, 10);
+      if (isNaN(reassignTo)) return res.status(400).json({ error: '指派参数无效' });
+      if (reassignTo === id) return res.status(400).json({ error: '不能指派给自己' });
+      const rep = (await client.query(`SELECT id FROM users WHERE id = $1 AND active = TRUE`, [reassignTo])).rows[0];
+      if (!rep) return res.status(400).json({ error: '被指派的用户不存在或已停用' });
+    }
+    // 案件指派：服务人员/签单人员都迁移到目标用户（未指派则清空，案件保留为未分配）
+    await client.query(`UPDATE cases SET assignee_id = $1 WHERE assignee_id = $2`, [reassignTo, id]);
+    await client.query(`UPDATE cases SET sign_staff_id = $1 WHERE sign_staff_id = $2`, [reassignTo, id]);
+    // 历史/审计类外键引用清空为 NULL，保留案件与附件数据
+    await client.query(`UPDATE cases SET created_by = NULL WHERE created_by = $1`, [id]);
+    await client.query(`UPDATE cases SET reminder_ack_by = NULL WHERE reminder_ack_by = $1`, [id]);
+    await client.query(`UPDATE case_history SET operator_id = NULL WHERE operator_id = $1`, [id]);
+    await client.query(`UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = $1`, [id]);
+    await client.query(`UPDATE contracts SET initiator_id = NULL WHERE initiator_id = $1`, [id]);
+    await client.query(`DELETE FROM users WHERE id = $1`, [id]);
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    next(e);
+  } finally {
+    client.release();
+  }
+});
+
 /* ---------- 角色权限配置 ---------- */
 router.post('/roles/permissions', requirePermission('system.roles'), async (req, res, next) => {
   try {
