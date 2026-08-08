@@ -256,12 +256,12 @@
       .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; }
       .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); }
       .lb-close { position:absolute; top:14px; right:18px; font-size:1.6rem; color:#e2e8f0; cursor:pointer; padding:6px; }
-      .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.08); border:none; color:#e2e8f0; font-size:2rem; width:52px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-      .lb-nav:hover { background:rgba(255,255,255,.18); }
+      .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(15,23,42,.55); border:1px solid rgba(255,255,255,.35); color:#fff; font-size:2rem; width:52px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.4); backdrop-filter:blur(2px); }
+      .lb-nav:hover { background:rgba(13,110,253,.85); border-color:rgba(255,255,255,.55); }
       .lb-prev { left:12px; } .lb-next { right:12px; }
       .lb-info { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#cbd5e1; font-size:.9rem; display:flex; align-items:center; justify-content:center; gap:12px; }
       .lb-dl { color:#93c5fd; text-decoration:none; }
-      @media (max-width:576px) { .att-thumbs { grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); } .lb-nav { width:40px; height:48px; font-size:1.4rem; } }
+      @media (max-width:576px) { .att-thumbs { grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); } .lb-nav { width:44px; height:52px; font-size:1.6rem; background:rgba(15,23,42,.6); } }
     </style>
 
     <div class="card mb-3">
