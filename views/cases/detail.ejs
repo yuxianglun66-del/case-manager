@@ -249,8 +249,10 @@
       .att-thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; margin-bottom:10px; }
       .att-thumb { position:relative; display:block; aspect-ratio:1/1; border-radius:8px; overflow:hidden; border:1px solid rgba(59,130,246,.2); background:#0f172a; }
       .att-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-      .att-thumb-actions { position:absolute; inset:0; display:none; align-items:center; justify-content:center; gap:6px; background:rgba(15,23,42,.55); }
-      .att-thumb:hover .att-thumb-actions { display:flex; }
+      .lb-action { color:#e2e8f0; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:8px; padding:5px 12px; font-size:.85rem; text-decoration:none; }
+      .lb-action:hover { background:rgba(255,255,255,.18); color:#fff; }
+      .lb-action.danger { color:#fca5a5; border-color:rgba(248,113,113,.4); }
+      .lb-action.danger:hover { background:rgba(248,113,113,.18); color:#fecaca; }
       .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; }
       .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); }
       .lb-close { position:absolute; top:14px; right:18px; font-size:1.6rem; color:#e2e8f0; cursor:pointer; padding:6px; }
@@ -295,12 +297,6 @@
                   <% gImgs.forEach(gi => { %>
                   <a class="att-thumb" href="javascript:void(0)" onclick="lbOpen(<%= imgList.findIndex(x => x.id === gi.id) %>)" title="<%= gi.original_name.replace(/["'<>]/g, '') %>">
                     <img src="/api/attachments/<%= gi.id %>/file" loading="lazy" alt="">
-                    <% if (can('attachments.manage')) { %>
-                    <span class="att-thumb-actions">
-                      <button class="btn btn-ico btn-light" title="替换文件" onclick="event.stopPropagation(); replaceFile(<%= gi.id %>, '<%= gi.original_name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-arrow-repeat"></i></button>
-                      <button class="btn btn-ico btn-outline-danger" title="删除" onclick="event.stopPropagation(); delFile(<%= gi.id %>)"><i class="bi bi-trash"></i></button>
-                    </span>
-                    <% } %>
                   </a>
                   <% }) %>
                 </div>
@@ -342,6 +338,10 @@
       <div class="lb-info">
         <span id="lbInfo"></span>
         <a id="lbDl" class="lb-dl" href="" target="_blank"><i class="bi bi-download"></i> 下载</a>
+        <% if (can('attachments.manage')) { %>
+        <button class="lb-action" id="lbReplace" onclick="lbReplaceCurrent()"><i class="bi bi-arrow-repeat"></i> 替换</button>
+        <button class="lb-action danger" id="lbDelete" onclick="lbDeleteCurrent()"><i class="bi bi-trash"></i> 删除</button>
+        <% } %>
       </div>
     </div>
 
@@ -965,6 +965,18 @@
     document.getElementById('lbDl').href = '/api/attachments/' + a.id + '/download';
     document.getElementById('lightbox').style.display = 'flex';
     document.body.style.overflow = 'hidden';
+  }
+  function lbReplaceCurrent() {
+    const a = LB_LIST[LB_IDX];
+    if (!a) return;
+    lbClose();
+    replaceFile(a.id, a.name);
+  }
+  function lbDeleteCurrent() {
+    const a = LB_LIST[LB_IDX];
+    if (!a) return;
+    lbClose();
+    delFile(a.id);
   }
   function lbClose() {
     document.getElementById('lightbox').style.display = 'none';
