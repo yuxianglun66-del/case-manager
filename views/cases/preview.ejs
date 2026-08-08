@@ -6,37 +6,104 @@
   <title>预览 - <%= att.original_name %></title>
   <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
+  <script src="/vendor/pdfjs/pdf.min.js"></script>
   <style>
-    body { margin: 0; height: 100vh; overflow: hidden; }
+    body { margin: 0; height: 100vh; overflow: hidden; background: #525659; }
     .preview-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #fff; border-bottom: 1px solid #dee2e6; padding: .5rem 1rem; }
-    .preview-content { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; overflow: auto; }
+    .preview-content { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
     .preview-image { max-width: 100%; height: auto; display: block; margin: 2rem auto; box-shadow: 0 0 20px rgba(0,0,0,.1); }
-    .preview-pdf { width: 100%; height: calc(100vh - 52px); border: none; }
-    .preview-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 52px); text-align: center; padding: 2rem; }
-    .preview-fallback i { font-size: 5rem; color: #6c757d; margin-bottom: 1rem; }
-    .preview-fallback h4 { margin-bottom: .5rem; }
-    .preview-fallback .text-muted { margin-bottom: 1.5rem; }
+    .pdf-wrap { padding: 16px 0; }
+    .pdf-page { display: block; margin: 0 auto 16px; max-width: 100%; box-shadow: 0 2px 10px rgba(0,0,0,.4); background: #fff; }
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; color: #fff; }
+    .spinner-border { width: 2.5rem; height: 2.5rem; margin-bottom: 1rem; }
+    .preview-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 52px); text-align: center; padding: 2rem; color: #fff; }
+    .preview-fallback i { font-size: 5rem; color: rgba(255,255,255,.5); margin-bottom: 1rem; }
+    .preview-fallback .btn { margin-top: 1rem; }
+    .convert-tip { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; z-index: 200; white-space: nowrap; }
   </style>
 </head>
 <body>
   <div class="preview-header d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2">
       <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
-      <span class="fw-semibold text-truncate" style="max-width:300px"><%= att.original_name %></span>
+      <span class="fw-semibold text-truncate" style="max-width:220px"><%= att.original_name %></span>
     </div>
     <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
   </div>
-  <div class="preview-content">
+  <div class="preview-content" id="previewContent">
     <% if (isImage) { %>
       <img class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
     <% } else { %>
-      <iframe class="preview-pdf" src="/api/attachments/<%= att.id %>/preview-file"></iframe>
-      <% if (isWord || isExcel) { %>
-      <div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;z-index:200">
-        <i class="bi bi-arrow-repeat"></i> 文档已转为 PDF 预览，首次打开可能需要几秒
+      <div id="pdfLoading" class="loading">
+        <div class="spinner-border text-light" role="status"></div>
+        <div>正在加载预览…</div>
       </div>
+      <div id="pdfFallback" class="preview-fallback" style="display:none">
+        <i class="bi bi-file-earmark-x"></i>
+        <h4>预览失败</h4>
+        <p class="text-light-emphasis">该文档可能无法在线预览，请下载查看。</p>
+        <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary"><i class="bi bi-download"></i> 下载</a>
+      </div>
+      <div id="pdfWrap" class="pdf-wrap" style="display:none"></div>
+      <% if (isWord || isExcel) { %>
+      <div class="convert-tip"><i class="bi bi-arrow-repeat"></i> 文档已转为 PDF 预览，首次打开可能需要几秒</div>
       <% } %>
     <% } %>
   </div>
+  <script>
+    (function () {
+      var wrap = document.getElementById('pdfWrap');
+      var loading = document.getElementById('pdfLoading');
+      var fallback = document.getElementById('pdfFallback');
+      function showFallback() {
+        if (loading) loading.style.display = 'none';
+        if (fallback) fallback.style.display = 'flex';
+      }
+      function showPdf() {
+        if (wrap) wrap.style.display = 'block';
+        if (loading) loading.style.display = 'none';
+      }
+      var url = '/api/attachments/<%= att.id %>/preview-file';
+      function renderPdf(opts) {
+        return pdfjsLib.getDocument(opts).promise.then(function (pdf) {
+          var containerWidth = (wrap.clientWidth || document.documentElement.clientWidth) - 32;
+          var frag = document.createDocumentFragment();
+          var chain = Promise.resolve();
+          for (var p = 1; p <= pdf.numPages; p++) {
+            (function (pageNum) {
+              chain = chain.then(function () {
+                return pdf.getPage(pageNum).then(function (page) {
+                  var vp1 = page.getViewport({ scale: 1 });
+                  var scale = Math.min(2, Math.max(0.5, containerWidth / vp1.width));
+                  var viewport = page.getViewport({ scale: scale });
+                  var canvas = document.createElement('canvas');
+                  canvas.width = Math.floor(viewport.width);
+                  canvas.height = Math.floor(viewport.height);
+                  canvas.className = 'pdf-page';
+                  canvas.style.width = canvas.width + 'px';
+                  var renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                  return renderTask.promise.then(function () {
+                    frag.appendChild(canvas);
+                  });
+                });
+              });
+            })(p);
+          }
+          return chain.then(function () {
+            wrap.appendChild(frag);
+            showPdf();
+          });
+        });
+      }
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
+        renderPdf({ url: url })
+          .catch(function () { return renderPdf({ url: url, disableWorker: true, isEvalSupported: false }); })
+          .catch(function () { showFallback(); });
+      } else {
+        showFallback();
+      }
+    })();
+  </script>
 </body>
 </html>
