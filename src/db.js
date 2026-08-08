@@ -490,6 +490,7 @@ async function initDb() {
       ['backup_time', '02:00', '自动备份执行时间（HH:MM，24小时制）'],
       ['backup_weekday', '0', '每周备份的星期（0=周日，1-6=周一至周六）'],
       ['backup_retention_days', '7', '备份保留天数，超过自动清除'],
+      ['audit_retention_days', '30', '操作日志保留天数，超过自动清除（0=不自动清理）'],
     ];
     for (const [key, value, desc] of defaultSettings) {
       await client.query(

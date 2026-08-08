@@ -5,6 +5,34 @@
   </div>
 </div>
 
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-1">日志保留时间</label>
+        <select class="form-select form-select-sm" id="inpRetention" style="min-width:150px">
+          <option value="3">3 天</option>
+          <option value="7">7 天</option>
+          <option value="30">30 天</option>
+          <option value="90">90 天</option>
+          <option value="0">不自动清理</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary btn-sm" id="btnSaveRetention"><i class="bi bi-save"></i> 保存</button>
+      </div>
+      <div class="col">
+        <div class="form-text mb-0">
+          超过保留时间的日志由系统每天自动清除。
+          <% if (auditCfg.audit_retention_days > 0) { %>当前设置：<strong><%= auditCfg.audit_retention_days %> 天</strong><% } else { %>当前设置：<strong>不自动清理</strong><% } %>
+          <% if (auditCfg.audit_last_cleanup) { %>（上次清理：<%= new Date(auditCfg.audit_last_cleanup).toLocaleString('zh-CN') %>）<% } %>
+          <button class="btn btn-link btn-sm p-0 ms-2" id="btnCleanupNow"><i class="bi bi-trash"></i> 立即清理 30 天前日志</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <form class="card mb-3" method="get" action="/settings/audit">
   <div class="card-body">
     <div class="row g-2 align-items-end">
@@ -112,6 +140,21 @@
 </style>
 
 <script>
+  document.getElementById('inpRetention').value = String(<%= auditCfg.audit_retention_days %>);
+  document.getElementById('btnSaveRetention').addEventListener('click', async () => {
+    try {
+      await postJSON('/api/settings', { audit_retention_days: document.getElementById('inpRetention').value });
+      toast('已保存，每日自动清理生效', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+  document.getElementById('btnCleanupNow').addEventListener('click', async () => {
+    if (!(await confirmBox('立即删除 30 天前的操作日志？此操作不可恢复。', '清理日志'))) return;
+    try {
+      const data = await postJSON('/api/audit/cleanup', { days: 30 });
+      toast('已清理 ' + data.removed + ' 条日志', 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) { toast(err.message, 'danger'); }
+  });
   document.querySelectorAll('.toggle-diff').forEach(el => {
     el.addEventListener('click', () => {
       const box = document.getElementById(el.dataset.target);

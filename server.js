@@ -220,6 +220,7 @@ async function start() {
     console.log(`[app] 案件管理系统已启动，端口 ${PORT} [${isProd ? '生产' : '开发'}模式]`);
   });
   require('./src/backup').startBackupScheduler();
+  require('./src/audit').startAuditCleanupScheduler();
 
   // ====== G2: 优雅停机（Docker stop / Ctrl+C 时先停服务再关连接池） ======
   const shutdown = async (signal) => {

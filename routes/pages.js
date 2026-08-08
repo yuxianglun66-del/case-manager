@@ -440,9 +440,11 @@ router.get('/settings/audit', async (req, res, next) => {
     )).rows;
     const users = (await pool.query(`SELECT id, display_name, username FROM users ORDER BY display_name`)).rows;
     const totalPages = Math.max(1, Math.ceil(total / limit));
+    const { readAuditSettings } = require('../src/audit');
+    const auditCfg = await readAuditSettings();
 
     res.render('settings/audit', {
-      title: '操作日志', logs: rows, users, total, page, limit, totalPages,
+      title: '操作日志', logs: rows, users, total, page, limit, totalPages, auditCfg,
       q: { user_id: user_id || '', action: action || '', date_from: date_from || '', date_to: date_to || '', keyword: keyword || '' },
     });
   } catch (e) { next(e); }

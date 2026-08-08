@@ -869,7 +869,7 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
 
 router.post('/settings', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days'];
+    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days'];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -988,6 +988,17 @@ router.post('/backup/settings', requireSuperAdmin, async (req, res, next) => {
     const s = await saveBackupSettings(req.body);
     await audit(req, '更新备份设置', { entity_type: 'backup', entity_id: 'settings', detail: '备份策略配置变更' });
     res.json({ ok: true, settings: s });
+  } catch (e) { next(e); }
+});
+
+/* ---------- 操作日志清理（仅超级管理员） ---------- */
+router.post('/audit/cleanup', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { pruneAuditLogs } = require('../src/audit');
+    const days = Math.min(3650, Math.max(1, parseInt(req.body.days, 10) || 30));
+    const removed = await pruneAuditLogs(days);
+    await audit(req, '清理操作日志', { entity_type: 'system', entity_id: 'audit_logs', detail: '清理 ' + days + ' 天前的操作日志 ' + removed + ' 条' });
+    res.json({ ok: true, removed });
   } catch (e) { next(e); }
 });
 
