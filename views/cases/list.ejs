@@ -146,8 +146,10 @@
             必填列：case_type_code（类型代码）、title（案件名称）、client_name（客户）、assignee_username（服务人员账号，可选）、status_name（状态名称）。
           </div>
           <div class="mb-3">
-            <label class="form-label">选择 CSV 文件</label>
-            <input type="file" name="file" class="form-control" accept=".csv" required>
+            <label class="btn btn-outline-primary w-100 mb-2" for="importFile">
+              <i class="bi bi-folder-plus"></i> 选择 CSV 文件
+              <input type="file" name="file" id="importFile" class="visually-hidden" accept=".csv" required>
+            </label>
             <div class="form-text">编码必须为 UTF-8（含 BOM 最佳）</div>
           </div>
         </div>

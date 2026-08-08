@@ -275,7 +275,10 @@
         <div class="mb-3">
           <% if (can('attachments.manage')) { %>
           <form id="uploadForm" class="d-flex gap-2 flex-wrap align-items-center">
-            <input type="file" name="files" class="form-control" multiple id="uploadInput" style="max-width:280px">
+            <label class="btn btn-outline-primary btn-sm mb-0" for="uploadInput">
+              <i class="bi bi-folder-plus"></i> 选择文件
+              <input type="file" name="files" id="uploadInput" multiple class="visually-hidden" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z">
+            </label>
             <input type="text" name="remark" id="uploadRemark" class="form-control" placeholder="备注（如：发票、病历、证明、认定书等）" style="max-width:260px">
             <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-cloud-arrow-up"></i> 上传</button>
             <small class="text-muted">支持图片、Word、PDF、Excel、ZIP、RAR 等，单个不超过 <%= MAX_MB %>MB</small>
@@ -459,7 +462,10 @@
       </div>
       <div class="modal-body">
         <div class="text-muted small mb-2" id="replaceName"></div>
-        <input type="file" class="form-control" id="replaceInput">
+        <label class="btn btn-outline-primary w-100 mb-0" for="replaceInput">
+          <i class="bi bi-folder-plus"></i> 选择新文件
+          <input type="file" class="visually-hidden" id="replaceInput" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z">
+        </label>
       </div>
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
