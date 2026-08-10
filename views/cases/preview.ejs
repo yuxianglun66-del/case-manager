@@ -81,10 +81,25 @@
         if (l) l.textContent = Math.round(stateZoom * 100) + '%';
       }
       function applyZoom() {
-        if (imgEl) { imgEl.style.transform = 'scale(' + stateZoom + ')'; return; }
+        if (imgEl) {
+          if (stateZoom === 1) {
+            imgEl.style.maxWidth = '100%';
+            imgEl.style.width = '';
+            imgEl.style.height = '';
+          } else {
+            var iw = imgEl.naturalWidth || 0;
+            if (iw) {
+              imgEl.style.maxWidth = 'none';
+              imgEl.style.width = Math.round(iw * stateZoom) + 'px';
+              imgEl.style.height = 'auto';
+            }
+          }
+          return;
+        }
         if (wrap) {
-          wrap.style.transformOrigin = '50% 0';
+          wrap.style.transformOrigin = '0 0';
           wrap.style.transform = 'scale(' + stateZoom + ')';
+          if (wrap.baseH) wrap.style.height = Math.round(wrap.baseH * stateZoom) + 'px';
         }
       }
       function setZoom(z) { stateZoom = clampZ(z); updateZoomUI(); applyZoom(); }
@@ -116,7 +131,7 @@
             });
           })(p);
         }
-        return chain.then(function () { wrap.appendChild(frag); showPdf(); });
+        return chain.then(function () { wrap.appendChild(frag); wrap.baseH = wrap.scrollHeight; showPdf(); });
       }
 
       document.getElementById('zoomOut').addEventListener('click', function () { setZoom(stateZoom / 1.25); });
@@ -163,6 +178,9 @@
         } else {
           showFallback();
         }
+      }
+      if (isImage && imgEl) {
+        imgEl.addEventListener('load', function () { applyZoom(); });
       }
     })();
   </script>
