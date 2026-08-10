@@ -8,31 +8,40 @@
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
   <script src="/vendor/pdfjs/pdf.min.js"></script>
   <style>
-    body { margin: 0; height: 100vh; overflow: hidden; background: #525659; }
-    .preview-header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #fff; border-bottom: 1px solid #dee2e6; padding: .5rem 1rem; }
-    .preview-content { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
-    .preview-image { max-width: 100%; height: auto; display: block; margin: 2rem auto; box-shadow: 0 0 20px rgba(0,0,0,.1); }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; overflow: hidden; background: #525659; }
+    .preview-header { flex: 0 0 auto; background: #fff; border-bottom: 1px solid #dee2e6; padding: .5rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+    .preview-content { flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+    .preview-image { max-width: 100%; height: auto; display: block; margin: 2rem auto; box-shadow: 0 0 20px rgba(0,0,0,.1); transform-origin: center top; transition: transform .05s; }
     .pdf-wrap { padding: 16px 0; }
-    .pdf-page { display: block; margin: 0 auto 16px; max-width: 100%; box-shadow: 0 2px 10px rgba(0,0,0,.4); background: #fff; }
+    .pdf-page { display: block; margin: 0 auto 16px; box-shadow: 0 2px 10px rgba(0,0,0,.4); background: #fff; }
     .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; color: #fff; }
     .spinner-border { width: 2.5rem; height: 2.5rem; margin-bottom: 1rem; }
-    .preview-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 52px); text-align: center; padding: 2rem; color: #fff; }
+    .preview-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; text-align: center; padding: 2rem; color: #fff; }
     .preview-fallback i { font-size: 5rem; color: rgba(255,255,255,.5); margin-bottom: 1rem; }
     .preview-fallback .btn { margin-top: 1rem; }
     .convert-tip { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; z-index: 200; white-space: nowrap; }
   </style>
 </head>
 <body>
-  <div class="preview-header d-flex align-items-center justify-content-between">
+  <div class="preview-header">
     <div class="d-flex align-items-center gap-2">
       <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
-      <span class="fw-semibold text-truncate" style="max-width:220px"><%= att.original_name %></span>
+      <span class="fw-semibold text-truncate" style="max-width:180px"><%= att.original_name %></span>
     </div>
-    <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+    <div class="d-flex align-items-center gap-2">
+      <div class="btn-group btn-group-sm" id="zoomControls">
+        <button type="button" class="btn btn-light" id="zoomOut" title="缩小"><i class="bi bi-dash-lg"></i></button>
+        <button type="button" class="btn btn-light disabled" id="zoomLabel" style="min-width:60px">100%</button>
+        <button type="button" class="btn btn-light" id="zoomIn" title="放大"><i class="bi bi-plus-lg"></i></button>
+        <button type="button" class="btn btn-light" id="zoomReset" title="重置为适合宽度"><i class="bi bi-arrows-angle-out"></i></button>
+      </div>
+      <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+    </div>
   </div>
   <div class="preview-content" id="previewContent">
     <% if (isImage) { %>
-      <img class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
+      <img id="previewImage" class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
     <% } else { %>
       <div id="pdfLoading" class="loading">
         <div class="spinner-border text-light" role="status"></div>
@@ -52,56 +61,107 @@
   </div>
   <script>
     (function () {
+      var contentEl = document.getElementById('previewContent');
       var wrap = document.getElementById('pdfWrap');
       var loading = document.getElementById('pdfLoading');
       var fallback = document.getElementById('pdfFallback');
-      function showFallback() {
-        if (loading) loading.style.display = 'none';
-        if (fallback) fallback.style.display = 'flex';
+      var imgEl = document.getElementById('previewImage');
+      var isImage = <%= isImage ? 'true' : 'false' %>;
+      var pdfDoc = null;
+      var stateZoom = 1;
+      var dpr = window.devicePixelRatio || 1;
+      var MINZ = 0.25, MAXZ = 6;
+      var zoomTimer = null;
+      var pinch = null;
+
+      function clampZ(z) { return Math.min(MAXZ, Math.max(MINZ, z)); }
+      function showFallback() { if (loading) loading.style.display = 'none'; if (fallback) fallback.style.display = 'flex'; }
+      function showPdf() { if (wrap) wrap.style.display = 'block'; if (loading) loading.style.display = 'none'; }
+      function updateZoomUI() {
+        var l = document.getElementById('zoomLabel');
+        if (l) l.textContent = Math.round(stateZoom * 100) + '%';
       }
-      function showPdf() {
-        if (wrap) wrap.style.display = 'block';
-        if (loading) loading.style.display = 'none';
+      function applyZoom() {
+        if (imgEl) { imgEl.style.transform = 'scale(' + stateZoom + ')'; return; }
+        if (zoomTimer) clearTimeout(zoomTimer);
+        zoomTimer = setTimeout(renderPdf, 120);
       }
-      var url = '/api/attachments/<%= att.id %>/preview-file';
-      function renderPdf(opts) {
-        return pdfjsLib.getDocument(opts).promise.then(function (pdf) {
-          var containerWidth = (wrap.clientWidth || document.documentElement.clientWidth) - 32;
-          var frag = document.createDocumentFragment();
-          var chain = Promise.resolve();
-          for (var p = 1; p <= pdf.numPages; p++) {
-            (function (pageNum) {
-              chain = chain.then(function () {
-                return pdf.getPage(pageNum).then(function (page) {
-                  var vp1 = page.getViewport({ scale: 1 });
-                  var scale = Math.min(2, Math.max(0.5, containerWidth / vp1.width));
-                  var viewport = page.getViewport({ scale: scale });
-                  var canvas = document.createElement('canvas');
-                  canvas.width = Math.floor(viewport.width);
-                  canvas.height = Math.floor(viewport.height);
-                  canvas.className = 'pdf-page';
-                  canvas.style.width = canvas.width + 'px';
-                  var renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
-                  return renderTask.promise.then(function () {
-                    frag.appendChild(canvas);
-                  });
+      function setZoom(z) { stateZoom = clampZ(z); updateZoomUI(); applyZoom(); }
+
+      function renderPdf() {
+        if (!pdfDoc) return;
+        wrap.innerHTML = '';
+        var cw = (wrap.clientWidth || document.documentElement.clientWidth) - 32;
+        var frag = document.createDocumentFragment();
+        var chain = Promise.resolve();
+        for (var p = 1; p <= pdfDoc.numPages; p++) {
+          (function (pageNum) {
+            chain = chain.then(function () {
+              return pdfDoc.getPage(pageNum).then(function (page) {
+                var vp1 = page.getViewport({ scale: 1 });
+                var fit = cw / vp1.width;
+                var s = fit * stateZoom * dpr;
+                var viewport = page.getViewport({ scale: s });
+                var canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page';
+                canvas.width = Math.floor(viewport.width);
+                canvas.height = Math.floor(viewport.height);
+                canvas.style.width = Math.floor(viewport.width / dpr) + 'px';
+                canvas.style.height = 'auto';
+                return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function () {
+                  frag.appendChild(canvas);
                 });
               });
-            })(p);
-          }
-          return chain.then(function () {
-            wrap.appendChild(frag);
-            showPdf();
-          });
-        });
+            });
+          })(p);
+        }
+        return chain.then(function () { wrap.appendChild(frag); showPdf(); });
       }
-      if (window.pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
-        renderPdf({ url: url })
-          .catch(function () { return renderPdf({ url: url, disableWorker: true, isEvalSupported: false }); })
-          .catch(function () { showFallback(); });
-      } else {
-        showFallback();
+
+      document.getElementById('zoomOut').addEventListener('click', function () { setZoom(stateZoom / 1.25); });
+      document.getElementById('zoomIn').addEventListener('click', function () { setZoom(stateZoom * 1.25); });
+      document.getElementById('zoomReset').addEventListener('click', function () { setZoom(1); });
+
+      contentEl.addEventListener('wheel', function (e) {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        setZoom(stateZoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+      }, { passive: false });
+
+      contentEl.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 2) {
+          var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          pinch = { d: d, z: stateZoom };
+        }
+      }, { passive: true });
+      contentEl.addEventListener('touchmove', function (e) {
+        if (!pinch || e.touches.length !== 2) return;
+        e.preventDefault();
+        var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        setZoom(pinch.z * d / pinch.d);
+      }, { passive: false });
+      contentEl.addEventListener('touchend', function (e) { if (e.touches.length < 2) pinch = null; }, { passive: true });
+
+      window.addEventListener('resize', function () {
+        if (!isImage && pdfDoc && stateZoom === 1) renderPdf();
+      });
+
+      if (!isImage) {
+        var url = '/api/attachments/<%= att.id %>/preview-file';
+        function load(urlOpts) {
+          return pdfjsLib.getDocument(urlOpts).promise.then(function (pdf) {
+            pdfDoc = pdf;
+            return renderPdf();
+          });
+        }
+        if (window.pdfjsLib) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
+          load({ url: url })
+            .catch(function () { return load({ url: url, disableWorker: true, isEvalSupported: false }); })
+            .catch(function () { showFallback(); });
+        } else {
+          showFallback();
+        }
       }
     })();
   </script>
