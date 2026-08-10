@@ -253,15 +253,20 @@
       .lb-action:hover { background:rgba(255,255,255,.18); color:#fff; }
       .lb-action.danger { color:#fca5a5; border-color:rgba(248,113,113,.4); }
       .lb-action.danger:hover { background:rgba(248,113,113,.18); color:#fecaca; }
-      .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; }
-      .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); }
+      .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; touch-action:pan-x pan-y; }
+      .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); transform-origin:center center; transition:transform .05s; }
       .lb-close { position:absolute; top:14px; right:18px; font-size:1.6rem; color:#e2e8f0; cursor:pointer; padding:6px; }
       .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(15,23,42,.55); border:1px solid rgba(255,255,255,.35); color:#fff; font-size:2rem; width:52px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.4); backdrop-filter:blur(2px); }
       .lb-nav:hover { background:rgba(13,110,253,.85); border-color:rgba(255,255,255,.55); }
       .lb-prev { left:12px; } .lb-next { right:12px; }
-      .lb-info { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#cbd5e1; font-size:.9rem; display:flex; align-items:center; justify-content:center; gap:12px; }
+      .lb-info { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#cbd5e1; font-size:.9rem; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; padding:0 10px; }
+      .lb-zoom { display:inline-flex; gap:4px; align-items:center; }
+      .lb-zbtn { background:rgba(15,23,42,.6); border:1px solid rgba(255,255,255,.3); color:#fff; width:32px; height:32px; border-radius:7px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.9rem; padding:0; }
+      .lb-zbtn:hover { background:rgba(13,110,253,.85); }
+      .lb-zbtn.lb-zlabel { width:auto; min-width:56px; font-size:.8rem; background:rgba(255,255,255,.14); cursor:default; }
+      .lb-zbtn.lb-zlabel:hover { background:rgba(255,255,255,.14); }
       .lb-dl { color:#93c5fd; text-decoration:none; }
-      @media (max-width:576px) { .att-thumbs { grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); } .lb-nav { width:44px; height:52px; font-size:1.6rem; background:rgba(15,23,42,.6); } }
+      @media (max-width:576px) { .att-thumbs { grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); } .lb-nav { width:44px; height:52px; font-size:1.6rem; background:rgba(15,23,42,.6); } .lb-zbtn { width:34px; height:34px; } }
     </style>
 
     <div class="card mb-3">
@@ -342,6 +347,12 @@
       <button class="lb-nav lb-next" onclick="lbNav(1)"><i class="bi bi-chevron-right"></i></button>
       <div class="lb-info">
         <span id="lbInfo"></span>
+        <span class="lb-zoom">
+          <button type="button" class="lb-zbtn" onclick="lbZoom(-1)" title="缩小"><i class="bi bi-dash-lg"></i></button>
+          <button type="button" class="lb-zbtn lb-zlabel" id="lbZoomLabel">100%</button>
+          <button type="button" class="lb-zbtn" onclick="lbZoom(1)" title="放大"><i class="bi bi-plus-lg"></i></button>
+          <button type="button" class="lb-zbtn" onclick="lbZoom(0)" title="重置为原始大小"><i class="bi bi-arrows-angle-out"></i></button>
+        </span>
         <a id="lbDl" class="lb-dl" href="" target="_blank"><i class="bi bi-download"></i> 下载</a>
         <% if (can('attachments.manage')) { %>
         <button class="lb-action" id="lbReplace" onclick="lbReplaceCurrent()"><i class="bi bi-arrow-repeat"></i> 替换</button>
@@ -984,11 +995,23 @@
     if (!LB_LIST.length || !LB_LIST[i]) return;
     LB_IDX = i;
     const a = LB_LIST[i];
+    lbZoomLevel = 1; lbApplyZoom();
     document.getElementById('lbImg').src = '/api/attachments/' + a.id + '/file';
     document.getElementById('lbInfo').textContent = (i + 1) + ' / ' + LB_LIST.length + ' · ' + (a.name || '');
     document.getElementById('lbDl').href = '/api/attachments/' + a.id + '/download';
     document.getElementById('lightbox').style.display = 'flex';
     document.body.style.overflow = 'hidden';
+  }
+  let lbZoomLevel = 1;
+  function lbApplyZoom() {
+    document.getElementById('lbImg').style.transform = 'scale(' + lbZoomLevel + ')';
+    const l = document.getElementById('lbZoomLabel');
+    if (l) l.textContent = Math.round(lbZoomLevel * 100) + '%';
+  }
+  function lbZoom(dir) {
+    if (dir === 0) lbZoomLevel = 1;
+    else lbZoomLevel = Math.min(6, Math.max(0.25, lbZoomLevel * (dir > 0 ? 1.25 : 1 / 1.25)));
+    lbApplyZoom();
   }
   function lbReplaceCurrent() {
     const a = LB_LIST[LB_IDX];
@@ -1019,4 +1042,27 @@
   document.getElementById('lightbox').addEventListener('click', (e) => {
     if (e.target.id === 'lightbox') lbClose();
   });
+  /* 灯箱图片缩放：双指捏合 / Ctrl+滚轮 */
+  const lbEl = document.getElementById('lightbox');
+  let lbPinch = null;
+  lbEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      lbPinch = { d, z: lbZoomLevel };
+    }
+  }, { passive: true });
+  lbEl.addEventListener('touchmove', (e) => {
+    if (!lbPinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    lbZoomLevel = Math.min(6, Math.max(0.25, lbPinch.z * d / lbPinch.d));
+    lbApplyZoom();
+  }, { passive: false });
+  lbEl.addEventListener('touchend', (e) => { if (e.touches.length < 2) lbPinch = null; }, { passive: true });
+  lbEl.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    lbZoomLevel = Math.min(6, Math.max(0.25, lbZoomLevel * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+    lbApplyZoom();
+  }, { passive: false });
 </script>

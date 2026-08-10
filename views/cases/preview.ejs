@@ -71,7 +71,6 @@
       var stateZoom = 1;
       var dpr = window.devicePixelRatio || 1;
       var MINZ = 0.25, MAXZ = 6;
-      var zoomTimer = null;
       var pinch = null;
 
       function clampZ(z) { return Math.min(MAXZ, Math.max(MINZ, z)); }
@@ -83,8 +82,10 @@
       }
       function applyZoom() {
         if (imgEl) { imgEl.style.transform = 'scale(' + stateZoom + ')'; return; }
-        if (zoomTimer) clearTimeout(zoomTimer);
-        zoomTimer = setTimeout(renderPdf, 120);
+        if (wrap) {
+          wrap.style.transformOrigin = '50% 0';
+          wrap.style.transform = 'scale(' + stateZoom + ')';
+        }
       }
       function setZoom(z) { stateZoom = clampZ(z); updateZoomUI(); applyZoom(); }
 
@@ -100,7 +101,7 @@
               return pdfDoc.getPage(pageNum).then(function (page) {
                 var vp1 = page.getViewport({ scale: 1 });
                 var fit = cw / vp1.width;
-                var s = fit * stateZoom * dpr;
+                var s = fit * dpr;
                 var viewport = page.getViewport({ scale: s });
                 var canvas = document.createElement('canvas');
                 canvas.className = 'pdf-page';
