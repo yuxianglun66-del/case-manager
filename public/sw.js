@@ -6,7 +6,6 @@ const PAGE_CACHE = `case-manager-pages-${VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
-  '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
@@ -19,8 +18,7 @@ const STATIC_ASSETS = [
 
 const isStaticAsset = (url) =>
   url.pathname.startsWith('/css/') || url.pathname.startsWith('/js/') ||
-  url.pathname.startsWith('/icons/') || url.pathname.startsWith('/vendor/') ||
-  url.pathname === '/manifest.json';
+  url.pathname.startsWith('/icons/') || url.pathname.startsWith('/vendor/');
 
 const isSensitive = (url) =>
   url.pathname.startsWith('/api/') || url.pathname.startsWith('/sign/') ||

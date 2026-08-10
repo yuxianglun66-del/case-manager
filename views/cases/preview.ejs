@@ -34,6 +34,9 @@
         <button type="button" class="btn btn-light" id="zoomOut" title="缩小"><i class="bi bi-dash-lg"></i></button>
         <button type="button" class="btn btn-light disabled" id="zoomLabel" style="min-width:60px">100%</button>
         <button type="button" class="btn btn-light" id="zoomIn" title="放大"><i class="bi bi-plus-lg"></i></button>
+        <% if (isImage) { %>
+        <button type="button" class="btn btn-light" id="zoomRotate" title="旋转"><i class="bi bi-arrow-clockwise"></i></button>
+        <% } %>
         <button type="button" class="btn btn-light" id="zoomReset" title="重置为适合宽度"><i class="bi bi-arrows-angle-out"></i></button>
       </div>
       <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
@@ -69,6 +72,7 @@
       var isImage = <%= isImage ? 'true' : 'false' %>;
       var pdfDoc = null;
       var stateZoom = 1;
+      var imgRot = 0;
       var dpr = window.devicePixelRatio || 1;
       var MINZ = 0.25, MAXZ = 6;
       var pinch = null;
@@ -82,15 +86,23 @@
       }
       function applyZoom() {
         if (imgEl) {
+          var rot = imgRot % 360;
+          imgEl.style.transformOrigin = 'center center';
+          imgEl.style.transform = 'rotate(' + rot + 'deg)';
           if (stateZoom === 1) {
             imgEl.style.maxWidth = '100%';
             imgEl.style.width = '';
             imgEl.style.height = '';
           } else {
             var iw = imgEl.naturalWidth || 0;
+            var ih = imgEl.naturalHeight || 0;
             if (iw) {
               imgEl.style.maxWidth = 'none';
-              imgEl.style.width = Math.round(iw * stateZoom) + 'px';
+              if (rot % 180 === 90) {
+                imgEl.style.width = Math.round(ih * stateZoom) + 'px';
+              } else {
+                imgEl.style.width = Math.round(iw * stateZoom) + 'px';
+              }
               imgEl.style.height = 'auto';
             }
           }
@@ -136,7 +148,11 @@
 
       document.getElementById('zoomOut').addEventListener('click', function () { setZoom(stateZoom / 1.25); });
       document.getElementById('zoomIn').addEventListener('click', function () { setZoom(stateZoom * 1.25); });
-      document.getElementById('zoomReset').addEventListener('click', function () { setZoom(1); });
+      document.getElementById('zoomReset').addEventListener('click', function () { imgRot = 0; setZoom(1); });
+      var rotateBtn = document.getElementById('zoomRotate');
+      if (rotateBtn) {
+        rotateBtn.addEventListener('click', function () { imgRot = (imgRot + 90) % 360; applyZoom(); });
+      }
 
       contentEl.addEventListener('wheel', function (e) {
         if (!e.ctrlKey) return;

@@ -253,7 +253,7 @@
       .lb-action:hover { background:rgba(255,255,255,.18); color:#fff; }
       .lb-action.danger { color:#fca5a5; border-color:rgba(248,113,113,.4); }
       .lb-action.danger:hover { background:rgba(248,113,113,.18); color:#fecaca; }
-      .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; touch-action:pan-x pan-y; }
+      .lightbox { position:fixed; inset:0; z-index:1060; background:rgba(2,6,23,.92); display:flex; align-items:center; justify-content:center; flex-direction:column; touch-action:none; }
       .lightbox img { max-width:92vw; max-height:82vh; object-fit:contain; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.6); transform-origin:center center; transition:transform .05s; }
       .lb-close { position:absolute; top:14px; right:18px; font-size:1.6rem; color:#e2e8f0; cursor:pointer; padding:6px; }
       .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(15,23,42,.55); border:1px solid rgba(255,255,255,.35); color:#fff; font-size:2rem; width:52px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.4); backdrop-filter:blur(2px); }
@@ -352,6 +352,7 @@
           <button type="button" class="lb-zbtn lb-zlabel" id="lbZoomLabel">100%</button>
           <button type="button" class="lb-zbtn" onclick="lbZoom(1)" title="放大"><i class="bi bi-plus-lg"></i></button>
           <button type="button" class="lb-zbtn" onclick="lbZoom(0)" title="重置为原始大小"><i class="bi bi-arrows-angle-out"></i></button>
+          <button type="button" class="lb-zbtn" onclick="lbRotate()" title="旋转"><i class="bi bi-arrow-clockwise"></i></button>
         </span>
         <a id="lbDl" class="lb-dl" href="" target="_blank"><i class="bi bi-download"></i> 下载</a>
         <% if (can('attachments.manage')) { %>
@@ -995,21 +996,25 @@
     if (!LB_LIST.length || !LB_LIST[i]) return;
     LB_IDX = i;
     const a = LB_LIST[i];
-    lbZoomLevel = 1; lbTx = 0; lbTy = 0; lbApplyZoom();
+    lbZoomLevel = 1; lbTx = 0; lbTy = 0; lbRot = 0; lbApplyZoom();
     document.getElementById('lbImg').src = '/api/attachments/' + a.id + '/file';
     document.getElementById('lbInfo').textContent = (i + 1) + ' / ' + LB_LIST.length + ' · ' + (a.name || '');
     document.getElementById('lbDl').href = '/api/attachments/' + a.id + '/download';
     document.getElementById('lightbox').style.display = 'flex';
     document.body.style.overflow = 'hidden';
   }
-  let lbZoomLevel = 1, lbTx = 0, lbTy = 0;
+  let lbZoomLevel = 1, lbTx = 0, lbTy = 0, lbRot = 0;
   function lbApplyZoom() {
-    document.getElementById('lbImg').style.transform = 'translate(' + lbTx + 'px,' + lbTy + 'px) scale(' + lbZoomLevel + ')';
+    document.getElementById('lbImg').style.transform = 'translate(' + lbTx + 'px,' + lbTy + 'px) rotate(' + lbRot + 'deg) scale(' + lbZoomLevel + ')';
     const l = document.getElementById('lbZoomLabel');
     if (l) l.textContent = Math.round(lbZoomLevel * 100) + '%';
   }
+  function lbRotate() {
+    lbRot = (lbRot + 90) % 360;
+    lbApplyZoom();
+  }
   function lbZoom(dir) {
-    if (dir === 0) { lbZoomLevel = 1; lbTx = 0; lbTy = 0; }
+    if (dir === 0) { lbZoomLevel = 1; lbTx = 0; lbTy = 0; lbRot = 0; }
     else lbZoomLevel = Math.min(6, Math.max(0.25, lbZoomLevel * (dir > 0 ? 1.25 : 1 / 1.25)));
     lbApplyZoom();
   }
@@ -1066,6 +1071,7 @@
     }
     if (lbDrag && lbZoomLevel > 1 && e.touches.length === 1) {
       e.preventDefault();
+      document.getElementById('lbImg').style.transition = 'none';
       const t = e.touches[0];
       lbTx = lbDrag.tx + (t.clientX - lbDrag.x);
       lbTy = lbDrag.ty + (t.clientY - lbDrag.y);
@@ -1079,6 +1085,7 @@
       lbDrag = { x: t.clientX, y: t.clientY, tx: lbTx, ty: lbTy };
     } else if (e.touches.length === 0) {
       lbDrag = null;
+      document.getElementById('lbImg').style.transition = '';
     }
   }, { passive: true });
   lbEl.addEventListener('wheel', (e) => {

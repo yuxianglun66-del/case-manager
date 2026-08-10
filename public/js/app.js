@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   document.addEventListener('click', (e) => {
     if (sidebar && sidebar.classList.contains('show')
-        && !sidebar.contains(e.target) && e.target.id !== 'menuToggle') {
+        && !sidebar.contains(e.target) && !toggle.contains(e.target)) {
       sidebar.classList.remove('show');
     }
   });

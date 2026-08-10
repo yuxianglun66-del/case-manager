@@ -173,6 +173,45 @@ app.use(async (req, res, next) => {
 
 app.locals.MAX_MB = require('./src/util').MAX_MB;
 
+// PWA 清单动态生成：启动页名称/主题色跟随系统设置
+app.get('/manifest.json', async (req, res) => {
+  try {
+    const rows = (await pool.query(`SELECT key, value FROM app_settings`)).rows;
+    const s = {};
+    for (const r of rows) s[r.key] = r.value;
+    const name = s.company_name || '案件管理系统';
+    const theme = s.theme_primary || '#3b82f6';
+    const manifest = {
+      name: name,
+      short_name: name.length > 12 ? name.slice(0, 12) : name,
+      description: '法律服务公司案件管理系统：案件、当事人、附件、电子合同一站式管理',
+      lang: 'zh-CN',
+      start_url: '/dashboard',
+      scope: '/',
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: theme,
+      theme_color: theme,
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      ]
+    };
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.json(manifest);
+  } catch (e) {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.json({ name: '案件管理系统', short_name: '案件管理', description: '法律服务公司案件管理系统', lang: 'zh-CN', start_url: '/dashboard', scope: '/', display: 'standalone', orientation: 'portrait', background_color: '#3b82f6', theme_color: '#3b82f6', icons: [
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ] });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Service Worker 禁止缓存，确保新版本及时生效
