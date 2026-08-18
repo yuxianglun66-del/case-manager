@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
 const { hasPermission } = require('../src/permissions');
-const { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
+const { upload, feeUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 const { ZipArchive } = require('archiver');
@@ -290,6 +290,111 @@ router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (r
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
+});
+
+/* ---------- 结构化费用 CRUD ---------- */
+const FEE_TYPES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+
+router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, u.display_name AS creator_name
+       FROM case_fees f LEFT JOIN users u ON f.created_by = u.id
+       WHERE f.case_id = $1 ORDER BY f.created_at DESC`, [req.caseRow.id]
+    );
+    const { rows: agg } = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN direction='income' THEN amount ELSE 0 END),0) AS income_total,
+         COALESCE(SUM(CASE WHEN direction='expense' THEN amount ELSE 0 END),0) AS expense_total,
+         COALESCE(SUM(CASE WHEN direction='income' AND status='paid' THEN amount ELSE 0 END),0) AS income_paid,
+         COALESCE(SUM(CASE WHEN direction='expense' AND status='paid' THEN amount ELSE 0 END),0) AS expense_paid
+       FROM case_fees WHERE case_id = $1`, [req.caseRow.id]
+    );
+    res.json({ ok: true, fees: rows, summary: agg[0], feeTypes: FEE_TYPES });
+  } catch (e) { next(e); }
+});
+
+router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUpload.single('file'), validateUploadedFiles, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { fee_type, amount, direction, payer, status, paid_at, note } = req.body;
+    if (!fee_type || !FEE_TYPES.includes(fee_type)) return res.status(400).json({ error: '费用类型无效' });
+    if (!amount || isNaN(amount)) return res.status(400).json({ error: '金额无效' });
+    const dir = direction === 'income' ? 'income' : 'expense';
+    const st = ['pending', 'paid', 'waived'].includes(status) ? status : 'pending';
+    const f = req.file || null;
+    const { rows } = await client.query(
+      `INSERT INTO case_fees (case_id, fee_type, amount, direction, payer, status, paid_at, file_path, file_original_name, file_mime, file_size, note, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+      [req.caseRow.id, fee_type, amount, dir, payer || null, st, paid_at || null,
+       f ? (caseFolder(req.caseRow) + '/fees/' + f.filename) : null,
+       f ? f.originalname : null, f ? f.mimetype : null, f ? f.size : 0,
+       note || null, req.session.user.id]
+    );
+    await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `${req.caseRow.case_no} ${fee_type} ¥${amount}` });
+    res.json({ ok: true, id: rows[0].id });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, feeUpload.single('file'), validateUploadedFiles, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const fid = parseInt(req.params.fid);
+    const { rows: existing } = await client.query('SELECT * FROM case_fees WHERE id=$1 AND case_id=$2', [fid, req.caseRow.id]);
+    if (!existing.length) return res.status(404).json({ error: '费用记录不存在' });
+    const old = existing[0];
+    const { fee_type, amount, direction, payer, status, paid_at, note, remove_file } = req.body;
+    const ft = fee_type || old.fee_type;
+    const amt = amount != null ? amount : old.amount;
+    const dir = direction || old.direction;
+    const st = status || old.status;
+    const f = req.file || null;
+    let filePath = old.file_path, fName = old.file_original_name, fMime = old.file_mime, fSize = old.file_size;
+    if (remove_file === '1' && !f) {
+      if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+      filePath = null; fName = null; fMime = null; fSize = 0;
+    }
+    if (f) {
+      if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+      filePath = caseFolder(req.caseRow) + '/fees/' + f.filename;
+      fName = f.originalname; fMime = f.mimetype; fSize = f.size;
+    }
+    await client.query(
+      `UPDATE case_fees SET fee_type=$1, amount=$2, direction=$3, payer=$4, status=$5, paid_at=$6, file_path=$7, file_original_name=$8, file_mime=$9, file_size=$10, note=$11, updated_at=now() WHERE id=$12`,
+      [ft, amt, dir, payer != null ? payer : old.payer, st, paid_at != null ? paid_at : old.paid_at, filePath, fName, fMime, fSize, note != null ? note : old.note, fid]
+    );
+    await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `${req.caseRow.case_no} ${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status }, after: { fee_type: ft, amount: amt, direction: dir, status: st } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.delete('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const fid = parseInt(req.params.fid);
+    const { rows } = await client.query('DELETE FROM case_fees WHERE id=$1 AND case_id=$2 RETURNING *', [fid, req.caseRow.id]);
+    if (!rows.length) return res.status(404).json({ error: '费用记录不存在' });
+    const old = rows[0];
+    if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+    await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `${req.caseRow.case_no} ${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.get('/cases/:id/fees/:fid/file', requirePermission('cases.view'), needCase, async (req, res, next) => {
+  try {
+    const fid = parseInt(req.params.fid);
+    const { rows } = await pool.query('SELECT * FROM case_fees WHERE id=$1 AND case_id=$2', [fid, req.caseRow.id]);
+    if (!rows.length || !rows[0].file_path) return res.status(404).json({ error: '文件不存在' });
+    const filePath = path.join(UPLOAD_DIR, rows[0].file_path);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
+    res.setHeader('Content-Type', rows[0].file_mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(rows[0].file_original_name || 'file')}`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { next(e); }
 });
 
 /* ---------- 附件上传 ---------- */

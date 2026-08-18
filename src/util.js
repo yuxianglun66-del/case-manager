@@ -108,6 +108,33 @@ const upload = multer({
   },
 });
 
+const feeStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    let dir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    if (req && req.caseRow) {
+      dir = path.join(dir, caseFolder(req.caseRow), 'fees');
+    }
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `fee-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`);
+  },
+});
+
+const feeUpload = multer({
+  storage: feeStorage,
+  limits: { fileSize: MAX_MB * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXT.includes(ext)) {
+      return cb(new Error(`不支持的文件类型：${ext || '(无扩展名)'}`));
+    }
+    cb(null, true);
+  },
+});
+
 function isAllowedExt(filename) {
   const ext = path.extname(filename || '').toLowerCase();
   return ALLOWED_EXT.includes(ext);
@@ -148,4 +175,4 @@ function caseFolder(row) {
   return s;
 }
 
-module.exports = { upload, validateUploadedFiles, contentTypeFor, isInlineSafe, isAllowedExt, getCaseForPermission, generateCaseNo, caseFolder, MAX_MB, ALLOWED_EXT };
+module.exports = { upload, feeUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, isAllowedExt, getCaseForPermission, generateCaseNo, caseFolder, MAX_MB, ALLOWED_EXT };

@@ -229,6 +229,27 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+
+-- 结构化费用表（每笔费用独立一行，支持截图/发票上传）
+CREATE TABLE IF NOT EXISTS case_fees (
+  id SERIAL PRIMARY KEY,
+  case_id INT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  fee_type VARCHAR(50) NOT NULL,
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  direction VARCHAR(10) NOT NULL DEFAULT 'expense',
+  payer VARCHAR(200),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  paid_at DATE,
+  file_path TEXT,
+  file_original_name VARCHAR(200),
+  file_mime VARCHAR(120),
+  file_size BIGINT DEFAULT 0,
+  note TEXT,
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_case_fees_case ON case_fees(case_id);
 `;
 
 const SEED_TYPES = [

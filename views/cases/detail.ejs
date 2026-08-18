@@ -144,39 +144,101 @@
       </div>
     </div>
 
-    <!-- ============ 费用（约定+明细合并） ============ -->
+    <!-- ============ 费用（结构化） ============ -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-cash"></i> 费用</span>
-        <% if (can('cases.fee')) { %>
-        <button class="btn btn-sm btn-outline-primary" onclick="toggleFeeEdit()"><i class="bi bi-pencil"></i> 编辑</button>
-        <% } %>
-      </div>
-      <div class="card-body py-2">
-        <div id="feeDisplay">
-          <% if (caseData.fee_agreement) { %>
-            <div class="small mb-1"><%= caseData.fee_agreement %></div>
-          <% } else { %>
-            <div class="text-muted small mb-1">未约定服务费方式</div>
-          <% } %>
-          <% if (caseData.fee_details) { %>
-            <div class="small"><%= caseData.fee_details %></div>
-          <% } else { %>
-            <div class="text-muted small">暂无费用明细</div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="toggleAgreement()" title="服务费约定"><i class="bi bi-file-text"></i></button>
+          <% if (can('cases.fee')) { %>
+          <button class="btn btn-sm btn-primary" onclick="openFeeModal()"><i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">新增</span></button>
           <% } %>
         </div>
-        <div id="feeEdit" style="display:none">
-          <div class="mb-2">
-            <label class="form-label small">服务费约定方式</label>
-            <textarea name="fee_agreement" id="feeAgreement" class="form-control form-control-sm" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData.fee_agreement || '' %></textarea>
+      </div>
+      <div class="card-body py-2">
+        <div id="agreementBox" style="display:none" class="mb-3">
+          <label class="form-label small fw-bold">服务费约定方式</label>
+          <textarea id="feeAgreement" class="form-control form-control-sm" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData.fee_agreement || '' %></textarea>
+          <% if (can('cases.fee')) { %>
+          <button class="btn btn-sm btn-outline-primary mt-1" onclick="saveAgreement()"><i class="bi bi-check-lg"></i> 保存约定</button>
+          <% } %>
+        </div>
+        <div id="feeSummary" class="d-flex flex-wrap gap-3 small mb-2 fw-bold"></div>
+        <div id="feeList"><div class="text-muted small">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- 费用弹窗 -->
+    <div class="modal fade" id="feeModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title" id="feeModalTitle">新增费用</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="mb-2">
-            <label class="form-label small">费用明细</label>
-            <textarea name="fee_details" id="feeDetails" class="form-control form-control-sm" rows="3" placeholder="如：鉴定费由XX支付、诉讼费由XX支付、保全费由XX支付、律师费由XX支付"><%= caseData.fee_details || '' %></textarea>
+          <div class="modal-body">
+            <input type="hidden" id="feeEditId">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small">费用类型 *</label>
+                <select id="feeType" class="form-select form-select-sm" required>
+                  <option value="">请选择</option>
+                  <option value="保全费">保全费</option>
+                  <option value="鉴定费">鉴定费</option>
+                  <option value="一审诉讼费">一审诉讼费</option>
+                  <option value="二审诉讼费">二审诉讼费</option>
+                  <option value="律师费">律师费</option>
+                  <option value="差旅费">差旅费</option>
+                  <option value="茶水费">茶水费</option>
+                  <option value="公证费">公证费</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">金额 *</label>
+                <input type="number" id="feeAmount" class="form-control form-control-sm" step="0.01" min="0" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">收/付</label>
+                <select id="feeDirection" class="form-select form-select-sm">
+                  <option value="expense">应付</option>
+                  <option value="income">应收</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">状态</label>
+                <select id="feeStatus" class="form-select form-select-sm">
+                  <option value="pending">待收/付</option>
+                  <option value="paid">已收/付</option>
+                  <option value="waived">减免</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">付款方</label>
+                <input type="text" id="feePayer" class="form-control form-control-sm" placeholder="如：委托人XX">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">日期</label>
+                <input type="date" id="feePaidAt" class="form-control form-control-sm">
+              </div>
+              <div class="col-12">
+                <label class="form-label small">备注</label>
+                <input type="text" id="feeNote" class="form-control form-control-sm" placeholder="补充说明">
+              </div>
+              <div class="col-12">
+                <label class="form-label small">截图/发票</label>
+                <div class="d-flex align-items-center gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('feeFileInput').click()"><i class="bi bi-paperclip"></i> 选择文件</button>
+                  <input type="file" id="feeFileInput" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf" style="display:none">
+                  <span id="feeFileName" class="text-muted small text-truncate" style="max-width:200px"></span>
+                </div>
+                <div id="feeFilePreview" class="mt-1"></div>
+              </div>
+            </div>
           </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-primary" onclick="saveFeeAll()"><i class="bi bi-check-lg"></i> 保存</button>
-            <button class="btn btn-sm btn-light" onclick="toggleFeeEdit()"><i class="bi bi-x-lg"></i> 取消</button>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-primary btn-sm" id="feeSaveBtn" onclick="saveFee()"><i class="bi bi-check-lg"></i> 保存</button>
           </div>
         </div>
       </div>
@@ -699,49 +761,136 @@
     } catch (err) { toast(err.message, 'danger'); }
   }
 
-  /* ============ 服务费约定方式 ============ */
-  function toggleFeeEdit() {
-    const display = document.getElementById('feeDisplay');
-    const edit = document.getElementById('feeEdit');
-    if (!display || !edit) return;
-    const isEditing = edit.style.display !== 'none';
-    if (isEditing) {
-      edit.style.display = 'none';
-      display.style.display = '';
-    } else {
-      edit.style.display = '';
-      display.style.display = 'none';
+  /* ============ 费用模块 ============ */
+  const CAN_FEE = <%= can('cases.fee') ? 'true' : 'false' %>;
+  const CASE_ID = <%= caseData.id %>;
+  const DIRECTION_LABELS = { income: '应收', expense: '应付' };
+  const STATUS_LABELS = { pending: '待收/付', paid: '已收/付', waived: '减免' };
+  const STATUS_COLORS = { pending: 'warning', paid: 'success', waived: 'secondary' };
+
+  function toggleAgreement() {
+    const box = document.getElementById('agreementBox');
+    box.style.display = box.style.display === 'none' ? '' : 'none';
+  }
+  async function saveAgreement() {
+    const v = document.getElementById('feeAgreement').value.trim();
+    try {
+      const res = await postJSON('/api/cases/' + CASE_ID + '/fee', { fee_agreement: v || null });
+      if (!res.ok) throw new Error('保存失败');
+      toast('服务费约定已保存', 'success');
+    } catch (e) { toast(e.message, 'danger'); }
+  }
+
+  async function loadFees() {
+    try {
+      const data = await postJSON('/api/cases/' + CASE_ID + '/fees', {});
+      const fees = data.fees || [];
+      const s = data.summary || {};
+      const incomeTotal = parseFloat(s.income_total) || 0;
+      const expenseTotal = parseFloat(s.expense_total) || 0;
+      const net = incomeTotal - expenseTotal;
+      document.getElementById('feeSummary').innerHTML =
+        '<span class="text-success">应收: ¥' + incomeTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>' +
+        '<span class="text-danger">应付: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>' +
+        '<span>净: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
+      if (!fees.length) {
+        document.getElementById('feeList').innerHTML = '<div class="empty-tip"><i class="bi bi-cash-stack"></i>暂无费用记录</div>';
+        return;
+      }
+      document.getElementById('feeList').innerHTML =
+        '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr>' +
+        '<th>类型</th><th class="text-end">金额</th><th class="d-none d-sm-table-cell">收/付</th>' +
+        '<th class="d-none d-md-table-cell">付款方</th><th class="d-none d-sm-table-cell">状态</th>' +
+        '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
+        fees.map(f => '<tr>' +
+          '<td><span class="badge bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' d-sm-none me-1">' + DIRECTION_LABELS[f.direction] + '</span>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
+          '<td class="text-end fw-bold">' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</td>' +
+          '<td class="d-none d-sm-table-cell">' + DIRECTION_LABELS[f.direction] + '</td>' +
+          '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
+          '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
+          '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
+          '<td class="text-end text-nowrap">' +
+            (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
+            (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ' : '') +
+            (CAN_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
+          '</td></tr>').join('') +
+        '</tbody></table></div>';
+    } catch (e) { document.getElementById('feeList').innerHTML = '<div class="text-danger small">加载失败</div>'; }
+  }
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function openFeeModal(fee) {
+    document.getElementById('feeEditId').value = fee ? fee.id : '';
+    document.getElementById('feeModalTitle').textContent = fee ? '编辑费用' : '新增费用';
+    document.getElementById('feeType').value = fee ? fee.fee_type : '';
+    document.getElementById('feeAmount').value = fee ? fee.amount : '';
+    document.getElementById('feeDirection').value = fee ? fee.direction : 'expense';
+    document.getElementById('feeStatus').value = fee ? fee.status : 'pending';
+    document.getElementById('feePayer').value = fee ? (fee.payer || '') : '';
+    document.getElementById('feePaidAt').value = fee ? (fee.paid_at || '') : '';
+    document.getElementById('feeNote').value = fee ? (fee.note || '') : '';
+    document.getElementById('feeFileInput').value = '';
+    document.getElementById('feeFileName').textContent = fee && fee.file_original_name ? fee.file_original_name : '';
+    var preview = document.getElementById('feeFilePreview');
+    if (fee && fee.file_path && fee.file_mime && fee.file_mime.startsWith('image/')) {
+      preview.innerHTML = '<img src="/api/cases/' + CASE_ID + '/fees/' + fee.id + '/file" style="max-height:80px;border-radius:4px">';
+    } else { preview.innerHTML = ''; }
+    new bootstrap.Modal(document.getElementById('feeModal')).show();
+  }
+
+  var _feesCache = [];
+  async function editFee(id) {
+    if (!_feesCache.length) {
+      var d = await postJSON('/api/cases/' + CASE_ID + '/fees', {});
+      _feesCache = d.fees || [];
     }
+    var f = _feesCache.find(x => x.id === id);
+    if (f) openFeeModal(f);
   }
-  async function saveFeeAgreement() {
-    const feeAgreement = document.getElementById('feeAgreement').value.trim();
+
+  async function saveFee() {
+    var id = document.getElementById('feeEditId').value;
+    var fd = new FormData();
+    fd.append('fee_type', document.getElementById('feeType').value);
+    fd.append('amount', document.getElementById('feeAmount').value);
+    fd.append('direction', document.getElementById('feeDirection').value);
+    fd.append('status', document.getElementById('feeStatus').value);
+    fd.append('payer', document.getElementById('feePayer').value);
+    fd.append('paid_at', document.getElementById('feePaidAt').value);
+    fd.append('note', document.getElementById('feeNote').value);
+    var fileInput = document.getElementById('feeFileInput');
+    if (fileInput.files.length) fd.append('file', fileInput.files[0]);
+    var btn = document.getElementById('feeSaveBtn');
+    btn.disabled = true;
     try {
-      const res = await postJSON('/api/cases/<%= caseData.id %>/update', { fee_agreement: feeAgreement || null });
-      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
-      toggleFeeEdit();
-      toast('服务费约定已更新', 'success');
-      setTimeout(() => location.reload(), 400);
-    } catch (err) { toast(err.message, 'danger'); }
+      var url = id ? '/api/cases/' + CASE_ID + '/fees/' + id : '/api/cases/' + CASE_ID + '/fees';
+      var csrf = getCsrfToken();
+      var res = await fetch(url, { method: id ? 'PUT' : 'POST', body: fd, headers: csrf ? {'x-csrf-token': csrf} : {} });
+      var j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '保存失败');
+      bootstrap.Modal.getInstance(document.getElementById('feeModal')).hide();
+      toast('费用已保存', 'success');
+      _feesCache = [];
+      loadFees();
+    } catch (e) { toast(e.message, 'danger'); }
+    finally { btn.disabled = false; }
   }
-  function toggleFeeEdit() {
-    const display = document.getElementById('feeDisplay');
-    const edit = document.getElementById('feeEdit');
-    if (!display || !edit) return;
-    const isEditing = edit.style.display !== 'none';
-    if (isEditing) { edit.style.display = 'none'; display.style.display = ''; }
-    else { edit.style.display = ''; display.style.display = 'none'; }
-  }
-  async function saveFeeAll() {
-    const feeAgreement = document.getElementById('feeAgreement').value.trim();
-    const feeDetails = document.getElementById('feeDetails').value.trim();
+
+  async function deleteFee(id) {
+    if (!confirm('确定删除此费用记录？')) return;
     try {
-      const res = await postJSON('/api/cases/<%= caseData.id %>/fee', { fee_agreement: feeAgreement || null, fee_details: feeDetails || null });
-      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
-      toggleFeeEdit();
-      toast('费用信息已更新', 'success');
-      setTimeout(() => location.reload(), 400);
-    } catch (err) { toast(err.message, 'danger'); }
+      await postJSON('/api/cases/' + CASE_ID + '/fees/' + id + '/delete', {});
+      toast('已删除', 'success');
+      _feesCache = [];
+      loadFees();
+    } catch (e) { toast(e.message, 'danger'); }
   }
+
+  document.getElementById('feeFileInput').addEventListener('change', function() {
+    document.getElementById('feeFileName').textContent = this.files.length ? this.files[0].name : '';
+  });
+
+  loadFees();
   const PARTY_ROLE_COLORS = <%- safeJson({ 原告:'#4361ee', 被告:'#dc3545', 第三人:'#0ea5e9', 伤者:'#f59e0b', 用人单位:'#6f42c1', 保险公司:'#0d9488', 肇事方:'#ef4444', 受害人:'#e11d48', 其他:'#64748b' }) %>;
   const roleColor = r => PARTY_ROLE_COLORS[r] || '#64748b';
   const CAN_MANAGE_PARTIES = <%= can('parties.manage') ? 'true' : 'false' %>;
