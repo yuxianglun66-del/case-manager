@@ -800,9 +800,10 @@
         '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
         fees.map(f => '<tr>' +
           '<td>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
-          '<td class="text-end fw-bold" style="color:' + (f.direction === 'income' ? '#198754' : '#dc3545') + ';font-size:1.1em">' +
+          '<td class="text-end">' +
+            '<span style="display:inline-block;background:' + (f.direction === 'income' ? '#198754' : '#dc3545') + ';color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.95em">' +
             (f.direction === 'income' ? '+' : '-') + '¥' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
-          '</td>' +
+            '</span></td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
           '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
