@@ -310,7 +310,8 @@ router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (
          COALESCE(SUM(CASE WHEN direction='expense' AND status='paid' THEN amount ELSE 0 END),0) AS expense_paid
        FROM case_fees WHERE case_id = $1`, [req.caseRow.id]
     );
-    res.json({ ok: true, fees: rows, summary: agg[0], feeTypes: FEE_TYPES });
+    const fees = rows.map(r => ({ ...r, paid_at: r.paid_at ? String(r.paid_at).slice(0, 10) : null }));
+    res.json({ ok: true, fees, summary: agg[0], feeTypes: FEE_TYPES });
   } catch (e) { next(e); }
 });
 

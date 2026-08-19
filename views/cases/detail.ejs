@@ -805,7 +805,10 @@
         '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
         fees.map(f => '<tr>' +
           '<td><span class="badge bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' d-sm-none me-1">' + DIRECTION_LABELS[f.direction] + '</span>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
-          '<td class="text-end fw-bold ' + (f.direction === 'income' ? 'text-success' : 'text-danger') + '">' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</td>' +
+          '<td class="text-end fw-bold">' +
+            '<span class="badge rounded-pill bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' fs-6">' +
+            (f.direction === 'income' ? '+' : '-') + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
+            '</span></td>' +
           '<td class="d-none d-sm-table-cell">' + DIRECTION_LABELS[f.direction] + '</td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
