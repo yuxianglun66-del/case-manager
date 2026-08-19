@@ -104,8 +104,8 @@
                       <a href="javascript:void(0)" class="toggle-diff text-decoration-none" data-target="diff-<%= l.id %>"><i class="bi bi-arrow-left-right"></i> 查看变更</a>
                     </div>
                     <div id="diff-<%= l.id %>" class="diff-box mt-1" style="display:none;">
-                      <% if (l.before_data) { %><div class="mb-1"><span class="text-danger fw-bold">改前：</span><code class="diff-code"><%= l.before_data %></code></div><% } %>
-                      <% if (l.after_data) { %><div><span class="text-success fw-bold">改后：</span><code class="diff-code"><%= l.after_data %></code></div><% } %>
+                      <% if (l.before_data) { %><div class="mb-1"><span class="text-danger fw-bold">改前：</span><pre class="diff-code mb-0"><%- JSON.stringify(l.before_data, null, 2) %></pre></div><% } %>
+                      <% if (l.after_data) { %><div><span class="text-success fw-bold">改后：</span><pre class="diff-code mb-0"><%- JSON.stringify(l.after_data, null, 2) %></pre></div><% } %>
                     </div>
                   <% } %>
                 </td>

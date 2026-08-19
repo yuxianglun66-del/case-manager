@@ -270,7 +270,7 @@ router.post('/cases/:id/reminder/ack', needCase, async (req, res, next) => {
       `UPDATE cases SET reminder_ack_at=now(), reminder_ack_by=$1, updated_at=now() WHERE id=$2`,
       [req.session.user.id, id]
     );
-    await audit(req, '确认提醒', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no });
+    await audit(req, '确认提醒', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -286,7 +286,7 @@ router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (r
       `UPDATE cases SET fee_agreement=$1, fee_details=$2, updated_at=now() WHERE id=$3`,
       [feeAgreement, feeDetails, id]
     );
-    await audit(req, '更新费用信息', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no, before: { fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { fee_agreement: feeAgreement, fee_details: feeDetails } });
+    await audit(req, '更新费用信息', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」', before: { fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { fee_agreement: feeAgreement, fee_details: feeDetails } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -331,7 +331,7 @@ router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUplo
        f ? f.originalname : null, f ? f.mimetype : null, f ? f.size : 0,
        note || null, req.session.user.id]
     );
-    await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `${req.caseRow.case_no} ${fee_type} ¥${amount}` });
+    await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${fee_type} ¥${amount}` });
     res.json({ ok: true, id: rows[0].id });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -364,7 +364,7 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
       `UPDATE case_fees SET fee_type=$1, amount=$2, direction=$3, payer=$4, status=$5, paid_at=$6, file_path=$7, file_original_name=$8, file_mime=$9, file_size=$10, note=$11, updated_at=now() WHERE id=$12`,
       [ft, amt, dir, payer != null ? payer : old.payer, st, paid_at != null ? paid_at : old.paid_at, filePath, fName, fMime, fSize, note != null ? note : old.note, fid]
     );
-    await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `${req.caseRow.case_no} ${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status }, after: { fee_type: ft, amount: amt, direction: dir, status: st } });
+    await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status }, after: { fee_type: ft, amount: amt, direction: dir, status: st } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -378,7 +378,7 @@ router.delete('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, 
     if (!rows.length) return res.status(404).json({ error: '费用记录不存在' });
     const old = rows[0];
     if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
-    await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `${req.caseRow.case_no} ${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
+    await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -435,7 +435,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     }
     await addHistory(client, req.caseRow.id, 'attachment', user.id, { note: `上传附件 ${files.length} 个` });
     await client.query('COMMIT');
-    await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
+    await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
     res.json({ ok: true, files: list });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
