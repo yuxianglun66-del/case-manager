@@ -156,7 +156,7 @@
         </div>
       </div>
       <div class="card-body py-2">
-        <div id="agreementBox" style="display:none" class="mb-3">
+        <div id="agreementBox" class="mb-3">
           <label class="form-label small fw-bold">服务费约定方式</label>
           <textarea id="feeAgreement" class="form-control form-control-sm" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData.fee_agreement || '' %></textarea>
           <% if (can('cases.fee')) { %>
