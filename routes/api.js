@@ -322,7 +322,7 @@ router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUplo
     if (!fee_type || !FEE_TYPES.includes(fee_type)) return res.status(400).json({ error: '费用类型无效' });
     if (!amount || isNaN(amount)) return res.status(400).json({ error: '金额无效' });
     const dir = direction === 'income' ? 'income' : 'expense';
-    const st = ['pending', 'paid', 'waived'].includes(status) ? status : 'pending';
+    const st = ['pending', 'paid', 'advanced', 'waived'].includes(status) ? status : 'pending';
     const f = req.file || null;
     const { rows } = await client.query(
       `INSERT INTO case_fees (case_id, fee_type, amount, direction, payer, status, paid_at, file_path, file_original_name, file_mime, file_size, note, created_by)
@@ -349,7 +349,7 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
     const ft = fee_type || old.fee_type;
     const amt = amount != null ? amount : old.amount;
     const dir = direction || old.direction;
-    const st = status || old.status;
+    const st = ['pending', 'paid', 'advanced', 'waived'].includes(status) ? status : old.status;
     const f = req.file || null;
     let filePath = old.file_path, fName = old.file_original_name, fMime = old.file_mime, fSize = old.file_size;
     if (remove_file === '1' && !f) {
