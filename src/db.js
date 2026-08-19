@@ -213,6 +213,10 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_staff_id INT REFERENCES users(id
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS sign_date DATE;
 CREATE INDEX IF NOT EXISTS idx_cases_sign_date ON cases(sign_date);
 
+-- 标的金额 / 实收金额
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS target_amount NUMERIC(12,2);
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12,2);
+
 -- 操作日志：登录 + 所有数据变更（含变更前后内容），仅超管可查看
 CREATE TABLE IF NOT EXISTS audit_logs (
   id SERIAL PRIMARY KEY,

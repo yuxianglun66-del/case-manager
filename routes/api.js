@@ -282,11 +282,13 @@ router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (r
     const id = req.caseRow.id;
     const feeAgreement = (req.body.fee_agreement || '').trim() || null;
     const feeDetails = (req.body.fee_details || '').trim() || null;
+    const targetAmount = req.body.target_amount ? parseFloat(req.body.target_amount) : null;
+    const receivedAmount = req.body.received_amount ? parseFloat(req.body.received_amount) : null;
     await client.query(
-      `UPDATE cases SET fee_agreement=$1, fee_details=$2, updated_at=now() WHERE id=$3`,
-      [feeAgreement, feeDetails, id]
+      `UPDATE cases SET fee_agreement=$1, fee_details=$2, target_amount=$3, received_amount=$4, updated_at=now() WHERE id=$5`,
+      [feeAgreement, feeDetails, targetAmount, receivedAmount, id]
     );
-    await audit(req, '更新费用信息', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」', before: { fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { fee_agreement: feeAgreement, fee_details: feeDetails } });
+    await audit(req, '更新费用信息', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」', before: { fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details, target_amount: req.caseRow.target_amount, received_amount: req.caseRow.received_amount }, after: { fee_agreement: feeAgreement, fee_details: feeDetails, target_amount: targetAmount, received_amount: receivedAmount } });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
