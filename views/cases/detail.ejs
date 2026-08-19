@@ -791,9 +791,9 @@
       const expenseTotal = parseFloat(s.expense_total) || 0;
       const net = incomeTotal - expenseTotal;
       document.getElementById('feeSummary').innerHTML =
-        '<span class="text-success">应收: ¥' + incomeTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>' +
-        '<span class="text-danger">应付: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>' +
-        '<span>净: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
+        '<span class="fw-bold" style="color:#198754">应收: ¥' + incomeTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span class="fw-bold" style="color:#dc3545">应付: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span class="fw-bold">净: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
       if (!fees.length) {
         document.getElementById('feeList').innerHTML = '<div class="empty-tip"><i class="bi bi-cash-stack"></i>暂无费用记录</div>';
         return;
@@ -805,10 +805,9 @@
         '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
         fees.map(f => '<tr>' +
           '<td><span class="badge bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' d-sm-none me-1">' + DIRECTION_LABELS[f.direction] + '</span>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
-          '<td class="text-end fw-bold">' +
-            '<span class="badge rounded-pill bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' fs-6">' +
-            (f.direction === 'income' ? '+' : '-') + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
-            '</span></td>' +
+          '<td class="text-end fw-bold" style="font-size:1.05em;color:' + (f.direction === 'income' ? '#198754' : '#dc3545') + '">' +
+            (f.direction === 'income' ? '+' : '-') + '¥' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
+          '</td>' +
           '<td class="d-none d-sm-table-cell">' + DIRECTION_LABELS[f.direction] + '</td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
