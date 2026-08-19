@@ -783,7 +783,8 @@
 
   async function loadFees() {
     try {
-      const data = await postJSON('/api/cases/' + CASE_ID + '/fees', {});
+      const res = await fetch('/api/cases/' + CASE_ID + '/fees');
+      const data = await res.json();
       const fees = data.fees || [];
       const s = data.summary || {};
       const incomeTotal = parseFloat(s.income_total) || 0;
@@ -841,7 +842,8 @@
   var _feesCache = [];
   async function editFee(id) {
     if (!_feesCache.length) {
-      var d = await postJSON('/api/cases/' + CASE_ID + '/fees', {});
+      var res2 = await fetch('/api/cases/' + CASE_ID + '/fees');
+      var d = await res2.json();
       _feesCache = d.fees || [];
     }
     var f = _feesCache.find(x => x.id === id);
@@ -879,7 +881,10 @@
   async function deleteFee(id) {
     if (!confirm('确定删除此费用记录？')) return;
     try {
-      await postJSON('/api/cases/' + CASE_ID + '/fees/' + id + '/delete', {});
+      var csrf = getCsrfToken();
+      var res = await fetch('/api/cases/' + CASE_ID + '/fees/' + id, { method: 'DELETE', headers: csrf ? {'x-csrf-token': csrf} : {} });
+      var j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || '删除失败');
       toast('已删除', 'success');
       _feesCache = [];
       loadFees();
