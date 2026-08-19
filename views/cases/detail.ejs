@@ -757,6 +757,7 @@
 
   /* ============ 费用模块 ============ */
   const CAN_FEE = <%= can('cases.fee') ? 'true' : 'false' %>;
+  const CAN_DELETE_FEE = <%= (user.role === 'super_admin' || user.role === 'admin') ? 'true' : 'false' %>;
   const CASE_ID = <%= caseData.id %>;
   const DIRECTION_LABELS = { income: '应收', expense: '应付' };
   const STATUS_LABELS = { pending: '待支付', paid: '已支付', advanced: '垫付', waived: '减免' };
@@ -794,22 +795,21 @@
       }
       document.getElementById('feeList').innerHTML =
         '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr>' +
-        '<th>类型</th><th class="text-end">金额</th><th class="d-none d-sm-table-cell">收/付</th>' +
+        '<th>类型</th><th class="text-end">金额</th>' +
         '<th class="d-none d-md-table-cell">付款方</th><th class="d-none d-sm-table-cell">状态</th>' +
         '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
         fees.map(f => '<tr>' +
-          '<td><span class="badge bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' d-sm-none me-1">' + DIRECTION_LABELS[f.direction] + '</span>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
-          '<td class="text-end fw-bold" style="font-size:1.05em;color:' + (f.direction === 'income' ? '#198754' : '#dc3545') + '">' +
+          '<td>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
+          '<td class="text-end fw-bold" style="color:' + (f.direction === 'income' ? '#198754' : '#dc3545') + ';font-size:1.1em">' +
             (f.direction === 'income' ? '+' : '-') + '¥' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
           '</td>' +
-          '<td class="d-none d-sm-table-cell">' + DIRECTION_LABELS[f.direction] + '</td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
-          '<td class="d-none d-md-table-cell">' + (f.paid_at ? String(f.paid_at).slice(0,10) : '-') + '</td>' +
+          '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
             (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
             (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ' : '') +
-            (CAN_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
+            (CAN_DELETE_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
           '</td></tr>').join('') +
         '</tbody></table></div>';
     } catch (e) { document.getElementById('feeList').innerHTML = '<div class="text-danger small">加载失败</div>'; }

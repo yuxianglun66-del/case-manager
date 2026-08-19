@@ -298,7 +298,7 @@ const FEE_TYPES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费
 router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT f.*, u.display_name AS creator_name
+      `SELECT f.*, TO_CHAR(f.paid_at, 'YYYY-MM-DD') AS paid_at, u.display_name AS creator_name
        FROM case_fees f LEFT JOIN users u ON f.created_by = u.id
        WHERE f.case_id = $1 ORDER BY f.created_at DESC`, [req.caseRow.id]
     );
@@ -310,8 +310,7 @@ router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (
          COALESCE(SUM(CASE WHEN direction='expense' AND status='paid' THEN amount ELSE 0 END),0) AS expense_paid
        FROM case_fees WHERE case_id = $1`, [req.caseRow.id]
     );
-    const fees = rows.map(r => ({ ...r, paid_at: r.paid_at ? String(r.paid_at).slice(0, 10) : null }));
-    res.json({ ok: true, fees, summary: agg[0], feeTypes: FEE_TYPES });
+    res.json({ ok: true, fees: rows, summary: agg[0], feeTypes: FEE_TYPES });
   } catch (e) { next(e); }
 });
 

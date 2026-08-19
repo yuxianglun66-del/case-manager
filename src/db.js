@@ -453,7 +453,7 @@ async function initDb() {
         'parties.manage', 'attachments.manage', 'contracts.manage',
       ],
       staff: [
-        'cases.create', 'cases.edit', 'cases.remind',
+        'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
         'parties.manage', 'attachments.manage',
       ],
     };
