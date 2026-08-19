@@ -208,8 +208,8 @@
               <div class="col-6">
                 <label class="form-label small">状态</label>
                 <select id="feeStatus" class="form-select form-select-sm">
-                  <option value="pending">待收/付</option>
-                  <option value="paid">已收/付</option>
+                  <option value="pending">待支付</option>
+                  <option value="paid">已支付</option>
                   <option value="waived">减免</option>
                 </select>
               </div>
@@ -765,7 +765,7 @@
   const CAN_FEE = <%= can('cases.fee') ? 'true' : 'false' %>;
   const CASE_ID = <%= caseData.id %>;
   const DIRECTION_LABELS = { income: '应收', expense: '应付' };
-  const STATUS_LABELS = { pending: '待收/付', paid: '已收/付', waived: '减免' };
+  const STATUS_LABELS = { pending: '待支付', paid: '已支付', waived: '减免' };
   const STATUS_COLORS = { pending: 'warning', paid: 'success', waived: 'secondary' };
 
   function toggleAgreement() {
@@ -805,11 +805,11 @@
         '<th class="d-none d-md-table-cell">日期</th><th></th></tr></thead><tbody>' +
         fees.map(f => '<tr>' +
           '<td><span class="badge bg-' + (f.direction === 'income' ? 'success' : 'danger') + ' d-sm-none me-1">' + DIRECTION_LABELS[f.direction] + '</span>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
-          '<td class="text-end fw-bold">' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</td>' +
+          '<td class="text-end fw-bold ' + (f.direction === 'income' ? 'text-success' : 'text-danger') + '">' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</td>' +
           '<td class="d-none d-sm-table-cell">' + DIRECTION_LABELS[f.direction] + '</td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
-          '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
+          '<td class="d-none d-md-table-cell">' + (f.paid_at ? String(f.paid_at).slice(0,10) : '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
             (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
             (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ' : '') +
