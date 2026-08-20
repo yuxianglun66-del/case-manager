@@ -180,6 +180,7 @@
       <nav class="sidebar-nav">
         <a href="/dashboard" class="<%= _active === 'dashboard' ? 'active' : '' %>"><i class="bi bi-grid-1x2-fill"></i><span>工作看板</span></a>
         <a href="/cases" class="<%= _active === 'cases' ? 'active' : '' %>"><i class="bi bi-folder2-open"></i><span>案件管理</span></a>
+        <a href="/library" class="<%= _active === 'library' ? 'active' : '' %>"><i class="bi bi-book-half"></i><span>法律法规库</span></a>
         <% if (_can('system.users')) { %>
           <a href="/users" class="<%= _active === 'users' ? 'active' : '' %>"><i class="bi bi-people-fill"></i><span>用户管理</span></a>
         <% } %>

@@ -450,4 +450,13 @@ router.get('/settings/audit', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/library', async (req, res, next) => {
+  try {
+    const { rows: items } = await pool.query(
+      `SELECT l.*, u.display_name AS creator_name FROM library_items l LEFT JOIN users u ON u.id = l.created_by ORDER BY l.created_at DESC`
+    );
+    res.render('library', { title: '法律法规库', items, canEdit: hasPermission(req.session.user, 'cases.edit') });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
 const { hasPermission } = require('../src/permissions');
-const { upload, feeUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
+const { upload, feeUpload, libraryUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 const { ZipArchive } = require('archiver');
@@ -1722,6 +1722,98 @@ router.post('/cases/:id/history/:hid/delete', async (req, res, next) => {
     await pool.query(`DELETE FROM case_history WHERE id = $1`, [hid]);
     await audit(req, '删除进度记录', { entity_type: 'history', entity_id: hid, detail: '案号 ' + c.case_no + '「' + c.title + '」删除进度记录：' + (h.note || '') });
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ==================== 法律法规案例库 ====================
+const LIBRARY_CATEGORIES = ['法律法规', '赔偿标准', '调解判决案例', '司法解释', '操作指引', '其他'];
+
+router.get('/library', requireLogin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT l.*, u.display_name AS creator_name FROM library_items l LEFT JOIN users u ON u.id = l.created_by ORDER BY l.created_at DESC`
+    );
+    res.json({ items: rows, categories: LIBRARY_CATEGORIES });
+  } catch (e) { next(e); }
+});
+
+router.post('/library', requirePermission('cases.edit'), libraryUpload.single('file'), validateUploadedFiles, async (req, res, next) => {
+  try {
+    const { title, category, content } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ error: '标题不能为空' });
+    if (!category || !LIBRARY_CATEGORIES.includes(category)) return res.status(400).json({ error: '无效的分类' });
+    const f = req.file;
+    const filePath = f ? ('library/' + f.filename) : null;
+    const { rows } = await pool.query(
+      `INSERT INTO library_items (title, category, content, file_path, file_original_name, file_mime, file_size, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [title.trim(), category, content || null, filePath, f ? f.originalname : null, f ? f.mimetype : null, f ? f.size : 0, req.session.user.id]
+    );
+    await audit(req, '新增法律法规', { entity_type: 'library', entity_id: rows[0].id, detail: '「' + title.trim() + '」' });
+    res.json({ ok: true, item: rows[0] });
+  } catch (e) { next(e); }
+});
+
+router.put('/library/:lid', requirePermission('cases.edit'), libraryUpload.single('file'), validateUploadedFiles, async (req, res, next) => {
+  try {
+    const { lid } = req.params;
+    const existing = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [lid])).rows[0];
+    if (!existing) return res.status(404).json({ error: '记录不存在' });
+    const { title, category, content } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ error: '标题不能为空' });
+    if (!category || !LIBRARY_CATEGORIES.includes(category)) return res.status(400).json({ error: '无效的分类' });
+    const f = req.file;
+    let filePath = existing.file_path;
+    let fileOriginalName = existing.file_original_name;
+    let fileMime = existing.file_mime;
+    let fileSize = existing.file_size;
+    if (f) {
+      if (existing.file_path) {
+        const old = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), existing.file_path);
+        fs.unlink(old, () => {});
+      }
+      filePath = 'library/' + f.filename;
+      fileOriginalName = f.originalname;
+      fileMime = f.mimetype;
+      fileSize = f.size;
+    }
+    await pool.query(
+      `UPDATE library_items SET title=$1, category=$2, content=$3, file_path=$4, file_original_name=$5, file_mime=$6, file_size=$7, updated_at=now() WHERE id=$8`,
+      [title.trim(), category, content || null, filePath, fileOriginalName, fileMime, fileSize, lid]
+    );
+    await audit(req, '修改法律法规', { entity_type: 'library', entity_id: parseInt(lid), detail: '「' + title.trim() + '」' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.delete('/library/:lid', requirePermission('cases.edit'), async (req, res, next) => {
+  try {
+    const { lid } = req.params;
+    const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [lid])).rows[0];
+    if (!item) return res.status(404).json({ error: '记录不存在' });
+    if (item.file_path) {
+      const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+      fs.unlink(fp, () => {});
+    }
+    await pool.query(`DELETE FROM library_items WHERE id = $1`, [lid]);
+    await audit(req, '删除法律法规', { entity_type: 'library', entity_id: parseInt(lid), detail: '「' + item.title + '」' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.get('/library/:lid/file', requireLogin, async (req, res, next) => {
+  try {
+    const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
+    if (!item || !item.file_path) return res.status(404).json({ error: '文件不存在' });
+    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
+    const ct = contentTypeFor(item.file_original_name);
+    if (isInlineSafe(ct)) {
+      res.setHeader('Content-Type', ct);
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(item.file_original_name) + '"');
+      fs.createReadStream(fp).pipe(res);
+    } else {
+      res.download(fp, item.file_original_name);
+    }
   } catch (e) { next(e); }
 });
 

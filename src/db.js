@@ -257,6 +257,22 @@ CREATE TABLE IF NOT EXISTS case_fees (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_case_fees_case ON case_fees(case_id);
+
+-- 法律法规案例库
+CREATE TABLE IF NOT EXISTS library_items (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  category VARCHAR(50) NOT NULL,
+  content TEXT,
+  file_path TEXT,
+  file_original_name VARCHAR(500),
+  file_mime VARCHAR(120),
+  file_size BIGINT DEFAULT 0,
+  created_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_library_category ON library_items(category);
 `;
 
 const SEED_TYPES = [

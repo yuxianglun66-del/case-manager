@@ -1,0 +1,154 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-book-half"></i> 法律法规库</h4>
+  <% if (canEdit) { %>
+    <button class="btn btn-primary btn-sm" onclick="openLibModal()"><i class="bi bi-plus-lg"></i> 新增</button>
+  <% } %>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex gap-2 flex-wrap">
+      <select class="form-select form-select-sm" id="libFilterCat" style="max-width:180px">
+        <option value="">全部分类</option>
+      </select>
+      <input type="text" class="form-control form-control-sm" id="libFilterKey" placeholder="搜索标题/内容..." style="max-width:260px">
+      <button class="btn btn-outline-primary btn-sm" onclick="loadLibrary()"><i class="bi bi-search"></i></button>
+    </div>
+  </div>
+</div>
+
+<div id="libList"></div>
+
+<% if (canEdit) { %>
+<div class="modal fade" id="libModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="libModalTitle">新增</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="libEditId">
+        <div class="mb-2"><label class="form-label small">标题 *</label><input type="text" class="form-control form-control-sm" id="libTitle" required></div>
+        <div class="mb-2"><label class="form-label small">分类 *</label><select class="form-select form-select-sm" id="libCategory"></select></div>
+        <div class="mb-2"><label class="form-label small">文本内容</label><textarea class="form-control form-control-sm" id="libContent" rows="4" placeholder="可粘贴法律条文、赔偿标准等文本"></textarea></div>
+        <div class="mb-2"><label class="form-label small">附件</label><input type="file" class="form-control form-control-sm" id="libFile" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"><div class="form-text">支持图片、PDF、Word、Excel、文本等格式</div></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary btn-sm" id="libSaveBtn" onclick="saveLibItem()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<script>
+var libItems = <%- JSON.stringify(items) %>;
+var libCats = ['法律法规','赔偿标准','调解判决案例','司法解释','操作指引','其他'];
+var canEditLib = <%= canEdit %>;
+
+(function() {
+  var sel = document.getElementById('libFilterCat');
+  libCats.forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+  var catSel = document.getElementById('libCategory');
+  if (catSel) libCats.forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+  loadLibrary();
+})();
+
+function loadLibrary() {
+  var cat = document.getElementById('libFilterCat').value;
+  var key = document.getElementById('libFilterKey').value.trim().toLowerCase();
+  var filtered = libItems.filter(function(it) {
+    if (cat && it.category !== cat) return false;
+    if (key && (it.title||'').toLowerCase().indexOf(key) < 0 && (it.content||'').toLowerCase().indexOf(key) < 0) return false;
+    return true;
+  });
+  var html = '';
+  if (!filtered.length) { html = '<div class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2">暂无记录</p></div>'; }
+  else {
+    filtered.forEach(function(it) {
+      var badge = 'bg-secondary';
+      if (it.category === '法律法规') badge = 'bg-primary';
+      else if (it.category === '赔偿标准') badge = 'bg-success';
+      else if (it.category === '调解判决案例') badge = 'bg-info text-dark';
+      else if (it.category === '司法解释') badge = 'bg-warning text-dark';
+      var hasFile = it.file_path;
+      var fileIcon = hasFile ? '<i class="bi bi-paperclip ms-1"></i>' : '';
+      var dateStr = String(it.created_at).slice(0, 10);
+      html += '<div class="card mb-2"><div class="card-body py-2 px-3"><div class="d-flex justify-content-between align-items-start"><div><span class="badge ' + badge + ' me-2">' + (it.category||'') + '</span><strong>' + (it.title||'') + '</strong>' + fileIcon;
+      if (hasFile) {
+        html += ' <a href="/api/library/' + it.id + '/file" target="_blank" class="text-primary small ms-2"><i class="bi bi-eye"></i> ' + (it.file_original_name||'查看附件') + '</a>';
+      }
+      html += '</div>';
+      if (canEditLib) {
+        html += '<div class="d-flex gap-1"><button class="btn btn-outline-primary btn-sm" onclick="editLibItem(' + it.id + ')"><i class="bi bi-pencil"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteLibItem(' + it.id + ')"><i class="bi bi-trash"></i></button></div>';
+      }
+      html += '</div>';
+      if (it.content) html += '<div class="text-muted small mt-1" style="white-space:pre-wrap;max-height:120px;overflow:auto">' + (it.content.length > 500 ? it.content.slice(0, 500) + '...' : it.content) + '</div>';
+      html += '<div class="text-muted small mt-1">' + (it.creator_name||'') + ' · ' + dateStr + '</div>';
+      html += '</div></div>';
+    });
+  }
+  document.getElementById('libList').innerHTML = html;
+}
+
+function openLibModal(item) {
+  document.getElementById('libEditId').value = item ? item.id : '';
+  document.getElementById('libTitle').value = item ? item.title : '';
+  document.getElementById('libCategory').value = item ? item.category : '法律法规';
+  document.getElementById('libContent').value = item ? (item.content || '') : '';
+  document.getElementById('libFile').value = '';
+  document.getElementById('libModalTitle').textContent = item ? '编辑' : '新增';
+  new bootstrap.Modal(document.getElementById('libModal')).show();
+}
+
+function editLibItem(id) {
+  var it = libItems.find(function(x) { return x.id === id; });
+  if (it) openLibModal(it);
+}
+
+async function saveLibItem() {
+  var id = document.getElementById('libEditId').value;
+  var title = document.getElementById('libTitle').value.trim();
+  var category = document.getElementById('libCategory').value;
+  var content = document.getElementById('libContent').value.trim();
+  var file = document.getElementById('libFile').files[0];
+  if (!title) return toast('标题不能为空', 'danger');
+  if (!category) return toast('请选择分类', 'danger');
+  var fd = new FormData();
+  fd.append('title', title);
+  fd.append('category', category);
+  fd.append('content', content);
+  if (file) fd.append('file', file);
+  var btn = document.getElementById('libSaveBtn');
+  btn.disabled = true;
+  try {
+    var url = id ? '/api/library/' + id : '/api/library';
+    var method = id ? 'PUT' : 'POST';
+    var res = await fetch(url, { method: method, body: fd });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || '保存失败');
+    toast('保存成功', 'success');
+    bootstrap.Modal.getInstance(document.getElementById('libModal')).hide();
+    var res2 = await fetch('/api/library');
+    var d2 = await res2.json();
+    libItems = d2.items;
+    loadLibrary();
+  } catch (e) { toast(e.message, 'danger'); }
+  btn.disabled = false;
+}
+
+async function deleteLibItem(id) {
+  var it = libItems.find(function(x) { return x.id === id; });
+  if (!confirm('确定删除「' + (it ? it.title : '') + '」？此操作不可撤销。')) return;
+  try {
+    var res = await fetch('/api/library/' + id, { method: 'DELETE' });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || '删除失败');
+    toast('已删除', 'success');
+    libItems = libItems.filter(function(x) { return x.id !== id; });
+    loadLibrary();
+  } catch (e) { toast(e.message, 'danger'); }
+}
+</script>
