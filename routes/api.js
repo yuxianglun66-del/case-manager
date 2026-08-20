@@ -116,7 +116,7 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     await addHistory(client, caseId, 'created', user.id, { statusId, note: '创建案件' });
     await client.query('COMMIT');
     await audit(req, '创建案件', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + caseNo + '「' + title + '」', after: { case_no: caseNo, title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate } });
-    pushEvent('case_assigned', assigneeId, '📋 您有新案件：' + caseNo + ' ' + title);
+    pushEvent('case_assigned', assigneeId, '📋 您有新案件：' + caseNo + ' ' + title + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     res.json({ ok: true, id: caseId, case_no: caseNo });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -190,7 +190,7 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     await client.query('COMMIT');
     await audit(req, '更新案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + title + '」', before: { title: req.caseRow.title, client_name: req.caseRow.client_name, assignee_id: req.caseRow.assignee_id, status_id: req.caseRow.status_id, sign_staff_id: req.caseRow.sign_staff_id, sign_date: req.caseRow.sign_date, next_action: req.caseRow.next_action, fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate, next_action: nextAction, fee_agreement: feeAgreement, fee_details: feeDetails } });
     if (assigneeId && assigneeId !== req.caseRow.assignee_id) {
-      pushEvent('case_assigned', assigneeId, '📋 案件 ' + req.caseRow.case_no + '「' + title + '」已分配给您');
+      pushEvent('case_assigned', assigneeId, '📋 案件 ' + req.caseRow.case_no + '「' + title + '」已分配给您' + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     }
     res.json({ ok: true, id });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -220,7 +220,7 @@ router.post('/cases/:id/status', requirePermission('cases.edit'), needCase, asyn
     await client.query('COMMIT');
     await audit(req, '变更状态', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 状态变更为「' + st.name + '」' + (note ? '（' + note + '）' : ''), before: { status_id: req.caseRow.status_id }, after: { status_id: statusId } });
     if (req.caseRow.assignee_id) {
-      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」');
+      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」' + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     }
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -267,7 +267,7 @@ router.post('/cases/:id/next-action', requirePermission('cases.remind'), needCas
     await audit(req, '更新下一步流程', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + ' 下一步：' + (nextAction || '（空）'), before: { next_action: req.caseRow.next_action, reminder_at: req.caseRow.reminder_at }, after: { next_action: nextAction, reminder_at: reminderAt } });
     if (req.caseRow.assignee_id) {
       const dateHint = reminderAt ? '，提醒时间：' + new Date(reminderAt).toLocaleDateString('zh-CN') : '';
-      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已设置下一步流程' + dateHint);
+      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已设置下一步流程' + dateHint + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     }
     res.json({ ok: true });
   } catch (e) { next(e); }
@@ -451,7 +451,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     await client.query('COMMIT');
     await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
     if (req.caseRow.assignee_id) {
-      pushEvent('new_attachment', req.caseRow.assignee_id, '📎 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传了 ' + files.length + ' 个附件' + (remark ? '（' + remark + '）' : ''));
+      pushEvent('new_attachment', req.caseRow.assignee_id, '📎 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传了 ' + files.length + ' 个附件' + (remark ? '（' + remark + '）' : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     }
     res.json({ ok: true, files: list });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
