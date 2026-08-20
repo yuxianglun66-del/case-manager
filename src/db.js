@@ -217,6 +217,9 @@ CREATE INDEX IF NOT EXISTS idx_cases_sign_date ON cases(sign_date);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS target_amount NUMERIC(12,2);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12,2);
 
+-- 企业微信推送：用户绑定企业微信 UserID
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wecom_userid VARCHAR(64);
+
 -- 操作日志：登录 + 所有数据变更（含变更前后内容），仅超管可查看
 CREATE TABLE IF NOT EXISTS audit_logs (
   id SERIAL PRIMARY KEY,
@@ -516,6 +519,11 @@ async function initDb() {
       ['backup_weekday', '0', '每周备份的星期（0=周日，1-6=周一至周六）'],
       ['backup_retention_days', '7', '备份保留天数，超过自动清除'],
       ['audit_retention_days', '30', '操作日志保留天数，超过自动清除（0=不自动清理）'],
+      ['wecom_corpid', '', '企业微信 CorpID'],
+      ['wecom_agentid', '', '企业微信自建应用 AgentID'],
+      ['wecom_secret', '', '企业微信自建应用 Secret'],
+      ['wecom_enabled', '0', '企业微信推送总开关：0/1'],
+      ['wecom_push_events', '{}', '企业微信推送事件开关 JSON（case_assigned/status_changed/reminder_due/new_attachment）'],
     ];
     for (const [key, value, desc] of defaultSettings) {
       await client.query(

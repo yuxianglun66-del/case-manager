@@ -10,6 +10,7 @@ const { convertOfficeToPdf } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
 const { ZipArchive } = require('archiver');
 const { audit } = require('../src/audit');
+const { pushEvent } = require('../src/wecom');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -115,6 +116,7 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     await addHistory(client, caseId, 'created', user.id, { statusId, note: '创建案件' });
     await client.query('COMMIT');
     await audit(req, '创建案件', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + caseNo + '「' + title + '」', after: { case_no: caseNo, title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate } });
+    pushEvent('case_assigned', assigneeId, '📋 您有新案件：' + caseNo + ' ' + title);
     res.json({ ok: true, id: caseId, case_no: caseNo });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -187,6 +189,9 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     await addHistory(client, id, 'edit', user.id, { statusId, note: '更新案件信息' });
     await client.query('COMMIT');
     await audit(req, '更新案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + title + '」', before: { title: req.caseRow.title, client_name: req.caseRow.client_name, assignee_id: req.caseRow.assignee_id, status_id: req.caseRow.status_id, sign_staff_id: req.caseRow.sign_staff_id, sign_date: req.caseRow.sign_date, next_action: req.caseRow.next_action, fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate, next_action: nextAction, fee_agreement: feeAgreement, fee_details: feeDetails } });
+    if (assigneeId && assigneeId !== req.caseRow.assignee_id) {
+      pushEvent('case_assigned', assigneeId, '📋 案件 ' + req.caseRow.case_no + '「' + title + '」已分配给您');
+    }
     res.json({ ok: true, id });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -214,6 +219,9 @@ router.post('/cases/:id/status', requirePermission('cases.edit'), needCase, asyn
     });
     await client.query('COMMIT');
     await audit(req, '变更状态', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 状态变更为「' + st.name + '」' + (note ? '（' + note + '）' : ''), before: { status_id: req.caseRow.status_id }, after: { status_id: statusId } });
+    if (req.caseRow.assignee_id) {
+      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」');
+    }
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -257,6 +265,10 @@ router.post('/cases/:id/next-action', requirePermission('cases.remind'), needCas
       [nextAction, reminderAt, id]
     );
     await audit(req, '更新下一步流程', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + ' 下一步：' + (nextAction || '（空）'), before: { next_action: req.caseRow.next_action, reminder_at: req.caseRow.reminder_at }, after: { next_action: nextAction, reminder_at: reminderAt } });
+    if (req.caseRow.assignee_id) {
+      const dateHint = reminderAt ? '，提醒时间：' + new Date(reminderAt).toLocaleDateString('zh-CN') : '';
+      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已设置下一步流程' + dateHint);
+    }
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -438,6 +450,9 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     await addHistory(client, req.caseRow.id, 'attachment', user.id, { note: `上传附件 ${files.length} 个` });
     await client.query('COMMIT');
     await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
+    if (req.caseRow.assignee_id) {
+      pushEvent('new_attachment', req.caseRow.assignee_id, '📎 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传了 ' + files.length + ' 个附件' + (remark ? '（' + remark + '）' : ''));
+    }
     res.json({ ok: true, files: list });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -665,6 +680,7 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     const role = (req.body.role === 'admin' && isSuperAdmin) ? 'admin' : 'staff';
     const securityQuestion = (req.body.security_question || '').trim();
     const securityAnswer = (req.body.security_answer || '').trim();
+    const wecomUserid = (req.body.wecom_userid || '').trim() || null;
     const pwErr = validatePasswordStrength(password);
     if (!username || !displayName || pwErr) {
       return res.status(400).json({ error: pwErr || '用户名、姓名必填，密码至少 8 位且须包含字母和数字' });
@@ -673,8 +689,8 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     if (dup.length) return res.status(400).json({ error: '用户名已存在' });
     const hash = await bcrypt.hash(password, 10);
     const ins = await pool.query(
-      `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-      [username, hash, displayName, role, securityQuestion || null, securityAnswer || null]
+      `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer, wecom_userid) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [username, hash, displayName, role, securityQuestion || null, securityAnswer || null, wecomUserid]
     );
     await audit(req, '新增用户', { entity_type: 'user', entity_id: ins.rows[0].id, detail: '用户名 ' + username + '（' + displayName + '，' + (role === 'admin' ? '管理员' : '服务人员') + '）', after: { username, display_name: displayName, role } });
     res.json({ ok: true });
@@ -702,9 +718,10 @@ router.post('/users/:id/update', requirePermission('system.users'), async (req, 
     if (target.id === req.session.user.id && (target.role === 'admin') && role !== 'admin') {
       return res.status(400).json({ error: '不能移除自己的管理员权限' });
     }
+    const wecomUserid = (req.body.wecom_userid !== undefined) ? ((req.body.wecom_userid || '').trim() || null) : target.wecom_userid;
     await pool.query(
-      `UPDATE users SET display_name=$1, role=$2, active=$3 WHERE id=$4`,
-      [displayName, role, active, id]
+      `UPDATE users SET display_name=$1, role=$2, active=$3, wecom_userid=$4 WHERE id=$5`,
+      [displayName, role, active, wecomUserid, id]
     );
     await audit(req, '更新用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' → ' + displayName + '（角色：' + (role === 'admin' ? '管理员' : '服务人员') + '，' + (active ? '启用' : '停用') + '）', before: { display_name: target.display_name, role: target.role, active: target.active }, after: { display_name: displayName, role, active } });
     res.json({ ok: true });
@@ -991,7 +1008,7 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
 
 router.post('/settings', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days'];
+    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days', 'wecom_corpid', 'wecom_agentid', 'wecom_secret', 'wecom_enabled', 'wecom_push_events'];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -1039,6 +1056,21 @@ router.post('/settings/logo', requirePermission('system.settings'), upload.singl
     );
     await audit(req, '更换Logo', { entity_type: 'system', entity_id: 'logo', detail: '新文件 ' + stored });
     res.json({ ok: true, logo: stored });
+  } catch (e) { next(e); }
+});
+
+/* ---------- 企业微信测试推送 ---------- */
+router.post('/wecom/test', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const { getAccessToken, sendText, getWecomUserid } = require('../src/wecom');
+    const wid = (req.body.wecom_userid || '').trim();
+    if (!wid) return res.status(400).json({ error: '请填写企业微信 UserID' });
+    const token = await getAccessToken();
+    if (!token) return res.status(400).json({ error: '未配置企业微信 CorpID/Secret 或 token 获取失败' });
+    const result = await sendText(wid, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
+    if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
+    await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: '推送给 ' + wid });
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
