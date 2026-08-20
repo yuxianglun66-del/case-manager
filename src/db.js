@@ -524,6 +524,7 @@ async function initDb() {
       ['wecom_secret', '', '企业微信自建应用 Secret'],
       ['wecom_enabled', '0', '企业微信推送总开关：0/1'],
       ['wecom_push_events', '{}', '企业微信推送事件开关 JSON（case_assigned/status_changed/reminder_due/new_attachment）'],
+      ['wecom_webhook', '', '企业微信群机器人 Webhook 地址'],
     ];
     for (const [key, value, desc] of defaultSettings) {
       await client.query(

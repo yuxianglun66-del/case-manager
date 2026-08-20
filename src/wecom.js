@@ -10,6 +10,21 @@ async function getSettings() {
   return s;
 }
 
+async function sendWebhook(webhookUrl, content) {
+  if (!webhookUrl) return { ok: false, error: '未配置 Webhook 地址' };
+  const resp = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ msgtype: 'text', text: { content } }),
+  });
+  const data = await resp.json();
+  if (data.errcode !== 0) {
+    console.error('[WeCom] webhook error:', data);
+    return { ok: false, error: data.errmsg || '发送失败' };
+  }
+  return { ok: true };
+}
+
 async function getAccessToken() {
   const now = Date.now();
   if (cachedToken && now < tokenExpiresAt) return cachedToken;
@@ -58,34 +73,20 @@ function isEventEnabled(events, eventKey) {
   } catch { return false; }
 }
 
-async function getWecomUserid(userId) {
-  if (!userId) return null;
-  const { rows } = await pool.query(`SELECT wecom_userid FROM users WHERE id = $1`, [userId]);
-  return rows[0] && rows[0].wecom_userid ? rows[0].wecom_userid.trim() : null;
-}
-
-async function pushNotify(userId, content) {
-  try {
-    const s = await getSettings();
-    if (s.wecom_enabled !== '1') return;
-    const wid = await getWecomUserid(userId);
-    if (!wid) return;
-    const result = await sendText(wid, content);
-    if (!result.ok) console.warn('[WeCom] push failed:', result.error);
-  } catch (e) {
-    console.error('[WeCom] pushNotify error:', e.message);
-  }
-}
-
 async function pushEvent(eventKey, userId, content) {
   try {
     const s = await getSettings();
     if (s.wecom_enabled !== '1') return;
     if (!isEventEnabled(s.wecom_push_events, eventKey)) return;
-    await pushNotify(userId, content);
+    if (s.wecom_webhook) {
+      await sendWebhook(s.wecom_webhook, content);
+    } else if (s.wecom_corpid && s.wecom_secret) {
+      const wid = await (require('./db').pool.query(`SELECT wecom_userid FROM users WHERE id = $1`, [userId])).then(r => r.rows[0]?.wecom_userid?.trim());
+      if (wid) await sendText(wid, content);
+    }
   } catch (e) {
     console.error('[WeCom] pushEvent error:', e.message);
   }
 }
 
-module.exports = { getSettings, getAccessToken, sendText, pushNotify, pushEvent, isEventEnabled, getWecomUserid };
+module.exports = { getSettings, getAccessToken, sendText, sendWebhook, pushEvent, isEventEnabled };

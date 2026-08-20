@@ -1008,7 +1008,7 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
 
 router.post('/settings', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days', 'wecom_corpid', 'wecom_agentid', 'wecom_secret', 'wecom_enabled', 'wecom_push_events'];
+    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days', 'wecom_corpid', 'wecom_agentid', 'wecom_secret', 'wecom_enabled', 'wecom_push_events', 'wecom_webhook'];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -1062,15 +1062,25 @@ router.post('/settings/logo', requirePermission('system.settings'), upload.singl
 /* ---------- 企业微信测试推送 ---------- */
 router.post('/wecom/test', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const { getAccessToken, sendText, getWecomUserid } = require('../src/wecom');
+    const { sendWebhook, sendText, getAccessToken } = require('../src/wecom');
+    const s = (await pool.query(`SELECT key, value FROM app_settings WHERE key LIKE 'wecom_%'`)).rows.reduce((o, r) => { o[r.key] = r.value; return o; }, {});
+    const webhook = req.body.webhook_url || s.wecom_webhook;
+    if (webhook) {
+      const result = await sendWebhook(webhook, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
+      if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
+      await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: 'Webhook 推送测试' });
+      return res.json({ ok: true });
+    }
     const wid = (req.body.wecom_userid || '').trim();
-    if (!wid) return res.status(400).json({ error: '请填写企业微信 UserID' });
-    const token = await getAccessToken();
-    if (!token) return res.status(400).json({ error: '未配置企业微信 CorpID/Secret 或 token 获取失败' });
-    const result = await sendText(wid, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
-    if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
-    await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: '推送给 ' + wid });
-    res.json({ ok: true });
+    if (wid) {
+      const token = await getAccessToken();
+      if (!token) return res.status(400).json({ error: '未配置企业微信 CorpID/Secret 或 token 获取失败' });
+      const result = await sendText(wid, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
+      if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
+      await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: '推送给 ' + wid });
+      return res.json({ ok: true });
+    }
+    return res.status(400).json({ error: '请先配置 Webhook 地址或填写企业微信 UserID' });
   } catch (e) { next(e); }
 });
 

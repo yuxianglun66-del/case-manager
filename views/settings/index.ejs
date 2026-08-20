@@ -241,22 +241,27 @@
     <div class="row g-4">
       <div class="col-12 col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><i class="bi bi-wechat"></i> 企业微信配置</div>
+          <div class="card-header"><i class="bi bi-wechat"></i> 推送配置</div>
           <div class="card-body">
             <div class="form-check form-switch mb-3">
               <input class="form-check-input" type="checkbox" id="wecomEnabled">
-              <label class="form-check-label fw-semibold" for="wecomEnabled">启用企业微信推送</label>
+              <label class="form-check-label fw-semibold" for="wecomEnabled">启用推送</label>
             </div>
             <div class="mb-3">
-              <label class="form-label">CorpID</label>
+              <label class="form-label">群机器人 Webhook 地址 <span class="text-danger">*</span></label>
+              <input type="text" id="wecomWebhook" class="form-control" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx">
+              <div class="form-text">企业微信群聊 → 添加群机器人 → 复制 Webhook 地址</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">（可选）应用消息 CorpID</label>
               <input type="text" id="wecomCorpid" class="form-control" placeholder="如：ww1234567890abcdef">
             </div>
             <div class="mb-3">
-              <label class="form-label">AgentID</label>
+              <label class="form-label">（可选）AgentID</label>
               <input type="text" id="wecomAgentid" class="form-control" placeholder="如：1000002">
             </div>
             <div class="mb-3">
-              <label class="form-label">Secret</label>
+              <label class="form-label">（可选）Secret</label>
               <input type="password" id="wecomSecret" class="form-control" placeholder="应用 Secret">
             </div>
             <button type="button" class="btn btn-primary" id="btnSaveWeCom"><i class="bi bi-save"></i> 保存配置</button>
@@ -294,14 +299,8 @@
             <button type="button" class="btn btn-primary" id="btnSaveEvents"><i class="bi bi-save"></i> 保存事件设置</button>
             <hr>
             <h6 class="mt-3">测试推送</h6>
-            <div class="d-flex gap-2 align-items-end">
-              <div class="flex-grow-1">
-                <label class="form-label small">企业微信 UserID</label>
-                <input type="text" id="wecomTestUser" class="form-control form-control-sm" placeholder="填写员工的企业微信 UserID">
-              </div>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="btnTestWeCom"><i class="bi bi-send"></i> 发送测试</button>
-            </div>
-            <div class="form-text">需先在「用户管理」中为员工填写企业微信 UserID，或在此直接输入测试。</div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnTestWeCom"><i class="bi bi-send"></i> 发送测试消息到群</button>
+            <div class="form-text">使用上方 Webhook 地址发送一条测试消息。</div>
           </div>
         </div>
       </div>
@@ -787,6 +786,7 @@
   const WE_EVENT_KEYS = ['case_assigned', 'status_changed', 'reminder_due', 'new_attachment'];
   const WE_EVENT_IDS = { case_assigned: 'evtCaseAssigned', status_changed: 'evtStatusChanged', reminder_due: 'evtReminderDue', new_attachment: 'evtNewAttachment' };
   document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('wecomWebhook').value = SETTINGS.wecom_webhook || '';
     document.getElementById('wecomCorpid').value = SETTINGS.wecom_corpid || '';
     document.getElementById('wecomAgentid').value = SETTINGS.wecom_agentid || '';
     document.getElementById('wecomSecret').value = SETTINGS.wecom_secret || '';
@@ -798,12 +798,13 @@
   document.getElementById('btnSaveWeCom').addEventListener('click', async () => {
     try {
       await postJSON('/api/settings', {
+        wecom_webhook: document.getElementById('wecomWebhook').value.trim(),
         wecom_corpid: document.getElementById('wecomCorpid').value.trim(),
         wecom_agentid: document.getElementById('wecomAgentid').value.trim(),
         wecom_secret: document.getElementById('wecomSecret').value.trim(),
         wecom_enabled: document.getElementById('wecomEnabled').checked ? '1' : '0',
       });
-      toast('企业微信配置已保存', 'success');
+      toast('推送配置已保存', 'success');
     } catch (err) { toast(err.message, 'danger'); }
   });
   document.getElementById('btnSaveEvents').addEventListener('click', async () => {
@@ -816,11 +817,11 @@
   });
   document.getElementById('btnTestWeCom').addEventListener('click', async () => {
     const btn = document.getElementById('btnTestWeCom');
-    const wid = document.getElementById('wecomTestUser').value.trim();
-    if (!wid) return toast('请填写企业微信 UserID', 'warning');
+    const webhook = document.getElementById('wecomWebhook').value.trim();
+    if (!webhook) return toast('请先填写 Webhook 地址', 'warning');
     btn.disabled = true;
     try {
-      const data = await postJSON('/api/wecom/test', { wecom_userid: wid });
+      await postJSON('/api/wecom/test', { webhook_url: webhook });
       toast('测试消息已发送', 'success');
     } catch (err) { toast(err.message || '发送失败', 'danger'); }
     btn.disabled = false;
