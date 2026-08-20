@@ -455,12 +455,12 @@ async function initDb() {
     // 默认角色权限（超管始终拥有全部权限，此处仅记录 管理员/员工 默认值）
     const DEFAULT_ROLE_PERMS = {
       admin: [
-        'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
+        'cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
         'cases.remind', 'cases.fee', 'cases.import_export',
         'parties.manage', 'attachments.manage', 'contracts.manage',
       ],
       staff: [
-        'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
+        'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
         'parties.manage', 'attachments.manage',
       ],
     };

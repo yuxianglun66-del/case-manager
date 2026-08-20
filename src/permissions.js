@@ -1,6 +1,7 @@
 const { pool } = require('./db');
 
 const PERMISSIONS = [
+  { key: 'cases.view', group: '案件管理', label: '查看案件详情', desc: '可以查看案件详情、附件和费用' },
   { key: 'cases.view_all', group: '案件管理', label: '查看全部案件', desc: '未开启仅能查看自己负责的案件' },
   { key: 'cases.create', group: '案件管理', label: '新建案件', desc: '可以创建新案件' },
   { key: 'cases.edit', group: '案件管理', label: '编辑案件', desc: '可以编辑案件信息与状态' },
@@ -25,12 +26,12 @@ const ROLES = {
 
 const DEFAULT_PERMS = {
   admin: [
-    'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
+    'cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
     'cases.remind', 'cases.fee', 'cases.import_export',
     'parties.manage', 'attachments.manage', 'contracts.manage',
   ],
   staff: [
-    'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
+    'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
     'parties.manage', 'attachments.manage',
   ],
 };
