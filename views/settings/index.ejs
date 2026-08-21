@@ -7,7 +7,7 @@
 
 <ul class="nav nav-tabs mb-3" role="tablist">
   <li class="nav-item">
-    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabTypes" type="button">案件类型与字段</button>
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTypes" type="button">案件类型与字段</button>
   </li>
   <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStatuses" type="button">案件状态</button>
@@ -28,7 +28,7 @@
 
 <div class="tab-content">
   <!-- ============ 案件类型 ============ -->
-  <div class="tab-pane fade show active" id="tabTypes">
+  <div class="tab-pane" id="tabTypes">
     <div class="d-flex justify-content-end mb-3">
       <button class="btn btn-primary" onclick="openTypeCreate()"><i class="bi bi-plus-lg"></i> 新增案件类型</button>
     </div>
@@ -235,7 +235,6 @@
           </table>
         </div>
       </div>
-    </div>
     </div>
   </div>
 
@@ -942,15 +941,20 @@
   renderLibCats();
 
   // ===== 标签页状态保持（hash） =====
-  document.querySelectorAll('#settingsTabs .nav-link, .nav-tabs .nav-link').forEach(function(btn) {
+  var allTabs = document.querySelectorAll('.nav-tabs .nav-link[data-bs-target]');
+  allTabs.forEach(function(btn) {
     btn.addEventListener('shown.bs.tab', function(e) {
       var t = e.target.getAttribute('data-bs-target');
-      if (t) { history.replaceState(null, '', t); }
+      if (t) history.replaceState(null, '', t);
     });
   });
   var h = location.hash;
-  if (h && document.querySelector('.nav-link[data-bs-target="' + h + '"]')) {
-    var tab = new bootstrap.Tab(document.querySelector('.nav-link[data-bs-target="' + h + '"]'));
-    tab.show();
+  var targetBtn = h ? document.querySelector('.nav-link[data-bs-target="' + h + '"]') : null;
+  if (targetBtn) {
+    var t = new bootstrap.Tab(targetBtn);
+    t.show();
+  } else {
+    var first = document.querySelector('.nav-tabs .nav-link[data-bs-target]');
+    if (first) { var t2 = new bootstrap.Tab(first); t2.show(); }
   }
 </script>
