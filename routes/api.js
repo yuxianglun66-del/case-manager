@@ -1825,8 +1825,28 @@ router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
     const isPdf = mime === 'application/pdf' || lower.endsWith('.pdf');
     const isWord = mime.includes('wordprocessing') || mime === 'application/msword' || /\.(docx?|wps|rtf)$/.test(lower);
     const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
-    if (isImage || isPdf || isWord || isExcel) {
-      res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord, isExcel, layout: false, isLibrary: true, libraryFile: fp });
+    if (isImage || isPdf) {
+      res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord: false, isExcel: false, layout: false, isLibrary: true });
+    } else if (isWord || isExcel) {
+      const { execSync } = require('child_process');
+      const os = require('os');
+      const tmpDir = os.tmpdir();
+      let converted = false;
+      let pdfPath = null;
+      try {
+        execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${fp}"`, { timeout: 60000, stdio: 'ignore' });
+        const pdfName = path.basename(fp, path.extname(fp)) + '.pdf';
+        pdfPath = path.join(tmpDir, pdfName);
+        if (fs.existsSync(pdfPath)) converted = true;
+      } catch (e) { /* 转换失败 */ }
+      if (converted && pdfPath) {
+        res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage: false, isPdf: true, isWord: false, isExcel: false, layout: false, isLibrary: true });
+      } else {
+        const ct = contentTypeFor(item.file_original_name);
+        res.setHeader('Content-Type', ct);
+        res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(item.file_original_name) + '"');
+        fs.createReadStream(fp).pipe(res);
+      }
     } else {
       const ct2 = contentTypeFor(item.file_original_name);
       res.setHeader('Content-Type', ct2);
@@ -1847,21 +1867,18 @@ router.get('/library/:lid/preview-file', requireLogin, async (req, res, next) =>
       || (item.file_mime || '').includes('spreadsheet') || item.file_mime === 'application/vnd.ms-excel'
       || /\.(docx?|wps|rtf|xlsx?|csv)$/.test(lower);
     let servePath = fp;
-    let mime = item.file_mime || 'application/octet-stream';
     if (isOffice) {
       const { execSync } = require('child_process');
       const os = require('os');
       const tmpDir = os.tmpdir();
-      const outBase = path.join(tmpDir, 'libpreview-' + Date.now());
       try {
         execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${fp}"`, { timeout: 60000, stdio: 'ignore' });
         const pdfName = path.basename(fp, path.extname(fp)) + '.pdf';
         const pdfPath = path.join(tmpDir, pdfName);
-        if (fs.existsSync(pdfPath)) { servePath = pdfPath; mime = 'application/pdf'; }
+        if (fs.existsSync(pdfPath)) servePath = pdfPath;
       } catch (e) { /* 转换失败则原样返回 */ }
     }
-    const ct = mime === 'application/pdf' ? 'application/pdf' : contentTypeFor(item.file_original_name);
-    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     fs.createReadStream(servePath).pipe(res);
   } catch (e) { next(e); }

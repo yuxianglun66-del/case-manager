@@ -13,9 +13,13 @@
   .lib-md-body th { background:#e9ecef; }
   .lib-content-box { background:#f8f9fa; border-radius:4px; padding:.5rem .7rem; border:1px solid #e9ecef; }
   .lib-content-box img { max-width:100%; height:auto; }
+  .lib-content-truncate { cursor:pointer; transition: background .15s; }
+  .lib-content-truncate:hover { background:#e9ecef; }
   #quillEditor { min-height:180px; font-size:.9rem; }
   .ql-toolbar.ql-snow { border-radius:4px 4px 0 0; }
   .ql-container.ql-snow { border-radius:0 0 4px 4px; }
+  #libContentModal .modal-body { max-height:70vh; overflow:auto; font-size:.9rem; line-height:1.7; }
+  #libContentModal .modal-body img { max-width:100%; height:auto; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -65,6 +69,18 @@
   </div>
 </div>
 <% } %>
+
+<div class="modal fade" id="libContentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="libContentModalTitle"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body lib-md-body" id="libContentModalBody"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 var libItems = <%- JSON.stringify(items) %>;
@@ -140,8 +156,11 @@ function loadLibrary() {
       }
       html += '</div>';
       if (it.content) {
-        var display = it.content.length > 1000 ? it.content.slice(0, 1000) + '...' : it.content;
-        html += '<div class="lib-content-box small mt-2" style="max-height:200px;overflow:auto;font-size:.85rem">' + renderContent(display) + '</div>';
+        var isLong = it.content.length > 300;
+        var display = isLong ? it.content.slice(0, 300) + '...' : it.content;
+        html += '<div class="lib-content-box lib-content-truncate small mt-2" style="font-size:.85rem" onclick="showLibContent(' + it.id + ')">' + renderContent(display);
+        if (isLong) html += '<div class="text-primary mt-1" style="font-size:.78rem"><i class="bi bi-arrows-expand"></i> 查看全部</div>';
+        html += '</div>';
       }
       html += '<div class="text-muted small mt-1">' + (it.creator_name||'') + ' · ' + dateStr + '</div>';
       html += '</div></div>';
@@ -180,6 +199,14 @@ function openLibModal(item) {
 function editLibItem(id) {
   var it = libItems.find(function(x) { return x.id === id; });
   if (it) openLibModal(it);
+}
+
+function showLibContent(id) {
+  var it = libItems.find(function(x) { return x.id === id; });
+  if (!it || !it.content) return;
+  document.getElementById('libContentModalTitle').textContent = it.title || '内容详情';
+  document.getElementById('libContentModalBody').innerHTML = renderContent(it.content);
+  new bootstrap.Modal(document.getElementById('libContentModal')).show();
 }
 
 async function saveLibItem() {
