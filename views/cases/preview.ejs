@@ -44,7 +44,7 @@
         <button type="button" class="btn btn-light" id="zoomReset" title="重置为适合宽度"><i class="bi bi-arrows-angle-out"></i></button>
       </div>
       <% if (isLibrary) { %>
-        <a href="/api/library/<%= att.id.replace('lib-','') %>/file" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+        <a href="/api/library/<%= String(att.id).replace('lib-','') %>/file" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
       <% } else { %>
         <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
       <% } %>
@@ -52,7 +52,7 @@
   </div>
   <div class="preview-content" id="previewContent">
     <% if (isImage) { %>
-      <img id="previewImage" class="preview-image" src="<%= isLibrary ? '/api/library/' + att.id.replace('lib-','') + '/file' : '/api/attachments/' + att.id + '/file' %>" alt="<%= att.original_name %>">
+      <img id="previewImage" class="preview-image" src="<%= isLibrary ? '/api/library/' + String(att.id).replace('lib-','') + '/file' : '/api/attachments/' + att.id + '/file' %>" alt="<%= att.original_name %>">
     <% } else { %>
       <div id="pdfLoading" class="loading">
         <div class="spinner-border text-light" role="status"></div>
@@ -62,7 +62,11 @@
         <i class="bi bi-file-earmark-x"></i>
         <h4>预览失败</h4>
         <p class="text-light-emphasis">该文档可能无法在线预览，请下载查看。</p>
+        <% if (isLibrary) { %>
+        <a href="/api/library/<%= String(att.id).replace('lib-','') %>/file" class="btn btn-primary"><i class="bi bi-download"></i> 下载</a>
+        <% } else { %>
         <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary"><i class="bi bi-download"></i> 下载</a>
+        <% } %>
       </div>
       <div id="pdfWrap" class="pdf-wrap" style="display:none"></div>
       <% if (isWord || isExcel) { %>

@@ -1828,19 +1828,13 @@ router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
     if (isImage || isPdf) {
       res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord: false, isExcel: false, layout: false, isLibrary: true });
     } else if (isWord || isExcel) {
-      const { execSync } = require('child_process');
-      const os = require('os');
-      const tmpDir = os.tmpdir();
+      const cached = fp + '.preview.pdf';
       let converted = false;
-      let pdfPath = null;
-      try {
-        execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${fp}"`, { timeout: 60000, stdio: 'ignore' });
-        const pdfName = path.basename(fp, path.extname(fp)) + '.pdf';
-        pdfPath = path.join(tmpDir, pdfName);
-        if (fs.existsSync(pdfPath)) converted = true;
-      } catch (e) { /* 转换失败 */ }
-      if (converted && pdfPath) {
-        res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage: false, isPdf: true, isWord: false, isExcel: false, layout: false, isLibrary: true });
+      if (!fs.existsSync(cached)) {
+        try { await convertOfficeToPdf(fp, cached); converted = true; } catch (e) { /* 转换失败 */ }
+      } else { converted = true; }
+      if (converted && fs.existsSync(cached)) {
+        res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: 'application/pdf' }, caseId: 0, isImage: false, isPdf: true, isWord: false, isExcel: false, layout: false, isLibrary: true });
       } else {
         const ct = contentTypeFor(item.file_original_name);
         res.setHeader('Content-Type', ct);
@@ -1867,19 +1861,18 @@ router.get('/library/:lid/preview-file', requireLogin, async (req, res, next) =>
       || (item.file_mime || '').includes('spreadsheet') || item.file_mime === 'application/vnd.ms-excel'
       || /\.(docx?|wps|rtf|xlsx?|csv)$/.test(lower);
     let servePath = fp;
+    let mime = item.file_mime || 'application/octet-stream';
     if (isOffice) {
-      const { execSync } = require('child_process');
-      const os = require('os');
-      const tmpDir = os.tmpdir();
-      try {
-        execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${fp}"`, { timeout: 60000, stdio: 'ignore' });
-        const pdfName = path.basename(fp, path.extname(fp)) + '.pdf';
-        const pdfPath = path.join(tmpDir, pdfName);
-        if (fs.existsSync(pdfPath)) servePath = pdfPath;
-      } catch (e) { /* 转换失败则原样返回 */ }
+      const cached = fp + '.preview.pdf';
+      if (!fs.existsSync(cached)) {
+        try { await convertOfficeToPdf(fp, cached); } catch (e) { /* fallback */ }
+      }
+      if (fs.existsSync(cached)) { servePath = cached; mime = 'application/pdf'; }
     }
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline');
+    const safeName = Buffer.from(item.file_original_name || 'file', 'utf8').toString('latin1');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(item.file_original_name || 'file')}; filename="${safeName}"`);
+    res.setHeader('Content-Type', mime);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     fs.createReadStream(servePath).pipe(res);
   } catch (e) { next(e); }
 });
