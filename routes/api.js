@@ -587,7 +587,7 @@ router.get('/attachments/:id/preview', async (req, res, next) => {
     const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
 
     if (isImage || isPdf || isWord || isExcel) {
-      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, isExcel, layout: false });
+      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, isExcel, layout: false, isLibrary: false });
     } else {
       // 其他类型直接内联流式传输，浏览器若支持则预览，否则下载
       serveAttachment(req, res, true).catch(next);
