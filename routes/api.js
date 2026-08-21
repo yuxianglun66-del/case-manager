@@ -1813,4 +1813,58 @@ router.get('/library/:lid/file', requireLogin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
+  try {
+    const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
+    if (!item || !item.file_path) return res.status(404).render('error', { title: '文件不存在', message: '文件不存在或已被删除。', user: req.session.user });
+    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    if (!fs.existsSync(fp)) return res.status(404).render('error', { title: '文件丢失', message: '文件已被删除。', user: req.session.user });
+    const mime = item.file_mime || '';
+    const lower = (item.file_original_name || '').toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isPdf = mime === 'application/pdf' || lower.endsWith('.pdf');
+    const isWord = mime.includes('wordprocessing') || mime === 'application/msword' || /\.(docx?|wps|rtf)$/.test(lower);
+    const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
+    if (isImage || isPdf || isWord || isExcel) {
+      res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord, isExcel, layout: false, isLibrary: true, libraryFile: fp });
+    } else {
+      const ct2 = contentTypeFor(item.file_original_name);
+      res.setHeader('Content-Type', ct2);
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(item.file_original_name) + '"');
+      fs.createReadStream(fp).pipe(res);
+    }
+  } catch (e) { next(e); }
+});
+
+router.get('/library/:lid/preview-file', requireLogin, async (req, res, next) => {
+  try {
+    const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
+    if (!item || !item.file_path) return res.status(404).json({ error: '文件不存在' });
+    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
+    const lower = (item.file_original_name || '').toLowerCase();
+    const isOffice = (item.file_mime || '').includes('wordprocessing') || item.file_mime === 'application/msword'
+      || (item.file_mime || '').includes('spreadsheet') || item.file_mime === 'application/vnd.ms-excel'
+      || /\.(docx?|wps|rtf|xlsx?|csv)$/.test(lower);
+    let servePath = fp;
+    let mime = item.file_mime || 'application/octet-stream';
+    if (isOffice) {
+      const { execSync } = require('child_process');
+      const os = require('os');
+      const tmpDir = os.tmpdir();
+      const outBase = path.join(tmpDir, 'libpreview-' + Date.now());
+      try {
+        execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${fp}"`, { timeout: 60000, stdio: 'ignore' });
+        const pdfName = path.basename(fp, path.extname(fp)) + '.pdf';
+        const pdfPath = path.join(tmpDir, pdfName);
+        if (fs.existsSync(pdfPath)) { servePath = pdfPath; mime = 'application/pdf'; }
+      } catch (e) { /* 转换失败则原样返回 */ }
+    }
+    const ct = mime === 'application/pdf' ? 'application/pdf' : contentTypeFor(item.file_original_name);
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Disposition', 'inline');
+    fs.createReadStream(servePath).pipe(res);
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

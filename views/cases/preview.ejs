@@ -26,7 +26,11 @@
 <body>
   <div class="preview-header">
     <div class="d-flex align-items-center gap-2">
-      <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
+      <% if (isLibrary) { %>
+        <button class="btn btn-light btn-sm" onclick="window.close()"><i class="bi bi-arrow-left"></i> 关闭</button>
+      <% } else { %>
+        <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
+      <% } %>
       <span class="fw-semibold text-truncate" style="max-width:180px"><%= att.original_name %></span>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -39,12 +43,16 @@
         <% } %>
         <button type="button" class="btn btn-light" id="zoomReset" title="重置为适合宽度"><i class="bi bi-arrows-angle-out"></i></button>
       </div>
-      <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+      <% if (isLibrary) { %>
+        <a href="/api/library/<%= att.id.replace('lib-','') %>/file" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+      <% } else { %>
+        <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> 下载</a>
+      <% } %>
     </div>
   </div>
   <div class="preview-content" id="previewContent">
     <% if (isImage) { %>
-      <img id="previewImage" class="preview-image" src="/api/attachments/<%= att.id %>/file" alt="<%= att.original_name %>">
+      <img id="previewImage" class="preview-image" src="<%= isLibrary ? '/api/library/' + att.id.replace('lib-','') + '/file' : '/api/attachments/' + att.id + '/file' %>" alt="<%= att.original_name %>">
     <% } else { %>
       <div id="pdfLoading" class="loading">
         <div class="spinner-border text-light" role="status"></div>
@@ -179,7 +187,11 @@
       });
 
       if (!isImage) {
+        <% if (isLibrary) { %>
+        var url = '/api/library/<%= att.id.replace("lib-","") %>/preview-file';
+        <% } else { %>
         var url = '/api/attachments/<%= att.id %>/preview-file';
+        <% } %>
         function load(urlOpts) {
           return pdfjsLib.getDocument(urlOpts).promise.then(function (pdf) {
             pdfDoc = pdf;
