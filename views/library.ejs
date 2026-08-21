@@ -173,12 +173,14 @@ async function saveLibItem() {
   fd.append('category', category);
   fd.append('content', content);
   if (file) fd.append('file', file);
+  var csrf = getCsrfToken();
+  if (csrf) fd.append('_csrf', csrf);
   var btn = document.getElementById('libSaveBtn');
   btn.disabled = true;
   try {
     var url = id ? '/api/library/' + id : '/api/library';
     var method = id ? 'PUT' : 'POST';
-    var res = await fetch(url, { method: method, body: fd });
+    var res = await fetch(url, { method: method, body: fd, headers: csrf ? { 'x-csrf-token': csrf } : {} });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || '保存失败');
     toast('保存成功', 'success');
@@ -195,7 +197,8 @@ async function deleteLibItem(id) {
   var it = libItems.find(function(x) { return x.id === id; });
   if (!confirm('确定删除「' + (it ? it.title : '') + '」？此操作不可撤销。')) return;
   try {
-    var res = await fetch('/api/library/' + id, { method: 'DELETE' });
+    var csrf = getCsrfToken();
+    var res = await fetch('/api/library/' + id, { method: 'DELETE', headers: csrf ? { 'x-csrf-token': csrf } : {} });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || '删除失败');
     toast('已删除', 'success');
