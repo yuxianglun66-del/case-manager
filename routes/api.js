@@ -1807,13 +1807,9 @@ router.get('/library/:lid/file', requireLogin, async (req, res, next) => {
     const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
     const ct = contentTypeFor(item.file_original_name);
-    if (isInlineSafe(ct)) {
-      res.setHeader('Content-Type', ct);
-      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(item.file_original_name) + '"');
-      fs.createReadStream(fp).pipe(res);
-    } else {
-      res.download(fp, item.file_original_name);
-    }
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(item.file_original_name) + '"');
+    fs.createReadStream(fp).pipe(res);
   } catch (e) { next(e); }
 });
 

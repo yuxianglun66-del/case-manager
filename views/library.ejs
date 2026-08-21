@@ -11,6 +11,11 @@
   .lib-md-body th { background:#e9ecef; }
   .lib-preview-box { border:1px solid #ced4da; border-radius:6px; padding:.8rem; min-height:100px; background:#f0f2f5; max-height:300px; overflow:auto; color:#212529; line-height:1.7; }
   .lib-content-box { background:#f8f9fa; border-radius:4px; padding:.5rem .7rem; border:1px solid #e9ecef; }
+  .md-toolbar { display:flex; flex-wrap:wrap; gap:2px; padding:4px; background:#f1f3f5; border:1px solid #ced4da; border-bottom:none; border-radius:4px 4px 0 0; }
+  .md-toolbar button { border:none; background:transparent; padding:3px 7px; border-radius:3px; font-size:.78rem; color:#495057; cursor:pointer; white-space:nowrap; }
+  .md-toolbar button:hover { background:#dee2e6; }
+  .md-toolbar .sep { width:1px; background:#ced4da; margin:0 3px; }
+  #libContent.md-editor { border-radius:0 0 4px 4px; font-size:.85rem; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -52,7 +57,27 @@
             <li class="nav-item"><a class="nav-link active" href="#" onclick="libTabEdit(event)">编辑</a></li>
             <li class="nav-item"><a class="nav-link" href="#" onclick="libTabPreview(event)">预览</a></li>
           </ul>
-          <textarea class="form-control form-control-sm" id="libContent" rows="6" placeholder="支持 Markdown 语法：**加粗**、*斜体*、# 标题、- 列表、> 引用、`代码`、[链接](url)、| 表格 |"></textarea>
+          <div class="md-toolbar" id="mdToolbar">
+            <button type="button" onclick="mdInsert('heading')" title="标题"><b>H</b></button>
+            <button type="button" onclick="mdInsert('bold')" title="加粗"><b>B</b></button>
+            <button type="button" onclick="mdInsert('italic')" title="斜体"><i>I</i></button>
+            <button type="button" onclick="mdInsert('strikethrough')" title="删除线"><s>S</s></button>
+            <div class="sep"></div>
+            <button type="button" onclick="mdInsert('ul')" title="无序列表">• 列表</button>
+            <button type="button" onclick="mdInsert('ol')" title="有序列表">1. 列表</button>
+            <button type="button" onclick="mdInsert('check')" title="任务列表">☑ 任务</button>
+            <div class="sep"></div>
+            <button type="button" onclick="mdInsert('quote')" title="引用">❝ 引用</button>
+            <button type="button" onclick="mdInsert('code')" title="代码">&lt;/&gt; 代码</button>
+            <button type="button" onclick="mdInsert('codeblock')" title="代码块">{ }</button>
+            <div class="sep"></div>
+            <button type="button" onclick="mdInsert('link')" title="链接">🔗</button>
+            <button type="button" onclick="mdInsert('image')" title="图片">🖼</button>
+            <button type="button" onclick="mdInsert('table')" title="表格">▦ 表格</button>
+            <div class="sep"></div>
+            <button type="button" onclick="mdInsert('hr')" title="分割线">―</button>
+          </div>
+          <textarea class="form-control form-control-sm md-editor" id="libContent" rows="6" placeholder="支持 Markdown 语法，点击上方工具栏快速插入"></textarea>
           <div id="libPreviewBox" class="lib-preview-box lib-md-body" style="display:none"></div>
         </div>
         <div class="mb-2"><label class="form-label small">附件</label><input type="file" class="form-control form-control-sm" id="libFile" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"><div class="form-text">支持图片、PDF、Word、Excel、文本等格式</div></div>
@@ -77,6 +102,36 @@ function renderMd(text) {
     return marked.parse(text);
   }
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function mdInsert(type) {
+  var ta = document.getElementById('libContent');
+  if (!ta) return;
+  var s = ta.selectionStart, e = ta.selectionEnd;
+  var sel = ta.value.substring(s, e);
+  var before = ta.value.substring(0, s);
+  var after = ta.value.substring(e);
+  var ins = '', cursor = 0;
+  switch(type) {
+    case 'heading': ins = '## ' + (sel||'标题'); cursor = sel ? ins.length : 3; break;
+    case 'bold': ins = '**' + (sel||'加粗文字') + '**'; cursor = sel ? ins.length : 2; break;
+    case 'italic': ins = '*' + (sel||'斜体文字') + '*'; cursor = sel ? ins.length : 1; break;
+    case 'strikethrough': ins = '~~' + (sel||'删除文字') + '~~'; cursor = sel ? ins.length : 2; break;
+    case 'ul': ins = '- ' + (sel||'列表项'); cursor = 2; break;
+    case 'ol': ins = '1. ' + (sel||'列表项'); cursor = 3; break;
+    case 'check': ins = '- [ ] ' + (sel||'任务项'); cursor = 6; break;
+    case 'quote': ins = '> ' + (sel||'引用内容'); cursor = 2; break;
+    case 'code': ins = '`' + (sel||'代码') + '`'; cursor = sel ? ins.length : 1; break;
+    case 'codeblock': ins = '```\n' + (sel||'代码块') + '\n```'; cursor = 4; break;
+    case 'link': ins = '[' + (sel||'链接文字') + '](https://)'; cursor = 1; break;
+    case 'image': ins = '![' + (sel||'图片描述') + '](https://)'; cursor = 2; break;
+    case 'table': ins = '| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |'; cursor = 2; break;
+    case 'hr': ins = '\n---\n'; cursor = 5; break;
+  }
+  ta.value = before + ins + after;
+  ta.focus();
+  var pos = s + cursor;
+  ta.setSelectionRange(pos, pos);
 }
 
 (function() {
