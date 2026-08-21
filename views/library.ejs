@@ -1,5 +1,5 @@
-<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<link href="/vendor/quill/quill.snow.css" rel="stylesheet">
+<script src="/vendor/quill/quill.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   .lib-md-body h1,.lib-md-body h2,.lib-md-body h3,.lib-md-body h4 { margin-top:.5rem; margin-bottom:.3rem; }
@@ -156,8 +156,11 @@ function openLibModal(item) {
   document.getElementById('libCategory').value = item ? item.category : '法律法规';
   document.getElementById('libFile').value = '';
   document.getElementById('libModalTitle').textContent = item ? '编辑' : '新增';
-  initQuill();
-  setTimeout(function() {
+  var modal = new bootstrap.Modal(document.getElementById('libModal'));
+  modal.show();
+  document.getElementById('libModal').addEventListener('shown.bs.modal', function onShown() {
+    document.getElementById('libModal').removeEventListener('shown.bs.modal', onShown);
+    initQuill();
     if (quillInstance) {
       if (item && item.content) {
         if (item.content.trim().charAt(0) === '<') {
@@ -171,8 +174,7 @@ function openLibModal(item) {
         quillInstance.setText('');
       }
     }
-  }, 50);
-  new bootstrap.Modal(document.getElementById('libModal')).show();
+  });
 }
 
 function editLibItem(id) {
