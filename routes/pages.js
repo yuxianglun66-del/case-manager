@@ -455,7 +455,10 @@ router.get('/library', async (req, res, next) => {
     const { rows: items } = await pool.query(
       `SELECT l.*, u.display_name AS creator_name FROM library_items l LEFT JOIN users u ON u.id = l.created_by ORDER BY l.created_at DESC`
     );
-    res.render('library', { title: '法律法规库', items, canEdit: hasPermission(req.session.user, 'cases.edit') });
+    const { rows: catRows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'library_categories'`);
+    let categories = [];
+    try { categories = JSON.parse(catRows[0]?.value || '[]'); } catch (e) {}
+    res.render('library', { title: '法律法规库', items, categories, canEdit: hasPermission(req.session.user, 'cases.edit') });
   } catch (e) { next(e); }
 });
 

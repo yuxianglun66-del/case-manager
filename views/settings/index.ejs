@@ -21,6 +21,9 @@
   <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabWeChat" type="button">企业微信推送</button>
   </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLibrary" type="button">法律法规库分类</button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -302,6 +305,35 @@
             <button type="button" class="btn btn-outline-primary btn-sm" id="btnTestWeCom"><i class="bi bi-send"></i> 发送测试消息到群</button>
             <div class="form-text">使用上方 Webhook 地址发送一条测试消息。</div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 法律法规库分类 ============ -->
+<div class="tab-pane fade" id="tabLibrary">
+  <div class="row">
+    <div class="col-12 col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-book"></i> 分类管理</span>
+          <button type="button" class="btn btn-primary btn-sm" id="btnAddLibCat"><i class="bi bi-plus-lg"></i> 新增分类</button>
+        </div>
+        <div class="card-body">
+          <div id="libCatList"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6><i class="bi bi-info-circle"></i> 说明</h6>
+          <ul class="small text-muted mb-0" style="padding-left:1rem">
+            <li>分类名称修改后，已归入该分类的记录自动跟随</li>
+            <li>删除分类时，该分类下的记录不会被删除</li>
+            <li>拖拽可调整分类在列表中的显示顺序</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -826,4 +858,88 @@
     } catch (err) { toast(err.message || '发送失败', 'danger'); }
     btn.disabled = false;
   });
+
+  // ====== 法律法规库分类管理 ======
+  let libCats = [];
+  try { libCats = JSON.parse(SETTINGS.library_categories || '[]'); } catch (e) { libCats = []; }
+  if (!libCats.length) {
+    libCats = [
+      { name: '法律法规', color: '#0d6efd' },
+      { name: '赔偿标准', color: '#ffc107' },
+      { name: '调解判决案例', color: '#0dcaf0' },
+      { name: '司法解释', color: '#dc3545' },
+      { name: '操作指引', color: '#198754' },
+      { name: '其他', color: '#6c757d' }
+    ];
+  }
+
+  function renderLibCats() {
+    const el = document.getElementById('libCatList');
+    if (!el) return;
+    if (!libCats.length) { el.innerHTML = '<div class="text-muted text-center py-3">暂无分类</div>'; return; }
+    let html = '<table class="table table-sm align-middle mb-0"><thead><tr><th style="width:40px"></th><th>分类名称</th><th style="width:120px">颜色</th><th style="width:100px">操作</th></tr></thead><tbody>';
+    libCats.forEach((c, i) => {
+      html += '<tr data-idx="' + i + '">';
+      html += '<td><i class="bi bi-grip-vertical text-muted" style="cursor:grab"></i></td>';
+      html += '<td><input type="text" class="form-control form-control-sm lib-cat-name" value="' + (c.name || '').replace(/"/g, '&quot;') + '" data-idx="' + i + '"></td>';
+      html += '<td><input type="color" class="form-control form-control-sm form-control-color lib-cat-color" value="' + (c.color || '#6c757d') + '" data-idx="' + i + '" style="width:50px;height:32px;padding:2px"></td>';
+      html += '<td><button type="button" class="btn btn-outline-danger btn-sm lib-cat-del" data-idx="' + i + '" title="删除"><i class="bi bi-trash"></i></button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+
+    el.querySelectorAll('.lib-cat-name').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const idx = parseInt(inp.dataset.idx);
+        libCats[idx].name = inp.value.trim();
+      });
+    });
+    el.querySelectorAll('.lib-cat-color').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const idx = parseInt(inp.dataset.idx);
+        libCats[idx].color = inp.value;
+        const preview = inp.closest('tr').querySelector('.lib-cat-preview');
+        if (preview) preview.style.background = inp.value;
+      });
+    });
+    el.querySelectorAll('.lib-cat-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        if (!confirm('确定删除分类「' + libCats[idx].name + '」？')) return;
+        libCats.splice(idx, 1);
+        renderLibCats();
+      });
+    });
+  }
+
+  document.getElementById('btnAddLibCat').addEventListener('click', () => {
+    libCats.push({ name: '新分类', color: '#6c757d' });
+    renderLibCats();
+    const inputs = document.querySelectorAll('.lib-cat-name');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+
+  const btnSaveLibCats = document.createElement('button');
+  btnSaveLibCats.type = 'button';
+  btnSaveLibCats.className = 'btn btn-primary';
+  btnSaveLibCats.innerHTML = '<i class="bi bi-save"></i> 保存分类设置';
+  btnSaveLibCats.addEventListener('click', async () => {
+    document.querySelectorAll('.lib-cat-name').forEach(inp => {
+      const idx = parseInt(inp.dataset.idx);
+      libCats[idx].name = inp.value.trim();
+    });
+    const names = libCats.map(c => c.name).filter(Boolean);
+    if (names.length !== new Set(names).size) return toast('分类名称不能重复', 'danger');
+    if (!names.length) return toast('至少保留一个分类', 'warning');
+    try {
+      await postJSON('/api/settings', { library_categories: JSON.stringify(libCats) });
+      toast('分类已保存', 'success');
+      SETTINGS.library_categories = JSON.stringify(libCats);
+    } catch (err) { toast(err.message, 'danger'); }
+  });
+  const libCatHeader = document.querySelector('#tabLibrary .card-header');
+  if (libCatHeader) { libCatHeader.querySelector('.card-header span'); libCatHeader.appendChild(btnSaveLibCats); }
+
+  renderLibCats();
 </script>

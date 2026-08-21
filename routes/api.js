@@ -1008,7 +1008,7 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
 
 router.post('/settings', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days', 'wecom_corpid', 'wecom_agentid', 'wecom_secret', 'wecom_enabled', 'wecom_push_events', 'wecom_webhook'];
+    const allowed = ['company_name', 'theme_mode', 'theme_primary', 'theme_sidebar', 'bg_gradient', 'app_url', 'reminder_advance_days', 'audit_retention_days', 'wecom_corpid', 'wecom_agentid', 'wecom_secret', 'wecom_enabled', 'wecom_push_events', 'wecom_webhook', 'library_categories'];
     const client = await pool.connect();
     try {
       await client.query('BEGIN');

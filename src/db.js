@@ -541,6 +541,14 @@ async function initDb() {
       ['wecom_enabled', '0', '企业微信推送总开关：0/1'],
       ['wecom_push_events', '{}', '企业微信推送事件开关 JSON（case_assigned/status_changed/reminder_due/new_attachment）'],
       ['wecom_webhook', '', '企业微信群机器人 Webhook 地址'],
+      ['library_categories', JSON.stringify([
+        { name: '法律法规', color: '#0d6efd' },
+        { name: '赔偿标准', color: '#ffc107' },
+        { name: '调解判决案例', color: '#0dcaf0' },
+        { name: '司法解释', color: '#dc3545' },
+        { name: '操作指引', color: '#198754' },
+        { name: '其他', color: '#6c757d' }
+      ]), '法律法规库分类列表 JSON（含名称和颜色）'],
     ];
     for (const [key, value, desc] of defaultSettings) {
       await client.query(
