@@ -147,15 +147,16 @@ function loadLibrary() {
     filtered.forEach(function(it) {
       var badge = 'bg-secondary';
       if (it.category === '法律法规') badge = 'bg-primary';
-      else if (it.category === '赔偿标准') badge = 'bg-success';
+      else if (it.category === '赔偿标准') badge = 'bg-warning text-dark';
       else if (it.category === '调解判决案例') badge = 'bg-info text-dark';
-      else if (it.category === '司法解释') badge = 'bg-warning text-dark';
+      else if (it.category === '司法解释') badge = 'bg-danger';
+      else if (it.category === '操作指引') badge = 'bg-success';
       var hasFile = it.file_path;
       var fileIcon = hasFile ? '<i class="bi bi-paperclip ms-1"></i>' : '';
       var dateStr = String(it.created_at).slice(0, 10);
       html += '<div class="card mb-2"><div class="card-body py-2 px-3"><div class="d-flex justify-content-between align-items-start"><div><span class="badge ' + badge + ' me-2">' + (it.category||'') + '</span><strong>' + (it.title||'') + '</strong>' + fileIcon;
       if (hasFile) {
-        html += ' <a href="/api/library/' + it.id + '/preview" target="_blank" class="text-primary small ms-2"><i class="bi bi-eye"></i> ' + (it.file_original_name||'查看附件') + '</a>';
+        html += ' <a href="/api/library/' + it.id + '/preview" target="_blank" class="text-primary small ms-2"><i class="bi bi-eye"></i> ' + (it.file_original_name||'查看附件') + ' <span class="text-muted" style="font-size:.75rem">(点击预览)</span></a>';
       }
       html += '</div>';
       if (canEditLib) {
@@ -163,11 +164,7 @@ function loadLibrary() {
       }
       html += '</div>';
       if (it.content) {
-        var isLong = it.content.length > 300;
-        var display = isLong ? it.content.slice(0, 300) + '...' : it.content;
-        html += '<div class="lib-content-box lib-content-truncate small mt-2" style="font-size:.85rem" onclick="showLibContent(' + it.id + ')">' + renderContent(display);
-        if (isLong) html += '<div class="text-primary mt-1" style="font-size:.78rem"><i class="bi bi-arrows-expand"></i> 查看全部</div>';
-        html += '</div>';
+        html += '<div class="text-muted small mt-2" style="font-size:.8rem;cursor:pointer" onclick="showLibContent(' + it.id + ')"><i class="bi bi-file-text"></i> 查看全部内容 <i class="bi bi-arrow-right"></i></div>';
       }
       html += '<div class="text-muted small mt-1">' + (it.creator_name||'') + ' · ' + dateStr + '</div>';
       html += '</div></div>';
