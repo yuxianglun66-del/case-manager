@@ -940,4 +940,17 @@
   if (libCatHeader) { libCatHeader.querySelector('.card-header span'); libCatHeader.appendChild(btnSaveLibCats); }
 
   renderLibCats();
+
+  // ===== 标签页状态保持（hash） =====
+  document.querySelectorAll('#settingsTabs .nav-link, .nav-tabs .nav-link').forEach(function(btn) {
+    btn.addEventListener('shown.bs.tab', function(e) {
+      var t = e.target.getAttribute('data-bs-target');
+      if (t) { history.replaceState(null, '', t); }
+    });
+  });
+  var h = location.hash;
+  if (h && document.querySelector('.nav-link[data-bs-target="' + h + '"]')) {
+    var tab = new bootstrap.Tab(document.querySelector('.nav-link[data-bs-target="' + h + '"]'));
+    tab.show();
+  }
 </script>
