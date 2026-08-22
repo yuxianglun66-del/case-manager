@@ -216,7 +216,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       signed_party_names: targets.map(t => t.rec.party_name),
       redirect: `/sign/${token}/done`
     });
-  } catch (e) { next(e); }
+  } catch (e) { console.error('[sign] submit error:', e); res.status(500).json({ error: '签署处理失败，请稍后重试' }); }
 });
 
 // 模板 PDF 预览（公开，token 校验）
