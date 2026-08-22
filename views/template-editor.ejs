@@ -151,7 +151,7 @@
     initSigns.forEach(s => boxes.push({
       id: nextId++, kind: 'sig', page: s.page || 1,
       x: s.x, y: s.y, w: s.width, h: s.height,
-      party_role: s.party_role || '', label: s.label || '', all_pages: s.all_pages || false
+      party_role: s.party_role || '', label: s.label || '', all_pages: s.all_pages || false, per_page: s.per_page || false, page_positions: s.page_positions || {}
     }));
     initTexts.forEach(t => boxes.push({
       id: nextId++, kind: 'txt', page: t.page || 1,
@@ -215,6 +215,13 @@
         <div class="mb-2 form-check">
           <input class="form-check-input" type="checkbox" id="ppAllPages" ${b.all_pages ? 'checked' : ''}>
           <label class="form-check-label" for="ppAllPages">每页显示签名（签一次，每页均盖）</label>
+        </div>
+        <div class="mb-2 form-check" id="ppPerPageWrap" style="${b.all_pages ? '' : 'display:none'}">
+          <input class="form-check-input" type="checkbox" id="ppPerPage" ${b.per_page ? 'checked' : ''}>
+          <label class="form-check-label" for="ppPerPage">每页位置不同（独立设置 X/Y）</label>
+        </div>
+        <div id="ppPerPageTable" style="${b.all_pages && b.per_page ? '' : 'display:none'}">
+          <table class="table table-sm table-bordered mb-1"><thead><tr><th>页</th><th>X</th><th>Y</th></tr></thead><tbody id="ppPerPageBody"></tbody></table>
         </div>` : `
         <div class="mb-2">
           <label class="form-label">文本内容（支持 {title}/{case_no}/{client_name}/{date}）</label>
@@ -269,6 +276,34 @@
       t.value += chip.dataset.var;
       t.focus();
     }));
+    // all_pages / per_page 交互
+    if (isSig) {
+      const allPagesCb = panel.querySelector('#ppAllPages');
+      const perPageCb = panel.querySelector('#ppPerPage');
+      const perPageWrap = panel.querySelector('#ppPerPageWrap');
+      const perPageTable = panel.querySelector('#ppPerPageTable');
+      const perPageBody = panel.querySelector('#ppPerPageBody');
+      function buildPageTable() {
+        if (!perPageBody) return;
+        perPageBody.innerHTML = '';
+        const totalPages = pageEls.length || 1;
+        for (let pg = 1; pg <= totalPages; pg++) {
+          const pp = (b.page_positions || {})[pg] || {};
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="text-center">${pg}</td><td><input type="number" class="form-control form-control-sm pp-pg-x" data-pg="${pg}" value="${Math.round(pp.x ?? b.x)}"></td><td><input type="number" class="form-control form-control-sm pp-pg-y" data-pg="${pg}" value="${Math.round(pp.y ?? b.y)}"></td>`;
+          perPageBody.appendChild(tr);
+        }
+      }
+      if (allPagesCb) allPagesCb.addEventListener('change', () => {
+        perPageWrap.style.display = allPagesCb.checked ? '' : 'none';
+        if (!allPagesCb.checked) { perPageTable.style.display = 'none'; }
+      });
+      if (perPageCb) perPageCb.addEventListener('change', () => {
+        perPageTable.style.display = perPageCb.checked ? '' : 'none';
+        if (perPageCb.checked) buildPageTable();
+      });
+      if (b.all_pages && b.per_page) buildPageTable();
+    }
   }
   function applyProps(b) {
     const g = id => document.getElementById(id);
@@ -276,7 +311,16 @@
     b.y = parseFloat(g('ppY')?.value) || b.y;
     b.w = parseFloat(g('ppW')?.value) || b.w;
     b.h = parseFloat(g('ppH')?.value) || b.h;
-    if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; b.all_pages = g('ppAllPages')?.checked || false; }
+    if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; b.all_pages = g('ppAllPages')?.checked || false; b.per_page = g('ppPerPage')?.checked || false;
+      if (b.all_pages && b.per_page) {
+        const pp = {};
+        document.querySelectorAll('#ppPerPageBody tr').forEach(tr => {
+          const pg = tr.querySelector('.pp-pg-x')?.dataset?.pg;
+          if (pg) pp[pg] = { x: parseFloat(tr.querySelector('.pp-pg-x').value) || b.x, y: parseFloat(tr.querySelector('.pp-pg-y').value) || b.y };
+        });
+        b.page_positions = pp;
+      } else { b.page_positions = {}; }
+    }
     else { b.text = g('ppText')?.value || ''; b.size = parseInt(g('ppSize')?.value, 10) || 12; b.party_role = g('ppRole')?.value || ''; }
   }
 
@@ -379,7 +423,7 @@
 
   // 保存
   document.getElementById('btnSave').addEventListener('click', async () => {
-    const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label, all_pages: b.all_pages || false }));
+    const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label, all_pages: b.all_pages || false, per_page: b.per_page || false, page_positions: b.page_positions || {} }));
     const text_fields = boxes.filter(b => b.kind === 'txt').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), text: b.text, size: b.size, party_role: b.party_role || '' }));
     const btn = document.getElementById('btnSave');
     btn.disabled = true;

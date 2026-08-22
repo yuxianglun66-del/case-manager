@@ -235,11 +235,13 @@
           const targets = (p.all_pages) ? Array.from({length: container.children.length}, (_, idx) => idx) : (p.page && [p.page - 1].filter(idx => container.children[idx]));
           const group = [];
           targets.forEach(pgIdx => {
+            const pgNum = pgIdx + 1;
+            const pp = (p.per_page && p.page_positions && p.page_positions[pgNum]) || {};
             const wrap = container.children[pgIdx];
             const overlay = document.createElement('div');
             overlay.className = 'sign-overlay';
-            overlay.style.left = (p.x || 0) + 'px';
-            overlay.style.top = (p.y || 0) + 'px';
+            overlay.style.left = (pp.x ?? p.x ?? 0) + 'px';
+            overlay.style.top = (pp.y ?? p.y ?? 0) + 'px';
             overlay.style.width = (p.width || 180) + 'px';
             overlay.style.height = (p.height || 60) + 'px';
             const lbl = document.createElement('span');

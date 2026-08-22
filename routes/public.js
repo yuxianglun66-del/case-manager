@@ -185,10 +185,14 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const dateStr = new Date().toLocaleDateString('zh-CN');
       // all_pages: 每页都绘制签名
       if (myPos.all_pages) {
-        for (const pg of pages) {
-          pg.drawImage(signImage, { x, y: pg.getHeight() - y - drawHeight, width: drawWidth, height: drawHeight });
+        const ppos = myPos.per_page && myPos.page_positions ? myPos.page_positions : null;
+        for (let pi = 0; pi < pages.length; pi++) {
+          const pg = pages[pi];
+          const pgNum = pi + 1;
+          const pp = ppos && ppos[pgNum] ? ppos[pgNum] : { x, y };
+          pg.drawImage(signImage, { x: pp.x, y: pg.getHeight() - pp.y - drawHeight, width: drawWidth, height: drawHeight });
           if (cjkFont) {
-            pg.drawText(dateStr, { x: x + 5, y: pg.getHeight() - y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
+            pg.drawText(dateStr, { x: pp.x + 5, y: pg.getHeight() - pp.y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
           }
         }
       } else {
