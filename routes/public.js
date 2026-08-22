@@ -112,9 +112,10 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     }
 
     const sigs = (await pool.query(
-      `SELECT cs.*, c.id AS contract_id, c.case_no, c.template_id, c.pdf_path AS contract_pdf, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
+      `SELECT cs.*, c.id AS contract_id, cas.case_no, c.template_id, c.pdf_path AS contract_pdf, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
        FROM contract_signatures cs
        JOIN contracts c ON c.id = cs.contract_id
+       JOIN cases cas ON cas.id = c.case_id
        JOIN contract_templates ct ON ct.id = c.template_id
        WHERE cs.sign_token = $1 ORDER BY cs.id ASC`, [token]
     )).rows;
