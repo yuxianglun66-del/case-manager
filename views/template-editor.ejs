@@ -151,7 +151,7 @@
     initSigns.forEach(s => boxes.push({
       id: nextId++, kind: 'sig', page: s.page || 1,
       x: s.x, y: s.y, w: s.width, h: s.height,
-      party_role: s.party_role || '', label: s.label || ''
+      party_role: s.party_role || '', label: s.label || '', all_pages: s.all_pages || false
     }));
     initTexts.forEach(t => boxes.push({
       id: nextId++, kind: 'txt', page: t.page || 1,
@@ -211,6 +211,10 @@
         <div class="mb-2">
           <label class="form-label">标签</label>
           <input id="ppLabel" class="form-control" value="${escAttr(b.label)}">
+        </div>
+        <div class="mb-2 form-check">
+          <input class="form-check-input" type="checkbox" id="ppAllPages" ${b.all_pages ? 'checked' : ''}>
+          <label class="form-check-label" for="ppAllPages">每页显示签名（签一次，每页均盖）</label>
         </div>` : `
         <div class="mb-2">
           <label class="form-label">文本内容（支持 {title}/{case_no}/{client_name}/{date}）</label>
@@ -272,7 +276,7 @@
     b.y = parseFloat(g('ppY')?.value) || b.y;
     b.w = parseFloat(g('ppW')?.value) || b.w;
     b.h = parseFloat(g('ppH')?.value) || b.h;
-    if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; }
+    if (b.kind === 'sig') { b.party_role = g('ppRole')?.value || ''; b.label = g('ppLabel')?.value || ''; b.all_pages = g('ppAllPages')?.checked || false; }
     else { b.text = g('ppText')?.value || ''; b.size = parseInt(g('ppSize')?.value, 10) || 12; b.party_role = g('ppRole')?.value || ''; }
   }
 
@@ -375,7 +379,7 @@
 
   // 保存
   document.getElementById('btnSave').addEventListener('click', async () => {
-    const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label }));
+    const sign_positions = boxes.filter(b => b.kind === 'sig').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), party_role: b.party_role, label: b.label, all_pages: b.all_pages || false }));
     const text_fields = boxes.filter(b => b.kind === 'txt').map(b => ({ page: b.page, x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h), text: b.text, size: b.size, party_role: b.party_role || '' }));
     const btn = document.getElementById('btnSave');
     btn.disabled = true;

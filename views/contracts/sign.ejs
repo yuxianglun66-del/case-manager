@@ -137,10 +137,13 @@
     }
 
     function highlightOverlay(i) {
-      overlays.forEach((o, idx) => {
-        o.classList.toggle('active', idx === i);
-        const lbl = o.querySelector('.ov-label');
-        if (lbl) lbl.style.display = idx === i ? 'block' : 'none';
+      overlays.forEach((group, idx) => {
+        const isActive = idx === i;
+        group.forEach(o => {
+          o.classList.toggle('active', isActive);
+          const lbl = o.querySelector('.ov-label');
+          if (lbl) lbl.style.display = isActive ? 'block' : 'none';
+        });
       });
     }
 
@@ -229,20 +232,24 @@
         // 为每个待签署位置绘制占位框
         toSign.forEach((s, i) => {
           const p = s.position || {};
-          if (!p.page || !container.children[p.page - 1]) return;
-          const wrap = container.children[p.page - 1];
-          const overlay = document.createElement('div');
-          overlay.className = 'sign-overlay';
-          overlay.style.left = (p.x || 0) + 'px';
-          overlay.style.top = (p.y || 0) + 'px';
-          overlay.style.width = (p.width || 180) + 'px';
-          overlay.style.height = (p.height || 60) + 'px';
-          const lbl = document.createElement('span');
-          lbl.className = 'ov-label';
-          lbl.textContent = '请在此签名';
-          overlay.appendChild(lbl);
-          wrap.appendChild(overlay);
-          overlays.push(overlay);
+          const targets = (p.all_pages) ? Array.from({length: container.children.length}, (_, idx) => idx) : (p.page && [p.page - 1].filter(idx => container.children[idx]));
+          const group = [];
+          targets.forEach(pgIdx => {
+            const wrap = container.children[pgIdx];
+            const overlay = document.createElement('div');
+            overlay.className = 'sign-overlay';
+            overlay.style.left = (p.x || 0) + 'px';
+            overlay.style.top = (p.y || 0) + 'px';
+            overlay.style.width = (p.width || 180) + 'px';
+            overlay.style.height = (p.height || 60) + 'px';
+            const lbl = document.createElement('span');
+            lbl.className = 'ov-label';
+            lbl.textContent = '请在此签名';
+            overlay.appendChild(lbl);
+            wrap.appendChild(overlay);
+            group.push(overlay);
+          });
+          overlays.push(group);
         });
         if (toSign.length) updateStepUI();
       } catch (err) {

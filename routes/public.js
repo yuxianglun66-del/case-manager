@@ -170,8 +170,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const myPos = (idx >= 0 && positions[idx])
         ? positions[idx]
         : (positions.find(p => p.party_role && p.party_role === t.rec.party_role) || positions[0] || {});
-      if (!(myPos.page && myPos.page <= pages.length)) continue;
-      const page = pages[myPos.page - 1];
+      if (!pages.length || (!myPos.all_pages && !(myPos.page && myPos.page <= pages.length))) continue;
       const signBuf = Buffer.from(t.b64.replace(/^data:image\/png;base64,/, ''), 'base64');
       // S5: 解码后体积上限（防止 PDF/内存膨胀）
       if (signBuf.length > 2 * 1024 * 1024) return res.status(400).json({ error: '签名数据过大' });
@@ -182,11 +181,22 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const drawWidth = myPos.width || 180;
       const drawHeight = myPos.height || 60;
       const x = myPos.x || 100;
-      const y = myPos.y || (page.getHeight() - 100); // pdf-lib 坐标原点左下角
-      page.drawImage(signImage, { x, y: page.getHeight() - y - drawHeight, width: drawWidth, height: drawHeight });
-      // 在签名下方画签署日期（需要中文字体）
-      if (cjkFont) {
-        page.drawText(`${new Date().toLocaleDateString('zh-CN')}`, { x: x + 5, y: page.getHeight() - y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
+      const y = myPos.y || 100;
+      const dateStr = new Date().toLocaleDateString('zh-CN');
+      // all_pages: 每页都绘制签名
+      if (myPos.all_pages) {
+        for (const pg of pages) {
+          pg.drawImage(signImage, { x, y: pg.getHeight() - y - drawHeight, width: drawWidth, height: drawHeight });
+          if (cjkFont) {
+            pg.drawText(dateStr, { x: x + 5, y: pg.getHeight() - y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
+          }
+        }
+      } else {
+        const page = pages[myPos.page - 1];
+        page.drawImage(signImage, { x, y: page.getHeight() - y - drawHeight, width: drawWidth, height: drawHeight });
+        if (cjkFont) {
+          page.drawText(dateStr, { x: x + 5, y: page.getHeight() - y - drawHeight - 18, size: 9, font: cjkFont, color: rgb(0, 0, 0) });
+        }
       }
     }
     if (!savedFiles.length) return res.status(400).json({ error: '签名位置无效' });
