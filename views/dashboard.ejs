@@ -14,41 +14,50 @@
 %>
 
 <div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
+  <div class="col-6 col-lg">
+    <a href="/cases" class="stat-card stat-link">
       <div class="stat-icon" style="background:var(--grad-primary)"><i class="bi bi-folder-fill"></i></div>
       <div>
         <div class="stat-num"><%= total %></div>
         <div class="stat-label">全部案件</div>
       </div>
-    </div>
+    </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
+  <div class="col-6 col-lg">
+    <a href="/cases?cat=pending" class="stat-card stat-link">
       <div class="stat-icon" style="background:var(--grad-amber)"><i class="bi bi-hourglass-split"></i></div>
       <div>
         <div class="stat-num"><%= totalPending %></div>
         <div class="stat-label">待受理</div>
       </div>
-    </div>
+    </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
+  <div class="col-6 col-lg">
+    <a href="/cases?cat=processing" class="stat-card stat-link">
       <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-gear-wide-connected"></i></div>
       <div>
         <div class="stat-num"><%= totalProcessing %></div>
         <div class="stat-label">处理中</div>
       </div>
-    </div>
+    </a>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
+  <div class="col-6 col-lg">
+    <a href="/cases?cat=litigation" class="stat-card stat-link">
+      <div class="stat-icon" style="background:var(--grad-purple)"><i class="bi bi-bank"></i></div>
+      <div>
+        <div class="stat-num"><%= totalLitigation %></div>
+        <div class="stat-label">诉讼中</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg">
+    <a href="/cases?cat=closed" class="stat-card stat-link">
       <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-patch-check-fill"></i></div>
       <div>
         <div class="stat-num"><%= totalClosed %></div>
         <div class="stat-label">已结案/归档</div>
       </div>
-    </div>
+    </a>
   </div>
 </div>
 

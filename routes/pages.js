@@ -126,6 +126,7 @@ router.get('/cases', async (req, res, next) => {
     const assigneeId = parseInt(req.query.assignee, 10) || null;
     const dateFrom = (req.query.date_from || '').trim();
     const dateTo = (req.query.date_to || '').trim();
+    const cat = (req.query.cat || '').trim();
 
     const where = [];
     const params = [];
@@ -135,6 +136,13 @@ router.get('/cases', async (req, res, next) => {
     if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
     if (dateFrom) { params.push(dateFrom); where.push(`c.sign_date >= $${params.length}`); }
     if (dateTo) { params.push(dateTo); where.push(`c.sign_date <= $${params.length}`); }
+    const catSql = {
+      pending: `s2.category = 'pending'`,
+      processing: `s2.category = 'processing'`,
+      litigation: `s2.category = 'litigation'`,
+      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+    };
+    if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (!canViewAll(user)) { params.push(user.id); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -172,7 +180,7 @@ router.get('/cases', async (req, res, next) => {
     res.render('cases/list', {
       title: '案件管理',
       cases, types, statuses, staff,
-      filters: { kw, type: typeId, status: statusId, assignee: assigneeId, date_from: dateFrom, date_to: dateTo },
+      filters: { kw, type: typeId, status: statusId, assignee: assigneeId, date_from: dateFrom, date_to: dateTo, cat },
       page: cur, totalPages, total: count.rows[0].n,
     });
   } catch (e) { next(e); }

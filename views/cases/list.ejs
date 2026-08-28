@@ -17,6 +17,18 @@
 </div>
 
 <div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/cases" class="btn btn-sm <%= !filters.cat ? 'btn-primary' : 'btn-outline-secondary' %>">全部案件</a>
+      <a href="/cases?cat=pending" class="btn btn-sm <%= filters.cat === 'pending' ? 'btn-primary' : 'btn-outline-secondary' %>">待受理</a>
+      <a href="/cases?cat=processing" class="btn btn-sm <%= filters.cat === 'processing' ? 'btn-primary' : 'btn-outline-secondary' %>">处理中</a>
+      <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
+      <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案/归档</a>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
   <div class="card-header py-2"><i class="bi bi-funnel"></i> 筛选案件</div>
   <div class="card-body py-3">
     <form method="GET" action="/cases" class="row g-2 align-items-end">
@@ -121,7 +133,7 @@
         <ul class="pagination pagination-sm">
           <% for (let p = 1; p <= totalPages; p++) { %>
             <li class="page-item <%= p === page ? 'active' : '' %>">
-              <a class="page-link" href="/cases?page=<%= p %>&kw=<%= encodeURIComponent(filters.kw) %>&type=<%= filters.type || '' %>&status=<%= filters.status || '' %>&assignee=<%= filters.assignee || '' %>&date_from=<%= filters.date_from || '' %>&date_to=<%= filters.date_to || '' %>"><%= p %></a>
+              <a class="page-link" href="/cases?page=<%= p %>&kw=<%= encodeURIComponent(filters.kw) %>&type=<%= filters.type || '' %>&status=<%= filters.status || '' %>&assignee=<%= filters.assignee || '' %>&date_from=<%= filters.date_from || '' %>&date_to=<%= filters.date_to || '' %>&cat=<%= filters.cat || '' %>"><%= p %></a>
             </li>
           <% } %>
         </ul>

@@ -1236,12 +1236,20 @@ router.get('/cases/export/csv', requirePermission('cases.import_export'), async 
     const typeId = parseInt(req.query.type, 10) || null;
     const statusId = parseInt(req.query.status, 10) || null;
     const assigneeId = parseInt(req.query.assignee, 10) || null;
+    const cat = (req.query.cat || '').trim();
 
     const where = [];
     const params = [];
     if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
+    const catSql = {
+      pending: `s2.category = 'pending'`,
+      processing: `s2.category = 'processing'`,
+      litigation: `s2.category = 'litigation'`,
+      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+    };
+    if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     if (!canViewAll) { params.push(user.id); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -1282,12 +1290,20 @@ router.get('/cases/export/xlsx', requirePermission('cases.import_export'), async
     const typeId = parseInt(req.query.type, 10) || null;
     const statusId = parseInt(req.query.status, 10) || null;
     const assigneeId = parseInt(req.query.assignee, 10) || null;
+    const cat = (req.query.cat || '').trim();
 
     const where = [];
     const params = [];
     if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
+    const catSql = {
+      pending: `s2.category = 'pending'`,
+      processing: `s2.category = 'processing'`,
+      litigation: `s2.category = 'litigation'`,
+      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+    };
+    if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     if (!canViewAll) { params.push(user.id); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
