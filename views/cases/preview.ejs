@@ -60,14 +60,10 @@
       </div>
       <div id="pdfFallback" class="preview-fallback" style="display:none">
         <i class="bi bi-file-earmark-x"></i>
-        <h4>预览失败</h4>
-        <p class="text-light-emphasis">该文档可能无法在线预览，请下载查看。</p>
-        <% if (isLibrary) { %>
-        <a href="/api/library/<%= String(att.id).replace('lib-','') %>/file" class="btn btn-primary"><i class="bi bi-download"></i> 下载</a>
-        <% } else { %>
-        <a href="/api/attachments/<%= att.id %>/download" class="btn btn-primary"><i class="bi bi-download"></i> 下载</a>
-        <% } %>
+        <h4>预览加载中</h4>
+        <p class="text-light-emphasis">在线渲染引擎未能打开该文档，已切换浏览器内置渲染，若长时间无内容请下载查看。</p>
       </div>
+      <iframe id="nativePreview" class="native-preview" style="display:none;width:100%;height:100%;border:0" title="PDF 预览"></iframe>
       <div id="pdfWrap" class="pdf-wrap" style="display:none"></div>
       <% if (isWord || isExcel) { %>
       <div class="convert-tip"><i class="bi bi-arrow-repeat"></i> 文档已转为 PDF 预览，首次打开可能需要几秒</div>
@@ -90,7 +86,20 @@
       var pinch = null;
 
       function clampZ(z) { return Math.min(MAXZ, Math.max(MINZ, z)); }
-      function showFallback() { if (loading) loading.style.display = 'none'; if (fallback) fallback.style.display = 'flex'; }
+      function showFallback() {
+        if (loading) loading.style.display = 'none';
+        if (fallback) fallback.style.display = 'flex';
+        var iframe = document.getElementById('nativePreview');
+        if (iframe) {
+          iframe.style.display = 'block';
+          iframe.style.height = (window.innerHeight - 60) + 'px';
+          <% if (isLibrary) { %>
+          iframe.src = '/api/library/<%= String(att.id).replace('lib-','') %>/preview-file';
+          <% } else { %>
+          iframe.src = '/api/attachments/<%= att.id %>/preview-file';
+          <% } %>
+        }
+      }
       function showPdf() { if (wrap) wrap.style.display = 'block'; if (loading) loading.style.display = 'none'; }
       function updateZoomUI() {
         var l = document.getElementById('zoomLabel');
