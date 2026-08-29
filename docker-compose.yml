@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: casemgr
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-please-change-me}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD（参考 .env.example）}
       POSTGRES_DB: casemgr
       TZ: Asia/Shanghai
     volumes:
@@ -24,9 +24,9 @@ services:
     environment:
       # 生产模式（禁用 DEMO 自动登录等所有调试绕过）
       NODE_ENV: production
-      DATABASE_URL: postgres://casemgr:${DB_PASSWORD:-please-change-me}@db:5432/casemgr
+      DATABASE_URL: postgres://casemgr:${DB_PASSWORD:?请设置 DB_PASSWORD}@db:5432/casemgr
       SESSION_SECRET: ${SESSION_SECRET:?请设置 SESSION_SECRET 环境变量}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请设置 ADMIN_PASSWORD（管理员初始密码）}
       APP_URL: ${APP_URL:-http://localhost:3000}
       UPLOAD_DIR: /app/uploads
       BACKUP_DIR: /app/backups
@@ -37,6 +37,12 @@ services:
     volumes:
       - uploads:/app/uploads
       - backups:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   pgdata:

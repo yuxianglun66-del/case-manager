@@ -23,6 +23,35 @@ const forgotPasswordLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
+// 登录失败锁定策略：连续 5 次失败锁定 15 分钟
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MINUTES = 15;
+
+// 记录一次登录失败；达到阈值则写入锁定时间（锁定到期后自动归零重新计数）
+async function recordLoginFailure(username) {
+  try {
+    await pool.query(
+      `INSERT INTO login_attempts (username, fail_count)
+       VALUES ($1, 1)
+       ON CONFLICT (username) DO UPDATE SET
+         fail_count = CASE
+           WHEN login_attempts.locked_until IS NOT NULL AND login_attempts.locked_until < now() THEN 1
+           ELSE login_attempts.fail_count + 1 END,
+         locked_until = CASE
+           WHEN login_attempts.locked_until IS NOT NULL AND login_attempts.locked_until < now() THEN NULL
+           WHEN (CASE
+             WHEN login_attempts.locked_until IS NOT NULL AND login_attempts.locked_until < now() THEN 1
+             ELSE login_attempts.fail_count + 1 END) >= $2
+           THEN now() + ($3 || ' minutes')::interval
+           ELSE NULL END,
+         updated_at = now()`,
+      [username, LOGIN_MAX_FAILS, LOGIN_LOCK_MINUTES]
+    );
+  } catch (e) {
+    console.error('[auth] recordLoginFailure error:', e.message);
+  }
+}
+
 function createAuthRouter(loginLimiter) {
   const router = express.Router();
 
@@ -38,12 +67,28 @@ function createAuthRouter(loginLimiter) {
       return res.render('login', { title: '登录', error: '请输入用户名和密码。', layout: false });
     }
     try {
-      const { rows } = await pool.query(`SELECT * FROM users WHERE username = $1`, [username.trim()]);
+      const uname = username.trim();
+      // ====== 账号锁定的不变量检查 ======
+      const { rows: laRows } = await pool.query(`SELECT fail_count, locked_until FROM login_attempts WHERE username = $1`, [uname]);
+      const la = laRows[0];
+      if (la && la.locked_until && new Date(la.locked_until) > new Date()) {
+        console.log(`[auth] login locked, username=${uname}`);
+        return res.render('login', { title: '登录', error: `登录失败次数过多，账号已锁定 ${LOGIN_LOCK_MINUTES} 分钟，请稍后再试。`, layout: false });
+      }
+
+      const { rows } = await pool.query(`SELECT * FROM users WHERE username = $1`, [uname]);
       const user = rows[0];
       if (!user) return res.render('login', { title: '登录', error: '用户名或密码错误。', layout: false });
       if (!user.active) return res.render('login', { title: '登录', error: '账号已被禁用，请联系管理员。', layout: false });
       const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) return res.render('login', { title: '登录', error: '用户名或密码错误。', layout: false });
+      if (!ok) {
+        await recordLoginFailure(uname);
+        console.log(`[auth] login failed, username=${uname}`);
+        return res.render('login', { title: '登录', error: '用户名或密码错误。', layout: false });
+      }
+
+      // 登录成功，清除失败计数
+      await pool.query(`DELETE FROM login_attempts WHERE username = $1`, [uname]);
 
       // H2: 登录成功后重新生成 session ID，防止 session 固定攻击
       const oldSession = { ...req.session };

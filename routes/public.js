@@ -49,11 +49,12 @@ router.get('/sign/:token', async (req, res, next) => {
   try {
     const { token } = req.params;
     const rows = (await pool.query(
-      `SELECT cs.*, c.title, c.pdf_path, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
-       FROM contract_signatures cs
-       JOIN contracts c ON c.id = cs.contract_id
-       JOIN contract_templates ct ON ct.id = c.template_id
-       WHERE cs.sign_token = $1 ORDER BY cs.id ASC`, [token]
+`SELECT cs.*, c.title, c.pdf_path, c.work_pdf_path, ct.pdf_path AS template_path, ct.sign_positions
+        FROM contract_signatures cs
+        JOIN contracts c ON c.id = cs.contract_id
+        JOIN contract_templates ct ON ct.id = c.template_id
+        JOIN cases cas ON cas.id = c.case_id
+        WHERE cs.sign_token = $1 AND cas.deleted_at IS NULL ORDER BY cs.id ASC`, [token]
     )).rows;
     if (!rows.length) return res.status(404).send('签署链接无效或已过期');
     const first = rows[0];
@@ -117,7 +118,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
        JOIN contracts c ON c.id = cs.contract_id
        JOIN cases cas ON cas.id = c.case_id
        JOIN contract_templates ct ON ct.id = c.template_id
-       WHERE cs.sign_token = $1 ORDER BY cs.id ASC`, [token]
+       WHERE cs.sign_token = $1 AND cas.deleted_at IS NULL ORDER BY cs.id ASC`, [token]
     )).rows;
     if (!sigs.length) return res.status(404).json({ error: '签署链接无效' });
     const first = sigs[0];
@@ -225,6 +226,20 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const { audit } = require('../src/audit');
       await audit({ session: { user: null }, ip: req.ip }, '签署合同', { entity_type: 'contract', entity_id: first.contract_id, detail: (targets.map(t => t.rec.party_name).filter(Boolean).join('、') || '当事人') + ' 完成签署' });
     } catch {}
+
+    try {
+      const { pushEvent } = require('../src/wecom');
+      const cRow = (await pool.query(
+        `SELECT cc.case_id, cc.initiator_id, k.assignee_id, k.case_no
+         FROM contracts cc LEFT JOIN cases k ON k.id = cc.case_id WHERE cc.id = $1`, [first.contract_id]
+      )).rows[0];
+      if (cRow) {
+        const signedNames = targets.map(t => t.rec.party_name).filter(Boolean).join('、') || '当事人';
+        const content = '✅ 合同签署完成\n\n案号：' + (cRow.case_no || '') + '\n合同：' + first.title + '\n签署人：' + signedNames + '\n时间：' + new Date().toLocaleString('zh-CN', { hour12: false }) + '\n\n请及时跟进并下载存档。';
+        const targetUid = cRow.assignee_id || cRow.initiator_id || null;
+        if (targetUid) await pushEvent('contract_signed', targetUid, content, { link: cRow.case_id ? '/cases/' + cRow.case_id : null, title: '合同签署' });
+      }
+    } catch (e) { console.error('[sign] notify error:', e.message); }
 
     res.json({
       ok: true, signed: true, all_signed: true,

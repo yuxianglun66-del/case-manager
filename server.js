@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
 const { pool, initDb } = require('./src/db');
 const { loadUser } = require('./src/auth');
 const expressLayouts = require('express-ejs-layouts');
@@ -33,8 +34,18 @@ if (isProd) app.set('trust proxy', 1);
 // ====== G1: 健康检查（无需登录，供 Docker/K8s 探活） ======
 app.get('/healthz', async (req, res) => {
   try {
-    await pool.query('SELECT 1');
-    res.json({ ok: true, uptime: process.uptime() });
+    const dbVer = (await pool.query('SELECT version() AS v')).rows[0].v;
+    const lo = await new Promise((resolve) => {
+      execFile('which', ['libreoffice'], (err) => resolve(!err));
+    });
+    res.json({
+      ok: true,
+      uptime: process.uptime(),
+      node: process.version,
+      db: String(dbVer).split(' on ')[0] || 'postgres',
+      libreoffice: lo,
+      memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    });
   } catch (e) {
     res.status(503).json({ ok: false, error: '数据库不可用' });
   }
@@ -113,10 +124,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'case-manager-session-secret',
   resave: false,
   saveUninitialized: false,
+  // H7: 会话空闲超时（滑动窗口）：连续 60 分钟无操作自动过期
+  rolling: true,
   cookie: {
     httpOnly: true,
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 60 * 60 * 1000,
     secure: isProd,
   },
 }));

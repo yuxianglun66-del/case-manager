@@ -220,6 +220,11 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12,2);
 -- 企业微信推送：用户绑定企业微信 UserID
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wecom_userid VARCHAR(64);
 
+-- 软删除：案件进入回收站（deleted_at 为空=正常，非空=已删除）
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS deleted_by INT REFERENCES users(id);
+CREATE INDEX IF NOT EXISTS idx_cases_deleted ON cases(deleted_at);
+
 -- 操作日志：登录 + 所有数据变更（含变更前后内容），仅超管可查看
 CREATE TABLE IF NOT EXISTS audit_logs (
   id SERIAL PRIMARY KEY,
@@ -273,6 +278,42 @@ CREATE TABLE IF NOT EXISTS library_items (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_library_category ON library_items(category);
+
+-- 登录失败计数与锁定
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  fail_count INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 站内通知（红点）
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  event_key VARCHAR(50),
+  title VARCHAR(200),
+  content TEXT,
+  link VARCHAR(500),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC);
+
+-- 推送投递日志（含失败重试记录）
+CREATE TABLE IF NOT EXISTS notify_logs (
+  id SERIAL PRIMARY KEY,
+  event_key VARCHAR(50),
+  target_user_id INT REFERENCES users(id),
+  channel VARCHAR(20) NOT NULL,
+  content TEXT,
+  status VARCHAR(10) NOT NULL,
+  error TEXT,
+  retries INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notify_logs_created ON notify_logs(created_at DESC);
 `;
 
 const SEED_TYPES = [

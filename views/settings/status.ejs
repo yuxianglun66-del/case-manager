@@ -1,0 +1,133 @@
+<div class="page-head">
+  <div>
+    <h1>运行状态</h1>
+    <div class="lead">进程、数据库、组件可用性、配置告警与推送健康度一览</div>
+  </div>
+  <div>
+    <button class="btn btn-outline-primary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-4 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-cpu"></i> 进程信息</div>
+      <div class="card-body">
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr><td class="text-muted">运行时长</td><td class="text-end"><%= proc.uptimeMin %> 分钟</td></tr>
+            <tr><td class="text-muted">内存占用 (RSS)</td><td class="text-end"><%= proc.memoryMB %> MB</td></tr>
+            <tr><td class="text-muted">堆内存 (Heap)</td><td class="text-end"><%= proc.heapMB %> MB</td></tr>
+            <tr><td class="text-muted">Node 版本</td><td class="text-end"><%= proc.node %></td></tr>
+            <tr><td class="text-muted">进程 PID</td><td class="text-end"><%= proc.pid %></td></tr>
+            <tr><td class="text-muted">系统</td><td class="text-end"><%= proc.platform %> (<%= proc.arch %>)</td></tr>
+            <tr><td class="text-muted">CPU 核数</td><td class="text-end"><%= proc.cpus %></td></tr>
+            <tr><td class="text-muted">负载 (1/5/15min)</td><td class="text-end"><%= proc.loadavg[0].toFixed(2) %> / <%= proc.loadavg[1].toFixed(2) %> / <%= proc.loadavg[2].toFixed(2) %></td></tr>
+            <tr><td class="text-muted">运行模式</td><td class="text-end"><span class="badge <%= isProd ? 'bg-danger' : 'bg-secondary' %>"><%= isProd ? '生产' : '开发' %></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-database"></i> 数据与组件</div>
+      <div class="card-body">
+        <label class="form-label text-muted mb-1">PostgreSQL</label>
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <span class="badge bg-success"><i class="bi bi-check-lg"></i> 正常</span>
+          <code class="small"><%= dbVersion %></code>
+        </div>
+        <label class="form-label text-muted mb-1">LibreOffice（附件转码）</label>
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <% if (libreoffice) { %>
+            <span class="badge bg-success"><i class="bi bi-check-lg"></i> 可用</span>
+            <span class="small text-muted">Office 附件可转 PDF 预览</span>
+          <% } else { %>
+            <span class="badge bg-danger"><i class="bi bi-x-lg"></i> 不可用</span>
+            <span class="small text-muted">Office 附件无法预览，请安装 LibreOffice</span>
+          <% } %>
+        </div>
+        <hr>
+        <label class="form-label text-muted mb-1">业务概况</label>
+        <div class="d-flex justify-content-between">
+          <div class="text-center">
+            <div class="fs-4 fw-bold"><%= caseCount %></div>
+            <div class="small text-muted">在办案件</div>
+          </div>
+          <div class="text-center">
+            <div class="fs-4 fw-bold <%= reminderCount > 0 ? 'text-warning' : '' %>"><%= reminderCount %></div>
+            <div class="small text-muted">待跟进提醒</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-exclamation-triangle"></i> 配置告警</div>
+      <div class="card-body">
+        <% if (!config.length) { %>
+          <div class="text-success small"><i class="bi bi-check-circle"></i> 未发现明显配置问题</div>
+        <% } %>
+        <% config.forEach((item) => { %>
+          <div class="d-flex align-items-start gap-2 mb-2">
+            <span class="badge <%= item.ok ? 'bg-success' : 'bg-danger' %> mt-1" style="flex:0 0 auto;"><%= item.ok ? 'OK' : '注意' %></span>
+            <div>
+              <div class="small fw-bold"><%= item.label %></div>
+              <div class="small text-muted"><%= item.tip %></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bell"></i> 推送健康度（近 7 天）</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="text-center">
+            <div class="fs-4 fw-bold"><%= notify.total %></div>
+            <div class="small text-muted">推送总数</div>
+          </div>
+          <div class="text-center">
+            <div class="fs-4 fw-bold <%= notify.fails > 0 ? 'text-danger' : 'text-success' %>"><%= notify.fails %></div>
+            <div class="small text-muted">失败次数</div>
+          </div>
+          <div class="text-center">
+            <div class="fs-4 fw-bold <%= notify.fails > 0 ? 'text-warning' : 'text-success' %>"><%= notify.total ? Math.round((notify.total - notify.fails) / notify.total * 100) : 100 %>%</div>
+            <div class="small text-muted">成功率</div>
+          </div>
+        </div>
+        <% if (notify.fails > 0) { %>
+          <div class="alert alert-warning small mt-3 mb-0">
+            <i class="bi bi-info-circle"></i> 近期存在推送失败，请前往
+            <a href="/settings#tabWeChat">系统设置 → 企业微信 → 推送记录</a> 查看具体原因。
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 mb-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-shield-check"></i> 健康检查端点</div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">Docker / 监控探针使用，无需登录：</p>
+        <div class="d-flex align-items-center gap-2">
+          <code class="small flex-fill">GET /healthz</code>
+          <span class="badge bg-success"><i class="bi bi-check-lg"></i> 已启用</span>
+        </div>
+        <hr>
+        <p class="small text-muted mb-1">服务器负载与告警建议在宿主机配置（如 monitor / NodePing / UptimeRobot 每分钟探测 /healthz）。</p>
+        <p class="small text-muted mb-0">容器已配置 <code>restart: unless-stopped</code> 与 <code>healthcheck</code>，崩溃将自动拉起。</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -17,16 +17,26 @@ function scopeClause(user) {
   return { where: ' AND c.assignee_id = $1', params: [user.id] };
 }
 
+// 全文搜索：案号/标题/客户 + 自定义字段（备注/地点等）+ 当事人 + 历史备注
+function kwCond(params) {
+  const p = params.length;
+  return `(c.case_no ILIKE $${p} OR c.title ILIKE $${p} OR c.client_name ILIKE $${p}
+    OR c.status_note ILIKE $${p} OR c.next_action ILIKE $${p}
+    OR EXISTS (SELECT 1 FROM case_field_values fv WHERE fv.case_id = c.id AND fv.value ILIKE $${p})
+    OR EXISTS (SELECT 1 FROM case_parties pp WHERE pp.case_id = c.id AND pp.name ILIKE $${p})
+    OR EXISTS (SELECT 1 FROM case_history h WHERE h.case_id = c.id AND h.note ILIKE $${p}))`;
+}
+
 /* ---------- 看板 ---------- */
 router.get('/dashboard', async (req, res, next) => {
   try {
     const sc = scopeClause(req.session.user);
 
-    const total = await pool.query(`SELECT COUNT(*)::int AS n FROM cases c WHERE 1=1${sc.where}`, sc.params);
+    const total = await pool.query(`SELECT COUNT(*)::int AS n FROM cases c WHERE c.deleted_at IS NULL${sc.where}`, sc.params);
     const byType = await pool.query(
       `SELECT t.id, t.name, t.color, COUNT(c.id)::int AS n
        FROM case_types t
-       LEFT JOIN cases c ON c.case_type_id = t.id
+       LEFT JOIN cases c ON c.case_type_id = t.id AND c.deleted_at IS NULL
        WHERE t.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
        GROUP BY t.id ORDER BY t.sort`,
       sc.params
@@ -34,7 +44,7 @@ router.get('/dashboard', async (req, res, next) => {
     const byStatus = await pool.query(
       `SELECT s.id, s.name, s.color, s.category, COUNT(c.id)::int AS n
        FROM statuses s
-       LEFT JOIN cases c ON c.status_id = s.id
+       LEFT JOIN cases c ON c.status_id = s.id AND c.deleted_at IS NULL
        WHERE s.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
        GROUP BY s.id ORDER BY s.sort`,
       sc.params
@@ -48,7 +58,7 @@ router.get('/dashboard', async (req, res, next) => {
        LEFT JOIN case_types t ON t.id = c.case_type_id
        LEFT JOIN statuses s ON s.id = c.status_id
        LEFT JOIN users u ON u.id = c.assignee_id
-       WHERE 1=1${sc.where}
+       WHERE c.deleted_at IS NULL${sc.where}
        ORDER BY c.updated_at DESC LIMIT 8`,
       sc.params
     );
@@ -56,7 +66,7 @@ router.get('/dashboard', async (req, res, next) => {
     const workload = canViewAll(req.session.user)
       ? (await pool.query(
           `SELECT u.id, u.display_name, COUNT(c.id)::int AS n
-           FROM users u LEFT JOIN cases c ON c.assignee_id = u.id
+           FROM users u LEFT JOIN cases c ON c.assignee_id = u.id AND c.deleted_at IS NULL
            WHERE u.active = TRUE GROUP BY u.id, u.display_name ORDER BY n DESC`
         )).rows
       : [];
@@ -76,6 +86,7 @@ router.get('/dashboard', async (req, res, next) => {
        LEFT JOIN users u ON u.id = c.assignee_id
        LEFT JOIN statuses s ON s.id = c.status_id
        WHERE c.reminder_at IS NOT NULL
+         AND c.deleted_at IS NULL
          AND c.next_action IS NOT NULL AND c.next_action <> ''
          AND c.reminder_ack_at IS NULL
          AND c.reminder_at <= now() + ($1 * interval '1 day')
@@ -128,9 +139,9 @@ router.get('/cases', async (req, res, next) => {
     const dateTo = (req.query.date_to || '').trim();
     const cat = (req.query.cat || '').trim();
 
-    const where = [];
+    const where = ['c.deleted_at IS NULL'];
     const params = [];
-    if (kw) { params.push(`%${kw}%`); where.push(`(c.case_no ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.client_name ILIKE $${params.length})`); }
+    if (kw) { params.push(`%${kw}%`); where.push(kwCond(params)); }
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
     if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
@@ -186,6 +197,52 @@ router.get('/cases', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/* ---------- 回收站（软删除案件，仅删除权限用户） ---------- */
+router.get('/cases/recycle', requirePermission('cases.delete'), async (req, res, next) => {
+  try {
+    const user = req.session.user;
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const per = 20;
+    const kw = (req.query.kw || '').trim();
+
+    const where = ['c.deleted_at IS NOT NULL'];
+    const params = [];
+    if (kw) { params.push(`%${kw}%`); where.push(kwCond(params)); }
+    if (!canViewAll(user)) { params.push(user.id); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
+    const whereSql = `WHERE ${where.join(' AND ')}`;
+
+    const count = await pool.query(`SELECT COUNT(*)::int AS n FROM cases c ${whereSql}`, params);
+    const totalPages = Math.max(Math.ceil(count.rows[0].n / per), 1);
+    const cur = Math.min(page, totalPages);
+    const offset = (cur - 1) * per;
+
+    params.push(per, offset);
+    const { rows: deletedCases } = await pool.query(
+      `SELECT c.id, c.case_no, c.title, c.client_name, c.deleted_at, c.updated_at,
+              t.name AS type_name, t.color AS type_color,
+              s.name AS status_name, s.color AS status_color,
+              u.display_name AS assignee_name,
+              du.display_name AS deleted_by_name
+       FROM cases c
+       LEFT JOIN case_types t ON t.id = c.case_type_id
+       LEFT JOIN statuses s ON s.id = c.status_id
+       LEFT JOIN users u ON u.id = c.assignee_id
+       LEFT JOIN users du ON du.id = c.deleted_by
+       ${whereSql}
+       ORDER BY c.deleted_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.render('cases/recycle', {
+      title: '回收站',
+      deletedCases,
+      page: cur, totalPages, total: count.rows[0].n,
+      filters: { kw },
+    });
+  } catch (e) { next(e); }
+});
+
 /* ---------- 案件新增表单 ---------- */
 router.get('/cases/new', async (req, res, next) => {
   try {
@@ -227,7 +284,7 @@ router.get('/cases/:id/edit', async (req, res, next) => {
   try {
     const user = req.session.user;
     const id = parseInt(req.params.id, 10);
-    const c = (await pool.query(`SELECT * FROM cases WHERE id = $1`, [id])).rows[0];
+    const c = (await pool.query(`SELECT * FROM cases WHERE id = $1 AND deleted_at IS NULL`, [id])).rows[0];
     if (!c) return res.status(404).render('error', { title: '案件不存在', message: '案件不存在或已被删除。', user });
     if (!canViewCase(user, c)) return res.status(403).render('error', { title: '无权访问', message: '您无权操作他人的案件。', user });
 
@@ -284,7 +341,7 @@ router.get('/cases/:id', async (req, res, next) => {
        LEFT JOIN case_types t ON t.id = c.case_type_id
        LEFT JOIN statuses s ON s.id = c.status_id
        LEFT JOIN users cu ON cu.id = c.created_by
-       WHERE c.id = $1`, [id]
+       WHERE c.id = $1 AND c.deleted_at IS NULL`, [id]
     )).rows[0];
     if (!c) return res.status(404).render('error', { title: '案件不存在', message: '案件不存在或已被删除。', user });
     if (!canViewCase(user, c)) return res.status(403).render('error', { title: '无权访问', message: '您无权查看他人的案件。', user });
@@ -340,7 +397,7 @@ router.get('/cases/:id', async (req, res, next) => {
 router.get('/users', requirePermission('system.users'), async (req, res, next) => {
   try {
     const { rows: users } = await pool.query(
-      `SELECT u.*, (SELECT COUNT(*)::int FROM cases c WHERE c.assignee_id = u.id) AS case_count
+      `SELECT u.*, (SELECT COUNT(*)::int FROM cases c WHERE c.assignee_id = u.id AND c.deleted_at IS NULL) AS case_count
        FROM users u ORDER BY u.role, u.id`
     );
     const canManageRoles = hasPermission(req.session.user, 'system.roles');
@@ -458,6 +515,100 @@ router.get('/settings/audit', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/* ---------- 运行状态（仅超级管理员） ---------- */
+router.get('/settings/status', async (req, res, next) => {
+  try {
+    if (!req.session.user || req.session.user.role !== 'super_admin') {
+      return res.status(403).render('error', {
+        title: '无权访问',
+        message: '仅超级管理员可查看运行状态。',
+        user: req.session.user
+      });
+    }
+    const { execFileSync } = require('child_process');
+    const os = require('os');
+
+    const [dbVerRow, appRows, caseRow, notifyRow] = await Promise.all([
+      pool.query(`SELECT version() AS v`),
+      pool.query(`SELECT key, value FROM app_settings`),
+      pool.query(`SELECT COUNT(*)::int AS n FROM cases WHERE deleted_at IS NULL`),
+      pool.query(`SELECT COUNT(*)::int AS total,
+                    COALESCE(SUM((status = 'fail')::int), 0)::int AS fails
+                  FROM notify_logs WHERE created_at >= now() - INTERVAL '7 days'`),
+    ]);
+
+    const s = {};
+    appRows.rows.forEach((r) => { s[r.key] = r.value; });
+
+    const remindersSql = `SELECT COUNT(*)::int AS n FROM cases
+      WHERE reminder_at IS NOT NULL AND next_action IS NOT NULL AND next_action <> ''
+        AND reminder_ack_at IS NULL AND deleted_at IS NULL
+        AND reminder_at <= now() + ($1 * interval '1 day')`;
+    const adv = parseInt(s.reminder_advance_days, 10) || 3;
+    const remRow = (await pool.query(remindersSql, [adv])).rows[0];
+
+    let libreoffice = true;
+    try { execFileSync('which', ['libreoffice'], { stdio: 'ignore' }); } catch (e) { libreoffice = false; }
+
+    const mem = process.memoryUsage();
+    const used = Math.round(process.uptime() / 60);
+
+    const config = [
+      {
+        key: 'app_url',
+        label: 'APP_URL（签署链接域名）',
+        ok: !!s.app_url,
+        tip: '未设置时签署/找回密码链接将使用请求主机名，部署在反向代理后时可能不正确',
+      },
+      {
+        key: 'wecom_enabled',
+        label: '企业微信推送',
+        ok: s.wecom_enabled === '1',
+        tip: '未启用，事件只在站内通知中可见',
+      },
+      {
+        key: 'backup',
+        label: '自动备份',
+        ok: s.backup_enabled === '1',
+        tip: '未启用自动备份，建议开启以防数据丢失（设置：' + (s.backup_time || '02:00') + '）',
+      },
+      {
+        key: 'company_name',
+        label: '机构名称',
+        ok: !!s.company_name,
+        tip: '未设置机构名称，界面将显示默认名',
+      },
+    ];
+
+    if (process.env.NODE_ENV === 'production' && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'case-manager-session-secret')) {
+      config.push({ key: 'session_secret', label: 'SESSION_SECRET 环境变量', ok: false, tip: '生产环境使用默认密钥，会话存在被伪造风险' });
+    }
+
+    res.render('settings/status', {
+      title: '运行状态',
+      proc: {
+        uptimeMin: used,
+        memoryMB: Math.round(mem.rss / 1024 / 1024),
+        heapMB: Math.round(mem.heapUsed / 1024 / 1024),
+        node: process.version,
+        pid: process.pid,
+        platform: process.platform + ' ' + os.release(),
+        arch: process.arch,
+        cpus: os.cpus().length,
+        loadavg: os.loadavg(),
+      },
+      dbVersion: String(dbVerRow.rows[0].v).split(' on ')[0],
+      libreoffice,
+      config,
+      notify: notifyRow.rows[0],
+      caseCount: caseRow.rows[0].n,
+      reminderCount: remRow.rows[0].n,
+      isProd: process.env.NODE_ENV === 'production',
+      envHasAppUrl: !!process.env.APP_URL,
+    });
+  } catch (e) { next(e); }
+});
+
 router.get('/library', async (req, res, next) => {
   try {
     const { rows: items } = await pool.query(
@@ -467,6 +618,125 @@ router.get('/library', async (req, res, next) => {
     let categories = [];
     try { categories = JSON.parse(catRows[0]?.value || '[]'); } catch (e) {}
     res.render('library', { title: '法律法规库', items, categories, canEdit: hasPermission(req.session.user, 'cases.edit') });
+  } catch (e) { next(e); }
+});
+
+/* ---------- 费用/业绩报表 ---------- */
+router.get('/reports/finance', async (req, res, next) => {
+  try {
+    const user = req.session.user;
+    const canViewAll = canViewAll(user);
+    const dateFrom = (req.query.date_from || '').trim();
+    const dateTo = (req.query.date_to || '').trim();
+    const assigneeId = parseInt(req.query.assignee, 10) || null;
+    const feeType = (req.query.fee_type || '').trim();
+
+    // ---- 案件维度：业绩与收款率（按 sign_date 过滤） ----
+    const cWhere = [];
+    const cParams = [];
+    let p = 0;
+    if (dateFrom) { cParams.push(dateFrom); cWhere.push(`c.sign_date >= $${++p}`); }
+    if (dateTo) { cParams.push(dateTo); cWhere.push(`c.sign_date <= $${++p}`); }
+    if (assigneeId && canViewAll) { cParams.push(assigneeId); cWhere.push(`c.assignee_id = $${++p}`); }
+    if (!canViewAll) { cParams.push(user.id); cWhere.push(`(c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`); }
+    const cWhereSql = cWhere.length
+      ? `WHERE ${cWhere.join(' AND ')} AND c.deleted_at IS NULL`
+      : 'WHERE c.deleted_at IS NULL';
+    const caseStats = (await pool.query(
+      `SELECT
+         COUNT(*)::int AS case_count,
+         COUNT(*) FILTER (WHERE s.category IN ('closed','archived')) AS settled_case_count,
+         COALESCE(SUM(c.target_amount), 0) AS target_total,
+         COALESCE(SUM(c.received_amount), 0) AS received_total,
+         COALESCE(SUM(CASE WHEN s.category IN ('closed','archived') THEN c.target_amount ELSE 0 END), 0) AS settled_target,
+         COALESCE(SUM(CASE WHEN s.category IN ('closed','archived') THEN c.received_amount ELSE 0 END), 0) AS settled_received
+       FROM cases c
+       LEFT JOIN statuses s ON s.id = c.status_id
+       ${cWhereSql}`, cParams
+    )).rows[0];
+
+    const byStaff = (await pool.query(
+      `SELECT c.assignee_id, u.display_name AS assignee_name,
+              COUNT(*)::int AS case_count,
+              COALESCE(SUM(c.target_amount),0) AS target_total,
+              COALESCE(SUM(c.received_amount),0) AS received_total
+       FROM cases c
+       LEFT JOIN users u ON u.id = c.assignee_id
+       ${cWhereSql}
+       GROUP BY c.assignee_id, u.display_name ORDER BY received_total DESC`, cParams
+    )).rows;
+
+    // ---- 费用维度（按费用创建时间过滤） ----
+    const fWhere = [];
+    const fParams = [];
+    p = 0;
+    if (dateFrom) { fParams.push(dateFrom); fWhere.push(`f.created_at >= $${++p}::date`); }
+    if (dateTo) { fParams.push(dateTo); fWhere.push(`f.created_at < ($${++p}::date + INTERVAL '1 day')`); }
+    if (feeType) { fParams.push(feeType); fWhere.push(`f.fee_type = $${++p}`); }
+    let fScopeSql = '';
+    if (!canViewAll) { fParams.push(user.id); fScopeSql = ` AND (c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`; }
+    else if (assigneeId) { fParams.push(assigneeId); fScopeSql = ` AND c.assignee_id = $${++p}`; }
+    const fWhereSql = fWhere.length ? `WHERE ${fWhere.join(' AND ')}` : 'WHERE 1=1';
+
+    const feeSummary = (await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN f.direction='income' THEN f.amount ELSE 0 END),0) AS income_total,
+         COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense_total,
+         COUNT(*)::int AS fee_count
+       FROM case_fees f
+       JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
+       ${fWhereSql}${fScopeSql}`, fParams
+    )).rows[0];
+
+    const byFeeType = (await pool.query(
+      `SELECT f.fee_type,
+         COUNT(*)::int AS cnt,
+         COALESCE(SUM(CASE WHEN f.direction='income' THEN f.amount ELSE 0 END),0) AS income,
+         COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense
+       FROM case_fees f
+       JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
+       ${fWhereSql}${fScopeSql}
+       GROUP BY f.fee_type ORDER BY income DESC, expense DESC`, fParams
+    )).rows;
+
+    const byStaffFee = (await pool.query(
+      `SELECT COALESCE(u.display_name,'未分配') AS assignee_name,
+         COUNT(f.id)::int AS cnt,
+         COALESCE(SUM(CASE WHEN f.direction='income' THEN f.amount ELSE 0 END),0) AS income,
+         COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense
+       FROM case_fees f
+       JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
+       LEFT JOIN users u ON u.id = c.assignee_id
+       ${fWhereSql}${fScopeSql}
+       GROUP BY u.display_name ORDER BY income DESC`, fParams
+    )).rows;
+
+    const feeRows = (await pool.query(
+      `SELECT f.id, f.case_id, f.fee_type, f.direction, f.amount, f.payer, f.status, f.note,
+              TO_CHAR(f.paid_at, 'YYYY-MM-DD') AS paid_at, f.created_at,
+              c.case_no, c.title, c.assignee_id,
+              u.display_name AS assignee_name
+       FROM case_fees f
+       JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
+       LEFT JOIN users u ON u.id = c.assignee_id
+       ${fWhereSql}${fScopeSql}
+       ORDER BY f.created_at DESC LIMIT 500`, fParams
+    )).rows;
+
+    const freqFeeTypes = (await pool.query(`SELECT DISTINCT fee_type FROM case_fees ORDER BY fee_type`)).rows.map(r => r.fee_type);
+    const staff = canViewAll ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows : [];
+    const FEE_TYPE_NAMES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+
+    const fmt = (n) => { const v = parseFloat(n) || 0; return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: 2 }); };
+    const rate = (received, target) => target > 0 ? ((received / target) * 100).toFixed(1) + '%' : '—';
+
+    res.render('reports/finance', {
+      title: '费用报表',
+      filters: { date_from: dateFrom, date_to: dateTo, assignee: assigneeId, fee_type: feeType },
+      caseStats, byStaff, feeSummary, byFeeType, byStaffFee, feeRows,
+      staff, freqFeeTypes, FEE_TYPE_NAMES, canViewAll,
+      fmt, rate,
+    });
   } catch (e) { next(e); }
 });
 

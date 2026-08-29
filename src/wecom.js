@@ -73,19 +73,90 @@ function isEventEnabled(events, eventKey) {
   } catch { return false; }
 }
 
-async function pushEvent(eventKey, userId, content) {
+const EVENT_TITLES = {
+  case_assigned: '案件分配',
+  status_changed: '状态变更',
+  reminder_due: '流程提醒',
+  new_attachment: '新附件',
+  contract_signed: '合同签署',
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function addInAppNotification(userId, eventKey, title, content, link) {
+  if (!userId) return;
+  try {
+    await pool.query(
+      `INSERT INTO notifications (user_id, event_key, title, content, link) VALUES ($1,$2,$3,$4,$5)`,
+      [userId, eventKey, title, content || '', link || null]
+    );
+  } catch (e) {
+    console.error('[WeCom] addInAppNotification error:', e.message);
+  }
+}
+
+async function logNotify(channel, userId, eventKey, content, status, error, retries) {
+  try {
+    await pool.query(
+      `INSERT INTO notify_logs (channel, target_user_id, event_key, content, status, error, retries) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [channel, userId || null, eventKey || null, content || '', status, error || null, retries || 0]
+    );
+  } catch (e) {
+    console.error('[WeCom] logNotify error:', e.message);
+  }
+}
+
+// 带重试的投递（最多 3 次，退避 600ms/1200ms）
+async function notifyWithRetry(fn) {
+  let lastErr = 'unknown';
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fn();
+      if (r && r.ok) return { ok: true, retries: i, error: null };
+      lastErr = (r && r.error) || 'unknown';
+    } catch (e) {
+      lastErr = e.message;
+    }
+    if (i < 2) await sleep(600 * (i + 1));
+  }
+  return { ok: false, retries: 2, error: lastErr };
+}
+
+async function pushEvent(eventKey, userId, content, opts = {}) {
+  if (!userId) return;
+  const title = opts.title || EVENT_TITLES[eventKey] || '系统通知';
+  const link = opts.link || null;
+
+  // 站内通知（红点）始终落库
+  await addInAppNotification(userId, eventKey, title, content, link);
+  await logNotify('inapp', userId, eventKey, content, 'success', null, 0);
+
   try {
     const s = await getSettings();
     if (s.wecom_enabled !== '1') return;
     if (!isEventEnabled(s.wecom_push_events, eventKey)) return;
+
+    let deliver;
     if (s.wecom_webhook) {
-      await sendWebhook(s.wecom_webhook, content);
+      deliver = await notifyWithRetry(() => sendWebhook(s.wecom_webhook, content));
     } else if (s.wecom_corpid && s.wecom_secret) {
-      const wid = await (require('./db').pool.query(`SELECT wecom_userid FROM users WHERE id = $1`, [userId])).then(r => r.rows[0]?.wecom_userid?.trim());
-      if (wid) await sendText(wid, content);
+      const q = await pool.query(`SELECT wecom_userid FROM users WHERE id = $1`, [userId]);
+      const wid = q.rows[0]?.wecom_userid?.trim();
+      if (!wid) {
+        await logNotify('wecom', userId, eventKey, content, 'fail', '用户未配置企业微信 UserID', 0);
+        return;
+      }
+      deliver = await notifyWithRetry(() => sendText(wid, content));
+    } else {
+      await logNotify('wecom', userId, eventKey, content, 'fail', '未配置 Webhook 或企业微信应用', 0);
+      return;
     }
+
+    await logNotify('wecom', userId, eventKey, content, deliver.ok ? 'success' : 'fail', deliver.error, deliver.retries);
+    if (!deliver.ok) console.error('[WeCom] pushEvent final fail:', deliver.error);
   } catch (e) {
     console.error('[WeCom] pushEvent error:', e.message);
+    await logNotify('wecom', userId, eventKey, content, 'fail', e.message, 0).catch(() => {});
   }
 }
 

@@ -8,10 +8,13 @@
     <a href="/cases/new" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 新增案件</a>
     <% } %>
     <% if (can('cases.import_export')) { %>
-    <a href="/api/cases/export/xlsx" class="btn btn-success"><i class="bi bi-file-earmark-spreadsheet"></i> 导出 Excel</a>
-    <a href="/api/cases/export/csv" class="btn btn-outline-success"><i class="bi bi-file-earmark-text"></i> 导出 CSV</a>
+    <a href="javascript:void(0)" onclick="window.location='/api/cases/export/xlsx'+(location.search||'')" class="btn btn-success"><i class="bi bi-file-earmark-spreadsheet"></i> 导出 Excel</a>
+    <a href="javascript:void(0)" onclick="window.location='/api/cases/export/csv'+(location.search||'')" class="btn btn-outline-success"><i class="bi bi-file-earmark-text"></i> 导出 CSV</a>
     <button class="btn btn-outline-secondary" onclick="openImportModal()"><i class="bi bi-upload"></i> 导入</button>
     <a href="/api/cases/import/template" class="btn btn-light border"><i class="bi bi-download"></i> 模板</a>
+    <% if (can('cases.delete')) { %>
+    <a href="/cases/recycle" class="btn btn-outline-secondary"><i class="bi bi-trash3"></i> 回收站</a>
+    <% } %>
     <% } %>
   </div>
 </div>
@@ -81,12 +84,34 @@
   </div>
 </div>
 
+<% if (can('cases.edit')) { %>
+<div class="card mb-3">
+  <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-muted small me-1"><i class="bi bi-check2-square"></i> 批量操作：</span>
+    <select id="batchStatus" class="form-select form-select-sm" style="width:150px">
+      <option value="">变更状态…</option>
+      <% statuses.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+    </select>
+    <button class="btn btn-sm btn-primary" id="btnBatchStatus">应用状态</button>
+    <% if (can('cases.view_all') && can('cases.assign') && staff.length) { %>
+    <select id="batchAssignee" class="form-select form-select-sm" style="width:160px">
+      <option value="">分配负责人…</option>
+      <% staff.forEach(s => { %><option value="<%= s.id %>"><%= s.display_name %></option><% }) %>
+    </select>
+    <button class="btn btn-sm btn-outline-primary" id="btnBatchAssignee">分配</button>
+    <% } %>
+    <span class="badge rounded-pill border text-muted" id="batchCount" style="background:var(--surface)"><i class="bi bi-square-check"></i> 已选 0 项</span>
+  </div>
+</div>
+<% } %>
+
 <div class="card">
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0">
         <thead>
           <tr>
+            <% if (can('cases.edit')) { %><th style="width:36px"><input type="checkbox" class="form-check-input" id="chkAllCases" title="全选"></th><% } %>
             <th>案号</th>
             <th>案件名称</th>
             <th>类型</th>
@@ -104,6 +129,9 @@
         <tbody>
           <% cases.forEach(c => { %>
             <tr class="row-link" onclick="location.href='/cases/<%= c.id %>'">
+              <% if (can('cases.edit')) { %>
+              <td style="width:36px"><input type="checkbox" class="form-check-input chk-case" value="<%= c.id %>" onclick="event.stopPropagation(); updateBatchBar()"></td>
+              <% } %>
               <td class="fw-bold" style="color:var(--bs-primary, #3b82f6) !important; letter-spacing:.3px"><%= c.case_no %></td>
               <td><%= c.title %></td>
               <td><span class="type-badge" style="background:<%= c.type_color %>"><%= c.type_name %></span></td>
@@ -121,7 +149,7 @@
             </tr>
           <% }) %>
           <% if (cases.length === 0) { %>
-            <tr><td colspan="<%= can('cases.delete') ? 12 : 11 %>" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的案件</td></tr>
+            <tr><td colspan="<%= can('cases.delete') ? 13 : 12 %>" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的案件</td></tr>
           <% } %>
         </tbody>
       </table>
@@ -176,11 +204,48 @@
   function openImportModal() {
     new bootstrap.Modal(document.getElementById('importModal')).show();
   }
+  function selectedCaseIds() {
+    return Array.from(document.querySelectorAll('.chk-case:checked')).map(el => Number(el.value));
+  }
+  function updateBatchBar() {
+    const el = document.getElementById('batchCount');
+    if (el) el.textContent = '✔ ' + selectedCaseIds().length + ' 项';
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('chkAllCases')?.addEventListener('change', function () {
+      document.querySelectorAll('.chk-case').forEach(el => { el.checked = this.checked; });
+      updateBatchBar();
+    });
+    document.getElementById('btnBatchStatus')?.addEventListener('click', async () => {
+      const ids = selectedCaseIds();
+      if (!ids.length) return toast('请先选择案件', 'warning');
+      const statusId = document.getElementById('batchStatus').value;
+      if (!statusId) return toast('请选择要变更的状态', 'warning');
+      if (!(await confirmBox('确定将选中的 ' + ids.length + ' 个案件状态批量变更为所选状态？', '批量变更状态'))) return;
+      try {
+        const data = await postJSON('/api/cases/batch/status', { ids, status_id: parseInt(statusId, 10) });
+        toast('已更新 ' + data.updated + ' 个案件状态', 'success');
+        setTimeout(() => location.reload(), 500);
+      } catch (err) { toast(err.message || '操作失败', 'danger'); }
+    });
+    document.getElementById('btnBatchAssignee')?.addEventListener('click', async () => {
+      const ids = selectedCaseIds();
+      if (!ids.length) return toast('请先选择案件', 'warning');
+      const assigneeId = document.getElementById('batchAssignee').value;
+      if (!assigneeId) return toast('请选择负责人', 'warning');
+      if (!(await confirmBox('确定将选中的 ' + ids.length + ' 个案件分配给该负责人？', '批量分配'))) return;
+      try {
+        const data = await postJSON('/api/cases/batch/assignee', { ids, assignee_id: parseInt(assigneeId, 10) });
+        toast('已分配 ' + data.updated + ' 个案件', 'success');
+        setTimeout(() => location.reload(), 500);
+      } catch (err) { toast(err.message || '操作失败', 'danger'); }
+    });
+  });
   async function delCase(id, caseNo) {
-    if (!(await confirmBox('确定删除案件「' + caseNo + '」？该操作将永久删除案件及所有附件、合同记录，无法恢复。', '删除案件'))) return;
+    if (!(await confirmBox('确定将案件「' + caseNo + '」移入回收站？可在回收站中恢复或彻底删除。', '删除案件'))) return;
     try {
       await postJSON('/api/cases/' + id + '/delete', {});
-      toast('案件已删除', 'success');
+      toast('案件已移入回收站', 'success');
       setTimeout(() => location.reload(), 500);
     } catch (err) { toast(err.message || '删除失败', 'danger'); }
   }

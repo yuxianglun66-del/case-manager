@@ -1,0 +1,273 @@
+<div class="page-head">
+  <div>
+    <h1>费用报表</h1>
+    <div class="lead">业绩·收款率·费用收支统计</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="?date_from=<%= filters.date_from || '' %>&date_to=<%= filters.date_to || '' %>&fee_type=<%= filters.fee_type || '' %>" id="btnToday" class="btn btn-light border"><i class="bi bi-calendar-week"></i> 本月</a>
+    <a href="/reports/finance" class="btn btn-light"><i class="bi bi-arrow-counterclockwise"></i> 全部</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="GET" action="/reports/finance" class="row g-2 align-items-end">
+      <div class="col-6 col-md-3 col-lg-2">
+        <label class="form-label mb-1">开始日期</label>
+        <input type="date" name="date_from" class="form-control" value="<%= filters.date_from %>">
+      </div>
+      <div class="col-6 col-md-3 col-lg-2">
+        <label class="form-label mb-1">结束日期</label>
+        <input type="date" name="date_to" class="form-control" value="<%= filters.date_to %>">
+      </div>
+      <% if (canViewAll) { %>
+      <div class="col-6 col-md-3 col-lg-2">
+        <label class="form-label mb-1">服务人员</label>
+        <select name="assignee" class="form-select">
+          <option value="">全部人员</option>
+          <% staff.forEach(s => { %>
+            <option value="<%= s.id %>" <%= filters.assignee === s.id ? 'selected' : '' %>><%= s.display_name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <% } %>
+      <div class="col-6 col-md-3 col-lg-2">
+        <label class="form-label mb-1">费用类型</label>
+        <select name="fee_type" class="form-select">
+          <option value="">全部类型</option>
+          <% FEE_TYPE_NAMES.concat(freqFeeTypes).filter((v,i,a) => a.indexOf(v)===i).forEach(t => { %>
+            <option value="<%= t %>" <%= filters.fee_type === t ? 'selected' : '' %>><%= t %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12 col-md-auto d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-search"></i> 查询</button>
+        <a href="/reports/finance" class="btn btn-light"><i class="bi bi-x-lg"></i> 清除</a>
+      </div>
+    </form>
+    <small class="text-muted">业绩/收款率按案件签单日期统计；费用明细按费用记录创建日期统计。</small>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-primary)"><i class="bi bi-flag-fill"></i></div>
+      <div>
+        <div class="stat-num"><%= fmt(caseStats.target_total) %></div>
+        <div class="stat-label">标的金额</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-cash-coin"></i></div>
+      <div>
+        <div class="stat-num"><%= fmt(caseStats.received_total) %></div>
+        <div class="stat-label">实收金额</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-percent"></i></div>
+      <div>
+        <div class="stat-num"><%= rate(caseStats.received_total, caseStats.target_total) %></div>
+        <div class="stat-label">综合收款率</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-amber)"><i class="bi bi-receipt-cutoff"></i></div>
+      <div>
+        <div class="stat-num"><%= caseStats.case_count %></div>
+        <div class="stat-label">案件数（已结清 <%= caseStats.settled_case_count %> 起）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-graph-up-arrow"></i></div>
+      <div>
+        <div class="stat-num"><%= fmt(feeSummary.income_total) %></div>
+        <div class="stat-label">应收费用（收入）</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-red)"><i class="bi bi-graph-down-arrow"></i></div>
+      <div>
+        <div class="stat-num"><%= fmt(feeSummary.expense_total) %></div>
+        <div class="stat-label">应付费用（支出）</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-purple)"><i class="bi bi-wallet2"></i></div>
+      <div>
+        <div class="stat-num"><%= fmt(feeSummary.income_total - feeSummary.expense_total) %></div>
+        <div class="stat-label">费用净额</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-list-check"></i></div>
+      <div>
+        <div class="stat-num"><%= feeSummary.fee_count %></div>
+        <div class="stat-label">费用记录数</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-people"></i> 服务人员业绩</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>服务人员</th>
+                <th class="text-end">案件数</th>
+                <th class="text-end">标的</th>
+                <th class="text-end">实收</th>
+                <th class="text-end">收款率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% byStaff.forEach((r, i) => { %>
+              <tr>
+                <td><span class="ms-2"><%= r.assignee_name || '未分配' %></span></td>
+                <td class="text-end"><%= r.case_count %></td>
+                <td class="text-end"><%= fmt(r.target_total) %></td>
+                <td class="text-end fw-bold" style="color:#198754"><%= fmt(r.received_total) %></td>
+                <td class="text-end"><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= rate(r.received_total, r.target_total) %></span></td>
+              </tr>
+              <% }) %>
+              <% if (!byStaff.length) { %><tr><td colspan="5" class="empty-tip">暂无数据</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-tags"></i> 服务人员费用收支</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>服务人员</th>
+                <th class="text-end">笔数</th>
+                <th class="text-end">应收(收入)</th>
+                <th class="text-end">应付(支出)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% byStaffFee.forEach((r) => { %>
+              <tr>
+                <td><span class="ms-2"><%= r.assignee_name %></span></td>
+                <td class="text-end"><%= r.cnt %></td>
+                <td class="text-end fw-bold" style="color:#198754"><%= fmt(r.income) %></td>
+                <td class="text-end" style="color:#dc3545"><%= fmt(r.expense) %></td>
+              </tr>
+              <% }) %>
+              <% if (!byStaffFee.length) { %><tr><td colspan="4" class="empty-tip">暂无数据</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-pie-chart"></i> 费用类型汇总</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>费用类型</th>
+            <th class="text-end">笔数</th>
+            <th class="text-end">应收(收入)</th>
+            <th class="text-end">应付(支出)</th>
+            <th class="text-end">净额</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% byFeeType.forEach((r) => { %>
+          <tr>
+            <td><span class="ms-2"><%= r.fee_type %></span></td>
+            <td class="text-end"><%= r.cnt %></td>
+            <td class="text-end fw-bold" style="color:#198754"><%= fmt(r.income) %></td>
+            <td class="text-end" style="color:#dc3545"><%= fmt(r.expense) %></td>
+            <td class="text-end"><%= fmt(r.income - r.expense) %></td>
+          </tr>
+          <% }) %>
+          <% if (!byFeeType.length) { %><tr><td colspan="5" class="empty-tip">暂无数据</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-receipt"></i> 费用明细 <small class="text-muted">最新 500 条</small></span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>案号</th>
+            <th>案件名称</th>
+            <th class="hide-mobile">服务人员</th>
+            <th>类型</th>
+            <th class="text-end">金额</th>
+            <th class="hide-mobile">收付方</th>
+            <th class="hide-mobile">日期</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% feeRows.forEach((f) => { %>
+          <tr class="row-link" onclick="location.href='/cases/<%= f.case_id %>'">
+            <td class="fw-bold" style="color:var(--bs-primary, #3b82f6) !important"><%= f.case_no %></td>
+            <td><%= f.title %></td>
+            <td class="hide-mobile"><%= f.assignee_name || '—' %></td>
+            <td><%= f.fee_type %></td>
+            <td class="text-end">
+              <span style="display:inline-block;background:<%= f.direction === 'income' ? '#198754' : '#dc3545' %>;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.95em"><%= f.direction === 'income' ? '+' : '-' %>¥<%= parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) %></span>
+            </td>
+            <td class="hide-mobile"><%= f.payer || '—' %></td>
+            <td class="hide-mobile text-muted"><%= f.paid_at || (f.created_at ? new Date(f.created_at).toLocaleDateString('zh-CN') : '') %></td>
+          </tr>
+          <% }) %>
+          <% if (!feeRows.length) { %><tr><td colspan="7" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的费用记录</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const btn = document.getElementById('btnToday');
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    btn.href = '?date_from=' + y + '-' + m + '-01&date_to=' + y + '-' + m + '-' + String(new Date(y, now.getMonth() + 1, 0).getDate()).padStart(2, '0');
+  })();
+</script>

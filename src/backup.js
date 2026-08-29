@@ -10,13 +10,15 @@ const BACKUP_VERSION = 1;
 const MAIN_TABLES = [
   'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
   'contract_templates', 'cases', 'case_field_values', 'case_history',
-  'app_settings', 'case_parties', 'contracts', 'contract_signatures'
+  'app_settings', 'case_parties', 'contracts', 'contract_signatures',
+  'case_fees', 'attachments', 'library_items'
 ];
 
 const RESTORE_ORDER = [
   'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
   'contract_templates', 'cases', 'case_field_values', 'case_history',
-  'case_parties', 'contracts', 'contract_signatures', 'app_settings'
+  'case_parties', 'contracts', 'contract_signatures', 'case_fees',
+  'attachments', 'library_items', 'app_settings'
 ];
 
 const SETTING_KEYS = [

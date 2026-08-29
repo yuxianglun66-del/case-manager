@@ -298,11 +298,52 @@
                 <label class="form-check-label" for="evtNewAttachment"><i class="bi bi-paperclip"></i> 新增附件：上传附件时通知</label>
               </div>
             </div>
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="evtContractSigned" value="contract_signed">
+                <label class="form-check-label" for="evtContractSigned"><i class="bi bi-file-earmark-check"></i> 合同签署：当事人完成合同签署时通知</label>
+              </div>
+            </div>
             <button type="button" class="btn btn-primary" id="btnSaveEvents"><i class="bi bi-save"></i> 保存事件设置</button>
             <hr>
             <h6 class="mt-3">测试推送</h6>
             <button type="button" class="btn btn-outline-primary btn-sm" id="btnTestWeCom"><i class="bi bi-send"></i> 发送测试消息到群</button>
             <div class="form-text">使用上方 Webhook 地址发送一条测试消息。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row mt-3">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-check"></i> 推送记录</span>
+            <button type="button" class="btn btn-outline-danger btn-sm" id="btnClearNotifyLogs"><i class="bi bi-trash"></i> 清理 30 天前记录</button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 notif-log-table">
+                <thead>
+                  <tr>
+                    <th>时间</th><th>目标</th><th>事件</th><th>渠道</th><th>结果</th><th>重试</th><th>错误信息</th>
+                  </tr>
+                </thead>
+                <tbody id="notifyLogBody"><tr><td colspan="7" class="text-center text-muted py-3">加载中…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card mt-3">
+          <div class="card-header"><i class="bi bi-browser-chrome"></i> 浏览器推送（Web Push）预留</div>
+          <div class="card-body small text-muted">
+            当前版本已预留浏览器 Push 消息处理（Service Worker 已具备接收/点击跳转能力），
+            服务端订阅链路需满足以下条件后才会启用：
+            <ul class="mb-1 mt-2">
+              <li>站点必须通过 <strong>HTTPS</strong> 部署（Chrome/Edge/Safari 强制要求，本机 localhost 除外）；</li>
+              <li>生成 VAPID 公钥/私钥并写入服务端配置；</li>
+              <li>通知权限需用户自行授权（浏览器弹窗）。</li>
+            </ul>
+            未启用前不影响现有站内通知与企业微信推送。
           </div>
         </div>
       </div>
@@ -812,8 +853,8 @@
   });
 
   /* ---- 企业微信推送 ---- */
-  const WE_EVENT_KEYS = ['case_assigned', 'status_changed', 'reminder_due', 'new_attachment'];
-  const WE_EVENT_IDS = { case_assigned: 'evtCaseAssigned', status_changed: 'evtStatusChanged', reminder_due: 'evtReminderDue', new_attachment: 'evtNewAttachment' };
+  const WE_EVENT_KEYS = ['case_assigned', 'status_changed', 'reminder_due', 'new_attachment', 'contract_signed'];
+  const WE_EVENT_IDS = { case_assigned: 'evtCaseAssigned', status_changed: 'evtStatusChanged', reminder_due: 'evtReminderDue', new_attachment: 'evtNewAttachment', contract_signed: 'evtContractSigned' };
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('wecomWebhook').value = SETTINGS.wecom_webhook || '';
     document.getElementById('wecomCorpid').value = SETTINGS.wecom_corpid || '';
@@ -855,6 +896,43 @@
     } catch (err) { toast(err.message || '发送失败', 'danger'); }
     btn.disabled = false;
   });
+
+  // ====== 推送投递日志 ======
+  const EVT_LABELS = { case_assigned: '案件分配', status_changed: '状态变更', reminder_due: '流程提醒', new_attachment: '新增附件', contract_signed: '合同签署' };
+  async function loadNotifyLogs() {
+    const tbody = document.getElementById('notifyLogBody');
+    if (!tbody) return;
+    try {
+      const resp = await fetch('/api/notify-logs', { headers: { 'Accept': 'application/json' } });
+      const data = await resp.json();
+      const rows = data.rows || [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">暂无推送记录</td></tr>'; return; }
+      tbody.innerHTML = rows.map(l => `
+        <tr>
+          <td class="text-nowrap small">${l.created_at || ''}</td>
+          <td class="small">${l.target_name ? escHtml(l.target_name) : '—'}</td>
+          <td class="small">${EVT_LABELS[l.event_key] || escHtml(l.event_key) || '—'}</td>
+          <td class="small">${l.channel === 'wecom' ? '企业微信' : '站内'}</td>
+          <td class="small">${l.status === 'success' ? '<span class="badge text-bg-success">成功</span>' : '<span class="badge text-bg-danger">失败</span>'}</td>
+          <td class="small">${l.retries || 0}</td>
+          <td class="small text-danger">${l.error ? escHtml(l.error) : (l.channel === 'inapp' ? '—' : '')}</td>
+        </tr>`).join('');
+    } catch (e) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">加载失败</td></tr>'; }
+  }
+  function escHtml(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  const clearBtn = document.getElementById('btnClearNotifyLogs');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      try {
+        const ok = await confirmBox('确定清理 30 天前的推送日志吗？', '清理日志');
+        if (!ok) return;
+        const r = await postJSON('/api/notify-logs/clear', {});
+        toast('已清理 ' + (r.removed || 0) + ' 条记录', 'success');
+        loadNotifyLogs();
+      } catch (err) { toast(err.message, 'danger'); }
+    });
+    loadNotifyLogs();
+  }
 
   // ====== 法律法规库分类管理 ======
   let libCats = [];

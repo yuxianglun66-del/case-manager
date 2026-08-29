@@ -180,6 +180,10 @@
       <nav class="sidebar-nav">
         <a href="/dashboard" class="<%= _active === 'dashboard' ? 'active' : '' %>"><i class="bi bi-grid-1x2-fill"></i><span>工作看板</span></a>
         <a href="/cases" class="<%= _active === 'cases' ? 'active' : '' %>"><i class="bi bi-folder2-open"></i><span>案件管理</span></a>
+        <a href="/reports/finance" class="<%= _active === 'finance' ? 'active' : '' %>"><i class="bi bi-graph-up"></i><span>费用报表</span></a>
+        <% if (_can('cases.delete')) { %>
+          <a href="/cases/recycle" class="<%= _active === 'recycle' ? 'active' : '' %>"><i class="bi bi-trash3"></i><span>回收站</span></a>
+        <% } %>
         <a href="/library" class="<%= _active === 'library' ? 'active' : '' %>"><i class="bi bi-book-half"></i><span>法律法规库</span></a>
         <% if (_can('system.users')) { %>
           <a href="/users" class="<%= _active === 'users' ? 'active' : '' %>"><i class="bi bi-people-fill"></i><span>用户管理</span></a>
@@ -188,6 +192,7 @@
           <a href="/settings" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-sliders"></i><span>系统设置</span></a>
         <% } %>
         <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
+          <a href="/settings/status" class="<%= _active === 'status' ? 'active' : '' %>"><i class="bi bi-activity"></i><span>运行状态</span></a>
           <a href="/settings/backup" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-database-fill-down"></i><span>备份与恢复</span></a>
           <a href="/settings/audit" class="<%= _active === 'audit' ? 'active' : '' %>"><i class="bi bi-journal-text"></i><span>操作日志</span></a>
         <% } %>
@@ -333,6 +338,104 @@
       if (savedTheme && window.uiTheme && window.uiTheme.find(savedTheme)) {
         window.uiTheme.applyNow(window.uiTheme.find(savedTheme));
       }
+    })();
+  </script>
+  <!-- ============ 站内通知（红点） ============ -->
+  <style>
+    .notify-wrap { position: fixed; top: 16px; right: 16px; z-index: 1060; }
+    @media (max-width: 767.98px) { .notify-wrap { top: 60px; } }
+    .notify-bell { position: relative; width: 40px; height: 40px; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--surface-elevated); border: 1px solid var(--content-border);
+      color: var(--content-fg); font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+    .notify-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px;
+      border-radius: 50%; background: #ef4444; border: 1.5px solid var(--surface-solid); }
+    .notify-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px;
+      padding: 0 4px; border-radius: 9px; background: #ef4444; color: #fff;
+      font-size: 11px; line-height: 18px; text-align: center; font-weight: 600; }
+    .notify-panel { position: absolute; top: 48px; right: 0; width: 340px; max-width: calc(100vw - 24px);
+      max-height: 440px; display: flex; flex-direction: column; border-radius: 14px;
+      background: var(--surface-elevated); border: 1px solid var(--content-border);
+      box-shadow: 0 12px 32px rgba(0,0,0,.28); overflow: hidden; }
+    .notify-head { display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-bottom: 1px solid var(--content-border); font-weight: 600; color: var(--content-fg); }
+    .notify-head span { font-size: 14px; }
+    .notify-body { overflow-y: auto; overflow-x: hidden; flex: 1; }
+    .notify-empty { padding: 28px 0; text-align: center; color: var(--content-faint); font-size: 13px; }
+    .notify-item { display: block; padding: 10px 14px; border-bottom: 1px solid var(--content-border);
+      text-decoration: none; transition: background .12s; }
+    .notify-item:hover { background: rgba(59,130,246,.06); }
+    .notify-item-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+    .notify-badge { font-size: 11px; color: var(--primary-text); background: rgba(59,130,246,.14);
+      border: 1px solid rgba(59,130,246,.25); border-radius: 6px; padding: 1px 6px; }
+    .notify-time { font-size: 11px; color: var(--content-faint); }
+    .notify-item-content { font-size: 12.5px; color: var(--content-fg); line-height: 1.45;
+      white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .notify-item.unread .notify-item-content { color: var(--content-muted); }
+    .notify-item.unread::before { content: ""; display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: #3b82f6; vertical-align: 1px; margin-right: 6px; }
+  </style>
+  <div class="notify-wrap d-print-none">
+    <button class="btn notify-bell" id="notifyBell" type="button" title="通知" aria-label="通知">
+      <i class="bi bi-bell"></i>
+      <span class="notify-dot" id="notifyDot" hidden></span>
+      <span class="notify-count" id="notifyCount" hidden></span>
+    </button>
+    <div class="notify-panel" id="notifyPanel" hidden>
+      <div class="notify-head">
+        <span><i class="bi bi-bell-fill me-1"></i> 通知</span>
+        <button type="button" class="btn btn-sm p-0" id="notifyReadAll" style="color:var(--primary-text)">全部已读</button>
+      </div>
+      <div class="notify-body" id="notifyBody"><div class="notify-empty">暂无通知</div></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const bell = document.getElementById('notifyBell');
+      const panel = document.getElementById('notifyPanel');
+      const dot = document.getElementById('notifyDot');
+      const cnt = document.getElementById('notifyCount');
+      const body = document.getElementById('notifyBody');
+      function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+      function render(rows) {
+        if (!rows || !rows.length) { body.innerHTML = '<div class="notify-empty">暂无通知</div>'; return; }
+        body.innerHTML = rows.map(n => `
+          <a class="notify-item${n.is_read ? '' : ' unread'}" href="${esc(n.link)}" data-id="${n.id}">
+            <div class="notify-item-title"><span>${n.title ? '<span class="notify-badge">' + esc(n.title) + '</span>' : ''}</span><span class="notify-time">${esc(n.created_at)}</span></div>
+            <div class="notify-item-content">${esc(n.content)}</div>
+          </a>`).join('');
+        body.querySelectorAll('.notify-item').forEach(el => {
+          el.addEventListener('click', () => {
+            postJSON('/api/notifications/' + el.dataset.id + '/read', {}).catch(() => {});
+          });
+        });
+      }
+      function refresh() {
+        fetch('/api/notifications', { headers: { 'Accept': 'application/json' } })
+          .then(r => r.json())
+          .then(d => {
+            if (!d.ok) return;
+            const n = d.unread || 0;
+            cnt.textContent = n > 99 ? '99+' : n;
+            cnt.hidden = n === 0;
+            dot.hidden = n === 0;
+            render(d.recent || []);
+          })
+          .catch(() => {});
+      }
+      bell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.hidden = !panel.hidden;
+        if (!panel.hidden) refresh();
+      });
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#notifyPanel') && !e.target.closest('#notifyBell')) panel.hidden = true;
+      });
+      document.getElementById('notifyReadAll').addEventListener('click', () => {
+        postJSON('/api/notifications/read', {}).then(refresh).catch(() => {});
+      });
+      refresh();
+      setInterval(refresh, 60000);
     })();
   </script>
   <script>

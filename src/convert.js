@@ -3,6 +3,9 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// 进程内进行中的转换表：destPath -> Promise，避免并发重复转换同一文件
+const inflight = new Map();
+
 // 将 Word(.doc/.docx/.wps/.rtf) 与 Excel(.xls/.xlsx/.csv) 转换为 PDF
 // 生产环境（Docker/Linux）统一用 LibreOffice；Windows 开发机优先 LibreOffice，否则 Word 用 COM、Excel 报错
 function convertOfficeToPdf(srcPath, destPath) {
@@ -95,4 +98,22 @@ function convertWithLibreOffice(bin, srcPath, destPath) {
   });
 }
 
-module.exports = { convertOfficeToPdf };
+module.exports = { convertOfficeToPdf, convertOfficeToPdfCached };
+
+// 带缓存与并发去重的转码：目标文件已存在直接返回；转换中并发请求共享同一 Promise；
+// 失败后清除锁，允许后续重试（并自动删除可能残留的半成品缓存文件）。
+async function convertOfficeToPdfCached(srcPath, destPath) {
+  if (!srcPath || !destPath) throw new Error('转码参数缺失');
+  if (fs.existsSync(destPath)) return destPath;
+  const key = path.resolve(destPath);
+  if (inflight.has(key)) return inflight.get(key);
+  const p = convertOfficeToPdf(srcPath, destPath)
+    .then((result) => { inflight.delete(key); return result; })
+    .catch((e) => {
+      inflight.delete(key);
+      try { if (fs.existsSync(destPath)) fs.rmSync(destPath); } catch (err) { /* ignore */ }
+      throw e;
+    });
+  inflight.set(key, p);
+  return p;
+}

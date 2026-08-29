@@ -288,10 +288,16 @@
                       <a href="/api/contracts/<%= c.id %>/download" class="btn btn-ico btn-success" title="下载已签署合同"><i class="bi bi-download"></i></a>
                     <% } %>
                     <% if (c.status === 'sent') { %>
+                      <% if (c.signatures && c.signatures[0] && c.signatures[0].sign_token) { %>
+                        <button class="btn btn-ico btn-outline-primary" title="复制签署链接" data-token="<%= c.signatures[0].sign_token %>" onclick="copySignLink(this)"><i class="bi bi-link-45deg"></i></button>
+                      <% } %>
                       <button class="btn btn-ico btn-light" title="查看签署进度" onclick="viewContractProgress(<%= c.id %>)"><i class="bi bi-eye"></i></button>
                       <% if (can('contracts.manage')) { %>
                       <button class="btn btn-ico btn-outline-danger" title="撤回" onclick="revokeContract(<%= c.id %>)"><i class="bi bi-x-circle"></i></button>
                       <% } %>
+                    <% } %>
+                    <% if (c.status === 'revoked' && can('contracts.manage')) { %>
+                      <button class="btn btn-ico btn-outline-primary" title="重新发起签署（生成新链接）" onclick="resendContract(<%= c.id %>)"><i class="bi bi-arrow-clockwise"></i></button>
                     <% } %>
                     <% if (typeof user !== 'undefined' && user && (user.role === 'super_admin' || user.role === 'admin')) { %>
                       <button class="btn btn-ico btn-outline-danger" title="删除合同" onclick="deleteContract(<%= c.id %>)"><i class="bi bi-trash"></i></button>
@@ -377,7 +383,7 @@
                 <div class="att-thumbs">
                   <% gImgs.forEach(gi => { %>
                   <a class="att-thumb" href="javascript:void(0)" onclick="lbOpen(<%= imgList.findIndex(x => x.id === gi.id) %>)" title="<%= gi.original_name.replace(/["'<>]/g, '') %>">
-                    <img src="/api/attachments/<%= gi.id %>/file" loading="lazy" alt="">
+                    <img src="/api/attachments/<%= gi.id %>/file" loading="lazy" decoding="async" alt="">
                   </a>
                   <% }) %>
                 </div>
@@ -1060,9 +1066,20 @@
         const template_id = document.getElementById('ctTemplateId').value;
         const title = document.getElementById('ctTitle').value.trim();
         const party_ids = Array.from(document.getElementById('ctPartyIds').selectedOptions).map(o=>Number(o.value));
-        if (!template_id || !title || !party_ids.length) return toast('请填写完整', 'warning');
+        if (!template_id || !title || !party_ids.length) { mb.okBtn.disabled = false; return toast('请填写完整', 'warning'); }
         mb.okBtn.disabled = true;
         try {
+          const csrfP = getCsrfToken();
+          const pres = await fetch('/api/cases/<%= caseData.id %>/contracts/validate', {method:'POST',headers:{'Content-Type':'application/json',...(csrfP?{'x-csrf-token':csrfP}:{}),},body:JSON.stringify({template_id:parseInt(template_id),party_ids})});
+          const pdata = await pres.json();
+          const warnings = pdata && pdata.warnings ? pdata.warnings : [];
+          if (warnings.length) {
+            let wlist = '<div class="text-start small"><div class="text-warning mb-2"><i class="bi bi-exclamation-triangle"></i> 以下变量因缺少资料将留空：</div><ul class="mb-0">';
+            warnings.forEach(w=>{ wlist += '<li>' + (w.scope==='party' ? ((w.party_name||'当事人')+'（'+(w.party_role||'未设置角色')+'）') : '案件') + '：' + w.label + '</li>'; });
+            wlist += '</ul><div class="text-muted mt-2">仍可发送，留空处将在合同中留白。建议先补充资料或调整当事人。</div></div>';
+            const go = await confirmBox(wlist, '检测到模板变量将留空');
+            if (!go) { mb.okBtn.disabled = false; return; }
+          }
           const csrf2 = getCsrfToken();
           const res = await fetch('/api/cases/<%= caseData.id %>/contracts', {method:'POST',headers:{'Content-Type':'application/json',...(csrf2?{'x-csrf-token':csrf2}:{}),},body:JSON.stringify({template_id:parseInt(template_id),title,party_ids})});
           const data = await res.json();
@@ -1135,6 +1152,16 @@
       const res = await fetch('/api/cases/<%= caseData.id %>/contracts/' + id + '/revoke', {method:'POST',headers:{'Content-Type':'application/json',...(csrf3?{'x-csrf-token':csrf3}:{}),}});
       if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '撤回失败'); }
       toast('已撤回', 'success');
+      setTimeout(()=>location.reload(),400);
+    } catch(err) { toast(err.message,'danger'); }
+  }
+  async function resendContract(id) {
+    if (!(await confirmBox('确定重新发起该合同签署？将生成全新的签署链接（7 天有效），此前发给当事人的旧链接将失效。', '重新发起签署'))) return;
+    try {
+      const csrfR = getCsrfToken();
+      const res = await fetch('/api/cases/<%= caseData.id %>/contracts/' + id + '/resend', {method:'POST',headers:{'Content-Type':'application/json',...(csrfR?{'x-csrf-token':csrfR}:{}),}});
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '重新发起失败'); }
+      toast('已生成新签署链接', 'success');
       setTimeout(()=>location.reload(),400);
     } catch(err) { toast(err.message,'danger'); }
   }

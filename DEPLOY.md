@@ -91,12 +91,15 @@ cp .env.example .env
 ### 4.3 启动
 ```bash
 docker compose up -d --build
-# app 容器：node:20-alpine，端口 3000 内部，映射宿主 8080
-# db  容器：postgres:16-alpine，健康检查 pg_isready
-# 数据卷：./data/postgres 与 ./data/uploads 为 bind mount
+# app 容器：node:20-alpine，端口 3000 内部，映射宿主 ${APP_PORT:-3000}
+# db  容器：postgres:16-alpine，健康检查 pg_isready（app 等待 db 就绪才启动）
+# 容器均有 healthcheck + restart: unless-stopped，崩溃自动拉起
+# 数据卷：pgdata / uploads / backups 为命名卷
 ```
 
-### 4.4 Nginx 反向代理 + SSL（示例）
+### 4.4 Nginx 反向代理 + SSL
+> app 端口默认 3000。若 .env 里设置了 APP_PORT=8080，下面 `proxy_pass` 端口同步改为 8080。
+
 ```nginx
 server {
     listen 80;
@@ -112,7 +115,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -123,8 +126,37 @@ server {
     }
 }
 ```
+> 生产模式下应用已开启 `trust proxy 1`，`X-Forwarded-Proto` 会正确回写，登录 Cookie 自动标记 secure。
 
-### 4.5 首次登录
+### 4.5 Caddy 反向代理（备选，自动 HTTPS，无需手工申请证书）
+仅需一个 Caddyfile，Caddy 会自动申请并续期 Let's Encrypt 证书：
+
+```caddyfile
+your-domain.com {
+    reverse_proxy 127.0.0.1:3000
+    request_body {
+        max_size 100MB   # 配合 MAX_FILE_MB
+    }
+}
+```
+```bash
+# Ubuntu 安装 Caddy 后，把上面内容写入 /etc/caddy/Caddyfile 并重启
+sudo systemctl restart caddy
+```
+
+### 4.6 签署链接域名（重要）
+系统生成合同签署链接 / 找回密码邮件 / 小程序二维码时需要外部可访问的 HTTPS 地址，请同步设置：
+```bash
+# .env 中设置（指向公网域名而非内网 IP）
+APP_URL=https://your-domain.com
+# 重新加载后，设置 → 运行状态 可核对 APP_URL 告警是否消失
+docker compose up -d --build
+```
+不设置时链接会退化为当前请求主机名，反向代理后可能出现内网地址导致当事人无法访问。
+
+> 若目标域名仅支持 IPv6 且代理环境不合规导致证书验证失败，可改用备案域名或参考 4.4 的 Nginx + 手动证书方案。
+
+### 4.7 首次登录
 - 访问 `https://your-domain.com`
 - 默认账号：`admin` / `admin123`
 - **登录后立即修改密码**（用户管理 → 编辑 admin → 重置密码）
@@ -156,8 +188,9 @@ server {
 # 数据库
 docker exec case-manager-db pg_dump -U casemgr casemgr > backup_$(date +%F).sql
 
-# 上传文件
-tar -czf uploads_$(date +%F).tar.gz ./data/uploads
+# 上传文件（uploads/backups 为命名卷，路径在容器内）
+docker exec case-manager-app sh -c 'cd /app && tar -czf /tmp/uploads.tgz uploads'
+docker cp case-manager-app:/tmp/uploads.tgz uploads_$(date +%F).tar.gz
 ```
 
 ### 恢复
@@ -166,8 +199,10 @@ tar -czf uploads_$(date +%F).tar.gz ./data/uploads
 docker exec -i case-manager-db psql -U casemgr casemgr < backup_2026-08-01.sql
 
 # 文件
-tar -xzf uploads_2026-08-01.tar.gz -C ./data/
+docker cp uploads_2026-08-01.tar.gz case-manager-app:/tmp/uploads.tgz
+docker exec case-manager-app sh -c 'cd /app && tar -xzf /tmp/uploads.tgz'
 ```
+> 系统内置「备份与恢复」页面（仅超级管理员，设置 → 备份与恢复）可自动备份全部业务数据并循环清理，生产环境建议开启。
 
 ### 升级
 ```bash

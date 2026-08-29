@@ -93,3 +93,31 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 });
+
+/* ---- Web Push 预留：需 HTTPS + VAPID 密钥（服务端订阅推送）后才生效 ---- */
+self.addEventListener('push', (e) => {
+  let data = { title: '案件管理系统', body: '', url: '/dashboard' };
+  try { if (e.data) Object.assign(data, e.data.json()); } catch (err) {}
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: data.url }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/dashboard', self.location.origin).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((list) => {
+        for (const c of list) {
+          if ('focus' in c) { c.focus(); if ('navigate' in c) c.navigate(url); return; }
+        }
+        return self.clients.openWindow(url);
+      })
+  );
+});

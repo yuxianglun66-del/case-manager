@@ -1,0 +1,131 @@
+<div class="page-head">
+  <div>
+    <h1>回收站</h1>
+    <div class="lead">共 <%= total %> 起已删除案件，可在 30 天内恢复</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/cases" class="btn btn-light border"><i class="bi bi-arrow-left"></i> 返回案件列表</a>
+    <button class="btn btn-success" id="btnRestoreSel" disabled><i class="bi bi-arrow-counterclockwise"></i> 恢复所选</button>
+    <button class="btn btn-outline-danger" id="btnEmptyTrash"><i class="bi bi-trash3"></i> 清空回收站</button>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="GET" action="/cases/recycle" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label mb-1">关键词</label>
+        <input type="text" name="kw" class="form-control" placeholder="搜索案号/名称/客户" value="<%= filters.kw %>">
+      </div>
+      <div class="col-12 col-md-auto d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-search"></i> 搜索</button>
+        <a href="/cases/recycle" class="btn btn-light"><i class="bi bi-arrow-counterclockwise"></i> 重置</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" class="form-check-input" id="chkAll"></th>
+            <th>案号</th>
+            <th>案件名称</th>
+            <th>类型</th>
+            <th>状态</th>
+            <th class="hide-mobile">客户</th>
+            <th class="hide-mobile">删除人</th>
+            <th class="hide-mobile">删除时间</th>
+            <th class="text-end">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% deletedCases.forEach(c => { %>
+            <tr>
+              <td><input type="checkbox" class="form-check-input chk-case" value="<%= c.id %>" onclick="updateRestoreSel()"></td>
+              <td class="fw-bold" style="color:var(--bs-primary, #3b82f6) !important; letter-spacing:.3px"><%= c.case_no %></td>
+              <td><%= c.title %></td>
+              <td><span class="type-badge" style="background:<%= c.type_color %>"><%= c.type_name %></span></td>
+              <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_name || '未设置' %></span></td>
+              <td class="hide-mobile"><i class="bi bi-person text-muted me-1"></i><%= c.client_name || '—' %></td>
+              <td class="hide-mobile"><i class="bi bi-person-x text-muted me-1"></i><%= c.deleted_by_name || '—' %></td>
+              <td class="hide-mobile text-muted"><%= c.deleted_at ? new Date(c.deleted_at).toLocaleString('zh-CN') : '' %></td>
+              <td class="text-end" style="white-space:nowrap">
+                <button class="btn btn-ico btn-outline-success" title="恢复案件" onclick="restoreCase(<%= c.id %>, '<%= c.case_no.replace(/[\\'\"<>]/g,'') %>')"><i class="bi bi-arrow-counterclockwise"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="彻底删除" onclick="purgeCase(<%= c.id %>, '<%= c.case_no.replace(/[\\'\"<>]/g,'') %>')"><i class="bi bi-trash3"></i></button>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (deletedCases.length === 0) { %>
+            <tr><td colspan="9" class="empty-tip"><i class="bi bi-inbox"></i>回收站是空的</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+    <% if (totalPages > 1) { %>
+    <div class="d-flex justify-content-between align-items-center p-3 border-top">
+      <small class="text-muted">第 <%= page %> / <%= totalPages %> 页</small>
+      <nav>
+        <ul class="pagination pagination-sm">
+          <% for (let p = 1; p <= totalPages; p++) { %>
+            <li class="page-item <%= p === page ? 'active' : '' %>">
+              <a class="page-link" href="/cases/recycle?page=<%= p %>&kw=<%= encodeURIComponent(filters.kw) %>"><%= p %></a>
+            </li>
+          <% } %>
+        </ul>
+      </nav>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  function selectedIds() {
+    return Array.from(document.querySelectorAll('.chk-case:checked')).map(el => Number(el.value));
+  }
+  function updateRestoreSel() {
+    const n = selectedIds().length;
+    document.getElementById('btnRestoreSel').disabled = n === 0;
+  }
+  document.getElementById('chkAll').addEventListener('change', function () {
+    document.querySelectorAll('.chk-case').forEach(el => { el.checked = this.checked; });
+    updateRestoreSel();
+  });
+  async function restoreCase(id, caseNo) {
+    if (!(await confirmBox('确定恢复案件「' + caseNo + '」？', '恢复案件'))) return;
+    try {
+      await postJSON('/api/cases/' + id + '/restore', {});
+      toast('案件已恢复', 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) { toast(err.message || '恢复失败', 'danger'); }
+  }
+  async function purgeCase(id, caseNo) {
+    if (!(await confirmBox('确定彻底删除案件「' + caseNo + '」？该操作将永久删除案件及所有附件、合同记录，无法恢复。', '彻底删除'))) return;
+    try {
+      await postJSON('/api/cases/' + id + '/delete/permanent', {});
+      toast('案件已彻底删除', 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) { toast(err.message || '删除失败', 'danger'); }
+  }
+  document.getElementById('btnRestoreSel').addEventListener('click', async () => {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    if (!(await confirmBox('确定恢复选中的 ' + ids.length + ' 个案件？', '批量恢复'))) return;
+    try {
+      const data = await postJSON('/api/recycle/restore', { ids });
+      toast(`已恢复 ${data.restored || 0} 个案件`, 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) { toast(err.message || '恢复失败', 'danger'); }
+  });
+  document.getElementById('btnEmptyTrash').addEventListener('click', async () => {
+    if (!(await confirmBox('确定清空回收站？将彻底删除全部 ' + <%= total %> + ' 个已删除案件及其附件、合同记录，无法恢复。', '清空回收站'))) return;
+    try {
+      const data = await postJSON('/api/recycle/empty', {});
+      toast(`已彻底删除 ${data.removed || 0} 个案件`, 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (err) { toast(err.message || '清空失败', 'danger'); }
+  });
+</script>
