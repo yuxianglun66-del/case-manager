@@ -3,10 +3,28 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
-const { hasPermission, PERMISSIONS, ROLES, permissionsOf } = require('../src/permissions');
+const { hasPermission, PERMISSIONS, permissionsOf } = require('../src/permissions');
 
 const router = express.Router();
 router.use(requireLogin);
+
+router.use((req, res, next) => {
+  const p = req.path;
+  let active = '';
+  if (p === '/dashboard') active = 'dashboard';
+  else if (p === '/cases' || p.startsWith('/cases/')) active = p.startsWith('/cases/recycle') ? 'recycle' : 'cases';
+  else if (p === '/reports/finance') active = 'finance';
+  else if (p === '/library') active = 'library';
+  else if (p === '/users') active = 'users';
+  else if (p === '/settings' || p.startsWith('/settings/')) {
+    if (p.startsWith('/settings/backup')) active = 'backup';
+    else if (p.startsWith('/settings/audit')) active = 'audit';
+    else if (p.startsWith('/settings/status')) active = 'status';
+    else active = 'settings';
+  }
+  res.locals.active = active;
+  next();
+});
 
 function canViewAll(user) {
   return hasPermission(user, 'cases.view_all');
@@ -401,18 +419,26 @@ router.get('/users', requirePermission('system.users'), async (req, res, next) =
        FROM users u ORDER BY u.role, u.id`
     );
     const canManageRoles = hasPermission(req.session.user, 'system.roles');
-    const rolePerms = {
-      super_admin: { permissions: PERMISSIONS.map((p) => p.key), locked: true },
-      admin: { permissions: permissionsOf('admin'), locked: false },
-      staff: { permissions: permissionsOf('staff'), locked: false },
-    };
+    const { getRoles } = require('../src/permissions');
+    const allRoles = getRoles(); // [{key,label,color,builtin,sort}]
+    const roleMap = {};
+    for (const r of allRoles) roleMap[r.key] = r;
+    const rolePerms = {};
+    for (const r of allRoles) {
+      if (r.key === 'super_admin') {
+        rolePerms[r.key] = { permissions: PERMISSIONS.map((p) => p.key), locked: true };
+      } else {
+        rolePerms[r.key] = { permissions: permissionsOf(r.key), locked: false };
+      }
+    }
     res.render('users/list', {
       title: '用户管理',
       users,
       canManageRoles,
       rolePerms,
       perms: PERMISSIONS,
-      roles: ROLES,
+      roles: roleMap,
+      roleKeys: allRoles.map((r) => r.key),
     });
   } catch (e) { next(e); }
 });
@@ -617,12 +643,12 @@ router.get('/library', async (req, res, next) => {
     const { rows: catRows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'library_categories'`);
     let categories = [];
     try { categories = JSON.parse(catRows[0]?.value || '[]'); } catch (e) {}
-    res.render('library', { title: '法律法规库', items, categories, canEdit: hasPermission(req.session.user, 'cases.edit') });
+    res.render('library', { title: '法律法规库', items, categories, canEdit: hasPermission(req.session.user, 'library.manage') });
   } catch (e) { next(e); }
 });
 
 /* ---------- 费用/业绩报表 ---------- */
-router.get('/reports/finance', async (req, res, next) => {
+router.get('/reports/finance', requirePermission('reports.view'), async (req, res, next) => {
   try {
     const user = req.session.user;
     const viewAll = canViewAll(user);

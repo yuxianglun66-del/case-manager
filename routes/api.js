@@ -4,7 +4,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { requireLogin, requirePermission, canViewCase } = require('../src/auth');
-const { hasPermission } = require('../src/permissions');
+const { hasPermission, BUILTIN_ROLES, roleExists, createRole, updateRole, deleteRole, getRoleLabel } = require('../src/permissions');
 const { upload, feeUpload, libraryUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf, convertOfficeToPdfCached } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
@@ -876,7 +876,10 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     const displayName = (req.body.display_name || '').trim();
     const password = req.body.password || '';
     const isSuperAdmin = req.session.user.role === 'super_admin';
-    const role = (req.body.role === 'admin' && isSuperAdmin) ? 'admin' : 'staff';
+    const role = (req.body.role || 'staff').trim();
+    if (role === 'super_admin') return res.status(400).json({ error: '不能创建超级管理员账号' });
+    if (role === 'admin' && !isSuperAdmin) return res.status(403).json({ error: '仅超级管理员可创建管理员账号' });
+    if (!roleExists(role)) return res.status(400).json({ error: '角色不存在' });
     const securityQuestion = (req.body.security_question || '').trim();
     const securityAnswer = (req.body.security_answer || '').trim();
     const wecomUserid = (req.body.wecom_userid || '').trim() || null;
@@ -891,7 +894,7 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
       `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer, wecom_userid) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [username, hash, displayName, role, securityQuestion || null, securityAnswer || null, wecomUserid]
     );
-    await audit(req, '新增用户', { entity_type: 'user', entity_id: ins.rows[0].id, detail: '用户名 ' + username + '（' + displayName + '，' + (role === 'admin' ? '管理员' : '服务人员') + '）', after: { username, display_name: displayName, role } });
+    await audit(req, '新增用户', { entity_type: 'user', entity_id: ins.rows[0].id, detail: '用户名 ' + username + '（' + displayName + '，' + getRoleLabel(role) + '）', after: { username, display_name: displayName, role } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -907,10 +910,11 @@ router.post('/users/:id/update', requirePermission('system.users'), async (req, 
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if (target.role === 'super_admin' || target.role === 'admin') {
       if (!isSuperAdmin) return res.status(403).json({ error: '仅超级管理员可管理管理员账号' });
-    } else if (req.body.role === 'admin' && !isSuperAdmin) {
-      return res.status(403).json({ error: '仅超级管理员可创建管理员账号' });
     }
-    const role = target.role === 'super_admin' ? 'super_admin' : ((req.body.role === 'admin' && isSuperAdmin) ? 'admin' : 'staff');
+    const role = target.role === 'super_admin' ? 'super_admin' : ((req.body.role || target.role || 'staff').trim());
+    if (role === 'super_admin') return res.status(400).json({ error: '不能把账号改为超级管理员' });
+    if (role === 'admin' && !isSuperAdmin) return res.status(403).json({ error: '仅超级管理员可将账号设为管理员' });
+    if (!roleExists(role)) return res.status(400).json({ error: '角色不存在' });
     if (target.id === req.session.user.id && target.role === 'super_admin') {
       return res.status(400).json({ error: '不能修改超级管理员账号的权限或停用自己' });
     }
@@ -922,7 +926,7 @@ router.post('/users/:id/update', requirePermission('system.users'), async (req, 
       `UPDATE users SET display_name=$1, role=$2, active=$3, wecom_userid=$4 WHERE id=$5`,
       [displayName, role, active, wecomUserid, id]
     );
-    await audit(req, '更新用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' → ' + displayName + '（角色：' + (role === 'admin' ? '管理员' : '服务人员') + '，' + (active ? '启用' : '停用') + '）', before: { display_name: target.display_name, role: target.role, active: target.active }, after: { display_name: displayName, role, active } });
+    await audit(req, '更新用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' → ' + displayName + '（角色：' + getRoleLabel(role) + '，' + (active ? '启用' : '停用') + '）', before: { display_name: target.display_name, role: target.role, active: target.active }, after: { display_name: displayName, role, active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1026,12 +1030,61 @@ router.post('/roles/permissions', requirePermission('system.roles'), async (req,
   try {
     const role = (req.body.role || '').trim();
     const permissions = Array.isArray(req.body.permissions) ? req.body.permissions : [];
-    if (role !== 'admin' && role !== 'staff') {
-      return res.status(400).json({ error: '仅可配置管理员或员工的权限' });
+    if (role === 'super_admin') {
+      return res.status(400).json({ error: '超级管理员权限固定为全部，不可修改' });
+    }
+    if (!roleExists(role)) {
+      return res.status(400).json({ error: '角色不存在' });
     }
     const { setPermissions } = require('../src/permissions');
     await setPermissions(role, permissions);
-    await audit(req, '更新角色权限', { entity_type: 'role', entity_id: role, detail: '角色「' + (role === 'admin' ? '管理员' : '服务人员') + '」权限：' + (permissions.length ? permissions.join('、') : '（全部移除）') });
+    await audit(req, '更新角色权限', { entity_type: 'role', entity_id: role, detail: '角色「' + getRoleLabel(role) + '」权限：' + (permissions.length ? permissions.join('、') : '（全部移除）') });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+/* ---------- 自定义角色管理 ---------- */
+router.post('/roles/create', requirePermission('system.roles'), async (req, res, next) => {
+  try {
+    const key = (req.body.key || '').trim().toLowerCase();
+    const label = (req.body.label || '').trim();
+    const color = (req.body.color || '#6f42c1').trim();
+    let created;
+    try {
+      created = await createRole(key, label, color);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    await audit(req, '新建角色', { entity_type: 'role', entity_id: created, detail: '角色「' + label + '」（' + key + '）', after: { key, label, color } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/roles/:key/update', requirePermission('system.roles'), async (req, res, next) => {
+  try {
+    const key = (req.params.key || '').trim().toLowerCase();
+    const label = (req.body.label || '').trim();
+    const color = (req.body.color || '#6f42c1').trim();
+    if (!label) return res.status(400).json({ error: '角色名称不能为空' });
+    try {
+      await updateRole(key, label, color);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    await audit(req, '修改角色', { entity_type: 'role', entity_id: key, detail: '角色「' + label + '」（' + key + '）', after: { key, label, color } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/roles/:key/delete', requirePermission('system.roles'), async (req, res, next) => {
+  try {
+    const key = (req.params.key || '').trim().toLowerCase();
+    try {
+      await deleteRole(key);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    await audit(req, '删除角色', { entity_type: 'role', entity_id: key, detail: '删除角色 ' + key });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

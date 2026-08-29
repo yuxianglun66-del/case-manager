@@ -119,6 +119,7 @@
           '.sidebar-nav a,.sidebar-nav a:link{color:' + sMuted + '!important;}' +
           '.sidebar-nav a:hover{color:' + sHoverFg + '!important;}' +
           '.sidebar-nav a.active{color:' + sActiveFg + '!important;}' +
+          '.sidebar-group-label{color:' + sFaint + '!important;}' +
           '.sidebar-brand{color:' + sFg + '!important;}' +
           '.sidebar-brand{border-bottom-color:' + sBorder + '!important;}' +
           '.sidebar-footer{border-top-color:' + sBorder + '!important;background:' + sFootBg + '!important;}' +
@@ -178,13 +179,17 @@
         <span><%= settings?.company_name || '案件管理系统' %></span>
       </div>
       <nav class="sidebar-nav">
+        <div class="sidebar-group-label">业务办理</div>
         <a href="/dashboard" class="<%= _active === 'dashboard' ? 'active' : '' %>"><i class="bi bi-grid-1x2-fill"></i><span>工作看板</span></a>
         <a href="/cases" class="<%= _active === 'cases' ? 'active' : '' %>"><i class="bi bi-folder2-open"></i><span>案件管理</span></a>
+        <% if (_can('reports.view')) { %>
         <a href="/reports/finance" class="<%= _active === 'finance' ? 'active' : '' %>"><i class="bi bi-graph-up"></i><span>费用报表</span></a>
+        <% } %>
+        <a href="/library" class="<%= _active === 'library' ? 'active' : '' %>"><i class="bi bi-book-half"></i><span>法律法规库</span></a>
         <% if (_can('cases.delete')) { %>
           <a href="/cases/recycle" class="<%= _active === 'recycle' ? 'active' : '' %>"><i class="bi bi-trash3"></i><span>回收站</span></a>
         <% } %>
-        <a href="/library" class="<%= _active === 'library' ? 'active' : '' %>"><i class="bi bi-book-half"></i><span>法律法规库</span></a>
+        <div class="sidebar-group-label">系统管理</div>
         <% if (_can('system.users')) { %>
           <a href="/users" class="<%= _active === 'users' ? 'active' : '' %>"><i class="bi bi-people-fill"></i><span>用户管理</span></a>
         <% } %>
@@ -193,7 +198,7 @@
         <% } %>
         <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
           <a href="/settings/status" class="<%= _active === 'status' ? 'active' : '' %>"><i class="bi bi-activity"></i><span>运行状态</span></a>
-          <a href="/settings/backup" class="<%= _active === 'settings' ? 'active' : '' %>"><i class="bi bi-database-fill-down"></i><span>备份与恢复</span></a>
+          <a href="/settings/backup" class="<%= _active === 'backup' ? 'active' : '' %>"><i class="bi bi-database-fill-down"></i><span>备份与恢复</span></a>
           <a href="/settings/audit" class="<%= _active === 'audit' ? 'active' : '' %>"><i class="bi bi-journal-text"></i><span>操作日志</span></a>
         <% } %>
       </nav>

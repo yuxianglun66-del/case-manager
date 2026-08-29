@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   PRIMARY KEY (role, permission)
 );
 
+CREATE TABLE IF NOT EXISTS roles (
+  key VARCHAR(20) PRIMARY KEY,
+  label VARCHAR(50) NOT NULL,
+  color VARCHAR(20) NOT NULL DEFAULT '#6f42c1',
+  builtin BOOLEAN NOT NULL DEFAULT FALSE,
+  sort INT NOT NULL DEFAULT 0
+);
+
 
 CREATE TABLE IF NOT EXISTS case_types (
   id SERIAL PRIMARY KEY,
@@ -513,14 +521,22 @@ async function initDb() {
     const DEFAULT_ROLE_PERMS = {
       admin: [
         'cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
-        'cases.remind', 'cases.fee', 'cases.import_export',
-        'parties.manage', 'attachments.manage', 'contracts.manage',
+        'cases.remind', 'cases.fee', 'cases.import_export', 'cases.batch', 'reports.view',
+        'parties.manage', 'attachments.manage', 'contracts.manage', 'library.manage',
       ],
       staff: [
-        'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee',
+        'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee', 'cases.batch', 'reports.view',
         'parties.manage', 'attachments.manage',
       ],
     };
+    // 种子内置角色元数据
+    await client.query(
+      `INSERT INTO roles (key, label, color, builtin, sort) VALUES
+         ('super_admin', '超级管理员', '#d63384', TRUE, 0),
+         ('admin', '管理员', '#6f42c1', TRUE, 1),
+         ('staff', '员工', '#4361ee', TRUE, 2)
+       ON CONFLICT (key) DO NOTHING`
+    ).catch(() => {});
     for (const [role, perms] of Object.entries(DEFAULT_ROLE_PERMS)) {
       for (const perm of perms) {
         await client.query(

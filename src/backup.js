@@ -8,14 +8,14 @@ const APP_NAME = 'case-manager';
 const BACKUP_VERSION = 1;
 
 const MAIN_TABLES = [
-  'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
+  'roles', 'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
   'contract_templates', 'cases', 'case_field_values', 'case_history',
   'app_settings', 'case_parties', 'contracts', 'contract_signatures',
   'case_fees', 'attachments', 'library_items'
 ];
 
 const RESTORE_ORDER = [
-  'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
+  'roles', 'users', 'role_permissions', 'case_types', 'case_fields', 'statuses',
   'contract_templates', 'cases', 'case_field_values', 'case_history',
   'case_parties', 'contracts', 'contract_signatures', 'case_fees',
   'attachments', 'library_items', 'app_settings'
@@ -131,6 +131,10 @@ async function restoreBackup(file) {
   const dump = JSON.parse(fs.readFileSync(full, 'utf8'));
   if (!dump || dump.app !== APP_NAME || !dump.tables) throw new Error('无效的备份文件');
   for (const t of RESTORE_ORDER) {
+    if (dump.tables[t] === undefined) {
+      if (t === 'roles') continue; // 兼容旧版备份（无 roles 表，恢复后自动补内置角色）
+      throw new Error(`备份文件缺少数据表：${t}`);
+    }
     if (!Array.isArray(dump.tables[t])) throw new Error(`备份文件缺少数据表：${t}`);
   }
   const client = await pool.connect();
@@ -171,6 +175,26 @@ async function restoreBackup(file) {
         if (seqName) {
           const maxId = rows.reduce((m, r) => (typeof r.id === 'number' ? Math.max(m, r.id) : m), 0);
           await client.query(`SELECT setval($1, $2, true)`, [seqName, maxId > 0 ? maxId : 1]);
+        }
+      }
+    }
+    // 兼容旧版备份：roles 表为空且恢复数据未提供时，补齐内置角色与默认权限
+    const roleN = (await client.query(`SELECT COUNT(*)::int AS n FROM roles`)).rows[0].n;
+    if (roleN === 0) {
+      await client.query(
+        `INSERT INTO roles (key, label, color, builtin, sort) VALUES
+         ('super_admin', '超级管理员', '#d63384', TRUE, 0), ('admin', '管理员', '#6f42c1', TRUE, 1), ('staff', '员工', '#4361ee', TRUE, 2)`
+      );
+      const defaults = {
+        admin: ['cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
+          'cases.remind', 'cases.fee', 'cases.import_export', 'cases.batch', 'reports.view',
+          'parties.manage', 'attachments.manage', 'contracts.manage', 'library.manage'],
+        staff: ['cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee', 'cases.batch', 'reports.view',
+          'parties.manage', 'attachments.manage'],
+      };
+      for (const [role, perms] of Object.entries(defaults)) {
+        for (const perm of perms) {
+          await client.query(`INSERT INTO role_permissions (role, permission) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [role, perm]);
         }
       }
     }

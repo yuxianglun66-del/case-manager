@@ -307,7 +307,8 @@ function canViewCase(reqUser, c) {
 }
 
 function setLocalsPerms(user, res) {
-  const roleLabel = (user && ROLES[user.role]) ? ROLES[user.role].label : (user && user.role === 'admin' ? '管理员' : '员工');
+  const { getRoleLabel } = require('./permissions');
+  const roleLabel = user ? getRoleLabel(user.role) : '';
   res.locals.roleLabel = roleLabel;
   res.locals.can = (perm) => hasPermission(user, perm);
 }

@@ -54,18 +54,26 @@
   <div class="card-header d-flex justify-content-between align-items-center">
     <div>
       <h6 class="mb-0"><i class="bi bi-shield-lock"></i> 角色与权限配置</h6>
-      <div class="text-muted small">超级管理员始终拥有全部权限；为「管理员」「员工」勾选可授予的功能与操作，保存后立即生效。</div>
+      <div class="text-muted small">超级管理员始终拥有全部权限；为各角色勾选可授予的功能与操作，保存后立即生效。</div>
     </div>
-    <button class="btn btn-primary btn-sm" id="btnSaveRolePerms"><i class="bi bi-check-lg"></i> 保存权限</button>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-outline-primary btn-sm" id="btnNewRole"><i class="bi bi-plus-lg"></i> 新建角色</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveRolePerms"><i class="bi bi-check-lg"></i> 保存权限</button>
+    </div>
   </div>
   <div class="card-body">
     <div class="row g-3">
       <% Object.entries(rolePerms).forEach(([rkey, rp]) => { %>
         <div class="col-lg-4">
           <div class="card h-100">
-            <div class="card-header py-2">
+            <div class="card-header py-2 d-flex align-items-center gap-1">
               <span class="type-badge" style="background:<%= roles[rkey].color %>"><%= roles[rkey].label %></span>
-              <% if (rp.locked) { %><span class="text-muted small ms-1">全部权限（不可修改）</span><% } %>
+              <% if (rp.locked) { %><span class="text-muted small ms-1">全部权限</span><% } %>
+              <span class="ms-auto"></span>
+              <% if (roles[rkey] && !roles[rkey].builtin) { %>
+                <button class="btn btn-ico btn-sm btn-light" title="编辑角色" onclick="editRole('<%= rkey %>')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-sm btn-outline-danger" title="删除角色" onclick="delRole('<%= rkey %>', '<%= roles[rkey].label %>')"><i class="bi bi-trash"></i></button>
+              <% } %>
             </div>
             <div class="card-body p-2" style="max-height:360px;overflow:auto">
               <% let curGroup = ''; %>
@@ -90,6 +98,40 @@
   </div>
 </div>
 <% } %>
+
+<!-- 新建/编辑角色 -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="roleForm">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="roleModalTitle">新建角色</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">角色标识（唯一，创建后不可修改）</label>
+            <input type="text" class="form-control" id="rKey" placeholder="如：paralegal" autocomplete="off" pattern="[a-z][a-z0-9_]{1,19}">
+            <div class="form-text">小写字母开头，可含数字和下划线，2-20 位；用于系统内部识别</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">角色名称</label>
+            <input type="text" class="form-control" id="rLabel" placeholder="如：律师助理">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">颜色</label>
+            <input type="color" class="form-control form-control-color" id="rColor" value="#6f42c1" style="width:60px;height:38px">
+          </div>
+          <div class="text-muted small">创建后可在上方权限列表中为其勾选权限，并在用户编辑时指派给账号。</div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- 新增/编辑用户 -->
 <div class="modal fade" id="userModal" tabindex="-1">
@@ -127,8 +169,9 @@
           <div class="mb-3">
             <label class="form-label">角色</label>
             <select name="role" id="uRole" class="form-select">
-              <option value="staff">员工（仅操作自己负责的案件，权限可配置）</option>
-              <option value="admin">管理员（业务功能全开，系统管理权限可配置）</option>
+              <% roleKeys.forEach(rk => { if (rk !== 'super_admin') { const r = roles[rk]; const desc = r && r.builtin ? (rk === 'admin' ? '业务功能全开，系统管理权限可配置' : '仅操作自己负责的案件，权限可配置') : '自定义角色，权限可配置'; %>
+                <option value="<%= rk %>"><%= r.label %>（<%= desc %>）</option>
+              <% } }) %>
             </select>
             <div class="form-text" id="uRoleHint"></div>
           </div>
@@ -228,6 +271,8 @@
 </div>
 
 <script>
+  const ROLE_KEYS = <%- JSON.stringify(roleKeys || []) %>;
+  const ROLE_MAP = <%- JSON.stringify(roles || {}) %>;
   let editingUserId = null;
   let editingOrigRole = null;
   let editingOrigActive = true;
@@ -376,11 +421,57 @@
   });
 
   <% if (canManageRoles) { %>
+  let editingRoleKey = null;
+  function openCreateRole() {
+    editingRoleKey = null;
+    document.getElementById('roleModalTitle').textContent = '新建角色';
+    document.getElementById('roleForm').reset();
+    document.getElementById('rKey').disabled = false;
+    document.getElementById('rColor').value = '#6f42c1';
+    new bootstrap.Modal(document.getElementById('roleModal')).show();
+  }
+  function editRole(key) {
+    editingRoleKey = key;
+    const r = ROLE_MAP[key] || {};
+    document.getElementById('roleModalTitle').textContent = '编辑角色';
+    document.getElementById('rKey').value = key;
+    document.getElementById('rKey').disabled = true;
+    document.getElementById('rLabel').value = r.label || '';
+    document.getElementById('rColor').value = r.color || '#6f42c1';
+    new bootstrap.Modal(document.getElementById('roleModal')).show();
+  }
+  async function delRole(key, label) {
+    if (!(await confirmBox('删除角色「' + label + '」？拥有该角色的用户需先调整到其他角色，其权限配置将一并清除。', '删除角色'))) return;
+    try {
+      await postJSON('/api/roles/' + key + '/delete', {});
+      toast('角色已删除', 'success');
+      setTimeout(() => location.reload(), 300);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+  document.getElementById('btnNewRole').addEventListener('click', openCreateRole);
+  document.getElementById('roleForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = document.getElementById('rKey').value.trim().toLowerCase();
+    const label = document.getElementById('rLabel').value.trim();
+    if (!/^[a-z][a-z0-9_]{1,19}$/.test(key)) return toast('角色标识须为小写字母开头，2-20 位', 'danger');
+    if (!label) return toast('角色名称不能为空', 'danger');
+    try {
+      if (editingRoleKey) {
+        await postJSON('/api/roles/' + editingRoleKey + '/update', { label, color: document.getElementById('rColor').value });
+      } else {
+        await postJSON('/api/roles/create', { key, label, color: document.getElementById('rColor').value });
+      }
+      bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
+      toast(editingRoleKey ? '角色已更新' : '角色已创建', 'success');
+      setTimeout(() => location.reload(), 400);
+    } catch (err) { toast(err.message || '保存失败', 'danger'); }
+  });
+
   document.getElementById('btnSaveRolePerms').addEventListener('click', async () => {
     const btn = document.getElementById('btnSaveRolePerms');
     btn.disabled = true;
     try {
-      const rolesToSave = ['admin', 'staff'];
+      const rolesToSave = ROLE_KEYS.filter((k) => k !== 'super_admin');
       for (const role of rolesToSave) {
         const perms = Array.from(document.querySelectorAll('.perm-cb[data-role="' + role + '"]:checked')).map((cb) => cb.value);
         await postJSON('/api/roles/permissions', { role, permissions: perms });
