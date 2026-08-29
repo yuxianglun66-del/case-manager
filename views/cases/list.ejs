@@ -19,22 +19,34 @@
   </div>
 </div>
 
+<% const hasFilter = !!(filters.kw || filters.type || filters.status || filters.assignee || filters.date_from || filters.date_to); %>
+<% const filterCount = [filters.kw, filters.type, filters.status, filters.assignee, (filters.date_from || filters.date_to)].filter(Boolean).length; %>
 <div class="card mb-3">
   <div class="card-body py-2">
-    <div class="d-flex flex-wrap gap-2">
-      <a href="/cases" class="btn btn-sm <%= !filters.cat ? 'btn-primary' : 'btn-outline-secondary' %>">全部案件</a>
-      <a href="/cases?cat=pending" class="btn btn-sm <%= filters.cat === 'pending' ? 'btn-primary' : 'btn-outline-secondary' %>">待受理</a>
-      <a href="/cases?cat=processing" class="btn btn-sm <%= filters.cat === 'processing' ? 'btn-primary' : 'btn-outline-secondary' %>">处理中</a>
-      <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
-      <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案/归档</a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="btn-group flex-wrap" role="group" aria-label="状态分类">
+        <a href="/cases" class="btn btn-sm <%= !filters.cat ? 'btn-primary' : 'btn-outline-secondary' %>">全部案件</a>
+        <a href="/cases?cat=pending" class="btn btn-sm <%= filters.cat === 'pending' ? 'btn-primary' : 'btn-outline-secondary' %>">待受理</a>
+        <a href="/cases?cat=processing" class="btn btn-sm <%= filters.cat === 'processing' ? 'btn-primary' : 'btn-outline-secondary' %>">处理中</a>
+        <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
+        <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案/归档</a>
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterForm" aria-expanded="<%= hasFilter ? 'true' : 'false' %>" aria-controls="filterForm">
+          <i class="bi bi-funnel"></i> 筛选
+          <% if (filterCount) { %><span class="badge rounded-pill text-bg-primary ms-1"><%= filterCount %></span><% } %>
+        </button>
+        <% if (can('cases.edit')) { %>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#batchPanel" aria-expanded="false" aria-controls="batchPanel">
+          <i class="bi bi-check2-square"></i> 批量操作
+          <span class="badge rounded-pill text-bg-primary ms-1" id="batchCountBadge" style="display:none">0</span>
+        </button>
+        <% } %>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="card mb-3">
-  <div class="card-header py-2"><i class="bi bi-funnel"></i> 筛选案件</div>
-  <div class="card-body py-3">
-    <form method="GET" action="/cases" class="row g-2 align-items-end">
+    <!-- 筛选条件（可折叠） -->
+    <form method="GET" action="/cases" class="row g-2 align-items-end collapse <%= hasFilter ? 'show' : '' %> mt-3" id="filterForm">
       <div class="col-12 col-md-4 col-lg-3">
         <label class="form-label mb-1">关键词</label>
         <input type="text" name="kw" class="form-control" placeholder="搜索案号/名称/客户" value="<%= filters.kw %>">
@@ -81,29 +93,30 @@
         <a href="/cases" class="btn btn-light"><i class="bi bi-arrow-counterclockwise"></i> 重置</a>
       </div>
     </form>
-  </div>
-</div>
 
-<% if (can('cases.edit')) { %>
-<div class="card mb-3">
-  <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
-    <span class="text-muted small me-1"><i class="bi bi-check2-square"></i> 批量操作：</span>
-    <select id="batchStatus" class="form-select form-select-sm" style="width:150px">
-      <option value="">变更状态…</option>
-      <% statuses.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
-    </select>
-    <button class="btn btn-sm btn-primary" id="btnBatchStatus">应用状态</button>
-    <% if (can('cases.view_all') && can('cases.assign') && staff.length) { %>
-    <select id="batchAssignee" class="form-select form-select-sm" style="width:160px">
-      <option value="">分配负责人…</option>
-      <% staff.forEach(s => { %><option value="<%= s.id %>"><%= s.display_name %></option><% }) %>
-    </select>
-    <button class="btn btn-sm btn-outline-primary" id="btnBatchAssignee">分配</button>
+    <% if (can('cases.edit')) { %>
+    <!-- 批量操作（可折叠） -->
+    <div class="collapse mt-3" id="batchPanel">
+      <div class="d-flex flex-wrap gap-2 align-items-center p-2 rounded" style="background:var(--surface-elevated);border:1px dashed var(--content-border)">
+        <span class="text-muted small"><i class="bi bi-check2-square"></i> 已选 <b id="batchCount">0</b> 项</span>
+        <select id="batchStatus" class="form-select form-select-sm" style="width:150px">
+          <option value="">变更状态…</option>
+          <% statuses.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+        </select>
+        <button class="btn btn-sm btn-primary" id="btnBatchStatus">应用状态</button>
+        <% if (can('cases.view_all') && can('cases.assign') && staff.length) { %>
+        <select id="batchAssignee" class="form-select form-select-sm" style="width:160px">
+          <option value="">分配负责人…</option>
+          <% staff.forEach(s => { %><option value="<%= s.id %>"><%= s.display_name %></option><% }) %>
+        </select>
+        <button class="btn btn-sm btn-outline-primary" id="btnBatchAssignee">分配</button>
+        <% } %>
+        <button class="btn btn-sm btn-light ms-auto" id="btnClearSel"><i class="bi bi-x-lg"></i> 取消选择</button>
+      </div>
+    </div>
     <% } %>
-    <span class="badge rounded-pill border text-muted" id="batchCount" style="background:var(--surface)"><i class="bi bi-square-check"></i> 已选 0 项</span>
   </div>
 </div>
-<% } %>
 
 <div class="card">
   <div class="card-body p-0">
@@ -208,12 +221,28 @@
     return Array.from(document.querySelectorAll('.chk-case:checked')).map(el => Number(el.value));
   }
   function updateBatchBar() {
+    const n = selectedCaseIds().length;
     const el = document.getElementById('batchCount');
-    if (el) el.textContent = '✔ ' + selectedCaseIds().length + ' 项';
+    if (el) el.textContent = String(n);
+    const badge = document.getElementById('batchCountBadge');
+    if (badge) {
+      badge.textContent = String(n);
+      badge.style.display = n ? '' : 'none';
+    }
+    const panel = document.getElementById('batchPanel');
+    if (panel && n && !panel.classList.contains('show')) {
+      bootstrap.Collapse.getOrCreateInstance(panel).show();
+    }
   }
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('chkAllCases')?.addEventListener('change', function () {
       document.querySelectorAll('.chk-case').forEach(el => { el.checked = this.checked; });
+      updateBatchBar();
+    });
+    document.getElementById('btnClearSel')?.addEventListener('click', () => {
+      document.querySelectorAll('.chk-case').forEach(el => { el.checked = false; });
+      const all = document.getElementById('chkAllCases');
+      if (all) all.checked = false;
       updateBatchBar();
     });
     document.getElementById('btnBatchStatus')?.addEventListener('click', async () => {
