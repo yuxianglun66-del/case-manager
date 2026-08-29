@@ -86,9 +86,9 @@
       var pinch = null;
 
       function clampZ(z) { return Math.min(MAXZ, Math.max(MINZ, z)); }
-      function showFallback() {
+      function showNativeIframe() {
         if (loading) loading.style.display = 'none';
-        if (fallback) fallback.style.display = 'flex';
+        if (fallback) fallback.style.display = 'none';
         var iframe = document.getElementById('nativePreview');
         if (iframe) {
           iframe.style.display = 'block';
@@ -200,6 +200,13 @@
       });
 
       if (!isImage) {
+        var pdfB64 = <%= pdfB64 ? '"' + pdfB64 + '"' : 'null' %>;
+        function base64ToUint8Array(b64) {
+          var raw = atob(b64);
+          var arr = new Uint8Array(raw.length);
+          for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+          return arr;
+        }
         <% if (isLibrary) { %>
         var url = '/api/library/<%= att.id.replace("lib-","") %>/preview-file';
         <% } else { %>
@@ -213,8 +220,12 @@
         }
         if (window.pdfjsLib) {
           pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
-          load({ url: url })
-            .catch(function () { return load({ url: url, disableWorker: true, isEvalSupported: false }); })
+          var firstOpts = pdfB64 ? { data: base64ToUint8Array(pdfB64) } : { url: url };
+          load(firstOpts)
+            .catch(function (e) {
+              if (pdfB64) { pdfB64 = null; return showNativeIframe(); }
+              return load({ url: url, disableWorker: true, isEvalSupported: false });
+            })
             .catch(function () { showFallback(); });
         } else {
           showFallback();

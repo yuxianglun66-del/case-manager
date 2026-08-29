@@ -779,7 +779,14 @@ router.get('/attachments/:id/preview', async (req, res, next) => {
     const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
 
     if (isImage || isPdf || isWord || isExcel) {
-      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, isExcel, layout: false, isLibrary: false });
+      // P1: PDF 内嵌 base64 直传 pdf.js（规避客户端拦截器拦 /api/ 子请求）：
+      // Word/Excel 仍走 preview-file 转换；图片走 /file 内联。
+      let pdfB64 = '';
+      if (isPdf) {
+        try { pdfB64 = fs.readFileSync(fp).toString('base64'); }
+        catch (e) { pdfB64 = ''; }
+      }
+      res.render('cases/preview', { att, caseId: caseRow.id, isImage, isPdf, isWord, isExcel, pdfB64, layout: false, isLibrary: false });
     } else {
       // 其他类型直接内联流式传输，浏览器若支持则预览，否则下载
       serveAttachment(req, res, true).catch(next);
