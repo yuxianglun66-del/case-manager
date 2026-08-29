@@ -2231,7 +2231,11 @@ router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
     const isWord = mime.includes('wordprocessing') || mime === 'application/msword' || /\.(docx?|wps|rtf)$/.test(lower);
     const isExcel = mime.includes('spreadsheet') || mime === 'application/vnd.ms-excel' || /\.(xlsx?|csv)$/.test(lower);
     if (isImage || isPdf) {
-      res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord: false, isExcel: false, layout: false, isLibrary: true });
+      let pdfB64 = null;
+      if (isPdf) {
+        try { pdfB64 = fs.readFileSync(fp).toString('base64'); } catch (e) { pdfB64 = null; }
+      }
+      res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: mime }, caseId: 0, isImage, isPdf, isWord: false, isExcel: false, layout: false, isLibrary: true, pdfB64 });
     } else if (isWord || isExcel) {
       const cached = fp + '.preview.pdf';
       let converted = false;
@@ -2239,7 +2243,9 @@ router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
         try { await convertOfficeToPdfCached(fp, cached); converted = true; } catch (e) { /* 转换失败 */ }
       } else { converted = true; }
       if (converted && fs.existsSync(cached)) {
-        res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: 'application/pdf' }, caseId: 0, isImage: false, isPdf: true, isWord: false, isExcel: false, layout: false, isLibrary: true });
+        let pdfB64 = null;
+        try { pdfB64 = fs.readFileSync(cached).toString('base64'); } catch (e) { pdfB64 = null; }
+        res.render('cases/preview', { att: { id: 'lib-' + item.id, original_name: item.file_original_name, mime_type: 'application/pdf' }, caseId: 0, isImage: false, isPdf: true, isWord: false, isExcel: false, layout: false, isLibrary: true, pdfB64 });
       } else {
         const ct = contentTypeFor(item.file_original_name);
         res.setHeader('Content-Type', ct);

@@ -101,6 +101,7 @@
         }
       }
       function showPdf() { if (wrap) wrap.style.display = 'block'; if (loading) loading.style.display = 'none'; }
+      function showFallback() { showNativeIframe(); }
       function updateZoomUI() {
         var l = document.getElementById('zoomLabel');
         if (l) l.textContent = Math.round(stateZoom * 100) + '%';
