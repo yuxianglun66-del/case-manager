@@ -35,8 +35,9 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     volumes:
-      - uploads:/app/uploads
-      - backups:/app/backups
+      # 默认使用命名卷；如需复用宿主目录（如旧实例遗留数据），设置 UPLOADS_DIR=/mnt/case-manager/uploads
+      - ${UPLOADS_DIR:-uploads}:/app/uploads
+      - ${BACKUPS_DIR:-backups}:/app/backups
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/healthz || exit 1"]
       interval: 30s
