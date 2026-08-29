@@ -200,7 +200,7 @@
       });
 
       if (!isImage) {
-        var pdfB64 = <%= pdfB64 ? '"' + pdfB64 + '"' : 'null' %>;
+        var pdfB64 = <%- (typeof pdfB64 === 'string' && pdfB64) ? JSON.stringify(pdfB64) : 'null' %>;
         function base64ToUint8Array(b64) {
           var raw = atob(b64);
           var arr = new Uint8Array(raw.length);
