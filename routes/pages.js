@@ -602,7 +602,7 @@ router.get('/settings/status', async (req, res, next) => {
       config,
       notify: notifyRow.rows[0],
       caseCount: caseRow.rows[0].n,
-      reminderCount: remRow.rows[0].n,
+      reminderCount: remRow.n,
       isProd: process.env.NODE_ENV === 'production',
       envHasAppUrl: !!process.env.APP_URL,
     });
@@ -625,7 +625,7 @@ router.get('/library', async (req, res, next) => {
 router.get('/reports/finance', async (req, res, next) => {
   try {
     const user = req.session.user;
-    const canViewAll = canViewAll(user);
+    const viewAll = canViewAll(user);
     const dateFrom = (req.query.date_from || '').trim();
     const dateTo = (req.query.date_to || '').trim();
     const assigneeId = parseInt(req.query.assignee, 10) || null;
@@ -637,8 +637,8 @@ router.get('/reports/finance', async (req, res, next) => {
     let p = 0;
     if (dateFrom) { cParams.push(dateFrom); cWhere.push(`c.sign_date >= $${++p}`); }
     if (dateTo) { cParams.push(dateTo); cWhere.push(`c.sign_date <= $${++p}`); }
-    if (assigneeId && canViewAll) { cParams.push(assigneeId); cWhere.push(`c.assignee_id = $${++p}`); }
-    if (!canViewAll) { cParams.push(user.id); cWhere.push(`(c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`); }
+    if (assigneeId && viewAll) { cParams.push(assigneeId); cWhere.push(`c.assignee_id = $${++p}`); }
+    if (!viewAll) { cParams.push(user.id); cWhere.push(`(c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`); }
     const cWhereSql = cWhere.length
       ? `WHERE ${cWhere.join(' AND ')} AND c.deleted_at IS NULL`
       : 'WHERE c.deleted_at IS NULL';
@@ -674,7 +674,7 @@ router.get('/reports/finance', async (req, res, next) => {
     if (dateTo) { fParams.push(dateTo); fWhere.push(`f.created_at < ($${++p}::date + INTERVAL '1 day')`); }
     if (feeType) { fParams.push(feeType); fWhere.push(`f.fee_type = $${++p}`); }
     let fScopeSql = '';
-    if (!canViewAll) { fParams.push(user.id); fScopeSql = ` AND (c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`; }
+    if (!viewAll) { fParams.push(user.id); fScopeSql = ` AND (c.assignee_id = $${++p} OR c.sign_staff_id = $${++p})`; }
     else if (assigneeId) { fParams.push(assigneeId); fScopeSql = ` AND c.assignee_id = $${++p}`; }
     const fWhereSql = fWhere.length ? `WHERE ${fWhere.join(' AND ')}` : 'WHERE 1=1';
 
@@ -724,7 +724,7 @@ router.get('/reports/finance', async (req, res, next) => {
     )).rows;
 
     const freqFeeTypes = (await pool.query(`SELECT DISTINCT fee_type FROM case_fees ORDER BY fee_type`)).rows.map(r => r.fee_type);
-    const staff = canViewAll ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows : [];
+    const staff = viewAll ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows : [];
     const FEE_TYPE_NAMES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
 
     const fmt = (n) => { const v = parseFloat(n) || 0; return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: 2 }); };
@@ -734,7 +734,7 @@ router.get('/reports/finance', async (req, res, next) => {
       title: '费用报表',
       filters: { date_from: dateFrom, date_to: dateTo, assignee: assigneeId, fee_type: feeType },
       caseStats, byStaff, feeSummary, byFeeType, byStaffFee, feeRows,
-      staff, freqFeeTypes, FEE_TYPE_NAMES, canViewAll,
+      staff, freqFeeTypes, FEE_TYPE_NAMES, canViewAll: viewAll,
       fmt, rate,
     });
   } catch (e) { next(e); }
