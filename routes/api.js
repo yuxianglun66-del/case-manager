@@ -442,8 +442,8 @@ router.post('/cases/:id/next-action', requirePermission('cases.remind'), needCas
     );
     await audit(req, '更新下一步流程', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + ' 下一步：' + (nextAction || '（空）'), before: { next_action: req.caseRow.next_action, reminder_at: req.caseRow.reminder_at }, after: { next_action: nextAction, reminder_at: reminderAt } });
     if (req.caseRow.assignee_id) {
-      const dateHint = reminderAt ? '，提醒时间：' + new Date(reminderAt).toLocaleDateString('zh-CN') : '';
-      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已设置下一步流程' + dateHint + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      const dateHint = reminderAt ? '\n⏰ 提醒时间：' + new Date(reminderAt).toLocaleString('zh-CN', { hour12: false }) : '';
+      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」设置了下一步流程' + dateHint + '\n📝 下一步内容：' + (nextAction || '（未填写）') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true });
   } catch (e) { next(e); }
