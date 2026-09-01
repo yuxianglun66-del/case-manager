@@ -157,7 +157,7 @@
             <tbody>
               <% recent.forEach(c => { %>
                 <tr class="row-link" onclick="location.href='/cases/<%= c.id %>'">
-                  <td class="fw-semibold"><%= c.case_no %></td>
+                  <td class="fw-bold" style="color:var(--bs-primary, #3b82f6) !important; letter-spacing:.3px"><%= c.case_no %></td>
                   <td><%= c.title %></td>
                   <td><span class="type-badge" style="background:<%= c.type_color %>"><%= c.type_name %></span></td>
                   <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_name || '未设置' %></span></td>
