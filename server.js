@@ -124,12 +124,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'case-manager-session-secret',
   resave: false,
   saveUninitialized: false,
-  // H7: 会话空闲超时（滑动窗口）：连续 60 分钟无操作自动过期
+  // H7: 会话空闲超时（滑动窗口）：连续 24 小时无操作自动过期
   rolling: true,
   cookie: {
     httpOnly: true,
     sameSite: 'strict',
-    maxAge: 60 * 60 * 1000,
+    maxAge: 24 * 60 * 60 * 1000,
     secure: isProd,
   },
 }));

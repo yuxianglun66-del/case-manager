@@ -126,17 +126,34 @@
       el.classList.toggle('active', el.dataset.uiTheme === themeKey);
     });
     if (opts.save) {
+      const payload = {
+        theme_mode: theme.mode,
+        theme_primary: theme.primary,
+        theme_sidebar: theme.sidebar,
+        bg_gradient: theme.bg,
+      };
+      let saved = false;
       try {
-        await window.postJSON('/api/settings', {
-          theme_mode: theme.mode,
-          theme_primary: theme.primary,
-          theme_sidebar: theme.sidebar,
-          bg_gradient: theme.bg,
-        });
+        await window.postJSON('/api/settings', payload);
+        saved = true;
+      } catch (firstErr) {
+        /* 会话/CSRF 失效时，刷新页面 CSRF token 后重试一次 */
+        if (firstErr && (firstErr.message === 'CSRF 令牌无效' || firstErr.message === '未登录' || firstErr.message === '请求失败')) {
+          try {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            const r = await fetch(location.href, { credentials: 'same-origin' });
+            const html = await r.text();
+            const m = html.match(/csrf-token[^>]*content="([^"]+)"/);
+            if (m && meta) meta.setAttribute('content', m[1]);
+            await window.postJSON('/api/settings', payload);
+            saved = true;
+          } catch (_) { /* 重试也失败，走下面的提示 */ }
+        }
+      }
+      if (saved) {
         if (typeof window.toast === 'function') window.toast(`主题已切换为「${theme.name}」并设为默认`, 'success');
-      } catch (err) {
-        if (typeof window.toast === 'function') window.toast('本地已切换，但保存全局默认失败：' + err.message, 'warning');
-        throw err;
+      } else {
+        if (typeof window.toast === 'function') window.toast('本地已切换，但保存全局默认失败，请刷新页面后重试', 'warning');
       }
     } else {
       if (typeof window.toast === 'function') window.toast(`主题已切换为「${theme.name}」（仅自己本次会话）`, 'success');
