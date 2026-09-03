@@ -52,7 +52,10 @@ async function postJSON(url, data, opts) {
     ...opts,
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.error || '请求失败');
+  if (!res.ok) {
+    console.error('[postJSON]', url, res.status, j);
+    throw new Error(j.error || ('请求失败 HTTP ' + res.status));
+  }
   return j;
 }
 
