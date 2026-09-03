@@ -261,6 +261,10 @@ function createAuthRouter(loginLimiter) {
 }
 
 // ====== M6: DEMO 模式只在非生产环境允许 ======
+function isApi(req) {
+  return (req.originalUrl || req.url || '').startsWith('/api');
+}
+
 function requireLogin(req, res, next) {
   if (process.env.DEMO === '1' && process.env.NODE_ENV !== 'production') {
     return next();
@@ -268,7 +272,7 @@ function requireLogin(req, res, next) {
   if (req.session && req.session.userId) {
     return next();
   }
-  if (req.path.startsWith('/api/')) {
+  if (isApi(req)) {
     return res.status(401).json({ error: '未登录' });
   }
   return res.redirect('/login');
@@ -285,11 +289,11 @@ function requirePermission(perm) {
       return next();
     }
     if (!req.session.userId) {
-      if (req.path.startsWith('/api/')) return res.status(401).json({ error: '未登录' });
+      if (isApi(req)) return res.status(401).json({ error: '未登录' });
       return res.redirect('/login');
     }
     if (hasPermission(req.session.user, perm)) return next();
-    if (req.path.startsWith('/api/')) {
+    if (isApi(req)) {
       return res.status(403).json({ error: '没有执行该操作的权限' });
     }
     return res.status(403).render('error', {

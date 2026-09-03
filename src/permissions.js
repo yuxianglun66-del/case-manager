@@ -35,6 +35,7 @@ const DEFAULT_PERMS = {
     'cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
     'cases.remind', 'cases.fee', 'cases.import_export', 'cases.batch', 'reports.view',
     'parties.manage', 'attachments.manage', 'contracts.manage', 'library.manage',
+    'system.settings',
   ],
   staff: [
     'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee', 'cases.batch', 'reports.view',
