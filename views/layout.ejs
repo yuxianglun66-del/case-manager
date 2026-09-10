@@ -113,6 +113,7 @@
         root.style.setProperty('--content-muted', cMuted);
         root.style.setProperty('--content-faint', cFaint);
         root.style.setProperty('--content-border', cBorder);
+        root.style.setProperty('--text-color', cFg);
         // 直接写入解析后颜色，规避浏览器对 var 依赖的延迟重算，保证文字始终清晰
         var css = '' +
           '.sidebar{background:' + sidebar + '!important;color:' + sFaint + '!important;}' +
@@ -139,9 +140,9 @@
           '.fw-semibold,.fw-bold,.fw-medium{color:' + cFg + '!important;}' +
           '.lead{color:' + cMuted + '!important;}' +
           '.page-head h1{color:' + cFg + '!important;}' +
-          '.btn-light{color:' + cFg + '!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
+          '.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
           '.btn-outline-secondary{color:' + cMuted + '!important;border-color:' + cBorder + '!important;}' +
-          '.btn-ico.btn-light{color:' + cFg + '!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
+          '.btn-ico.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.06)' : '#ffffff') + '!important;border-color:' + cBorder + '!important;}' +
           '.info-label{color:' + cMuted + '!important;}' +
           '.info-value{color:' + cFg + '!important;}' +
           '.file-item{background:var(--surface)!important;border-color:' + cBorder + '!important;color:' + cFg + '!important;}' +
@@ -167,7 +168,16 @@
   </script>
 </head>
 <body style="background: var(--body-bg-gradient);">
-  <script>if (window.applyThemeContrast) window.applyThemeContrast();</script>
+  <script>
+    (function () {
+      var saved = localStorage.getItem('themeMode');
+      var mode = saved || '<%= (settings && settings.theme_mode) || "light" %>';
+      if (mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.body.classList.add('theme-dark');
+      }
+    })();
+    if (window.applyThemeContrast) window.applyThemeContrast();
+  </script>
   <div class="app-shell">
     <aside class="sidebar d-print-none">
       <div class="sidebar-brand">
@@ -254,14 +264,10 @@
   </div>
   <script>
     (function() {
-      const saved = localStorage.getItem('themeMode');
-      const mode = saved || '<%= settings?.theme_mode || "light" %>';
-      if (mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.body.classList.add('theme-dark');
-      }
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
         if (localStorage.getItem('themeMode') === 'auto' || !localStorage.getItem('themeMode')) {
           document.body.classList.toggle('theme-dark', e.matches);
+          if (window.applyThemeContrast) window.applyThemeContrast();
         }
       });
     })();
