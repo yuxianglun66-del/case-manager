@@ -26,7 +26,7 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <% if (can('cases.edit')) { %>
-    <a href="/cases/<%= caseData.id %>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> 编辑</a>
+    <a href="/cases/<%= caseData.id %>/edit" class="btn btn-outline-primary"><i class="bi bi-pencil-fill"></i> 编辑</a>
     <% } %>
     <a href="/cases" class="btn btn-light"><i class="bi bi-arrow-left"></i> 返回</a>
   </div>
@@ -129,7 +129,7 @@
                     </div>
                     <div class="d-flex gap-1 flex-shrink-0">
                       <% if (can('parties.manage')) { %>
-                      <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(<%= p.id %>)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(<%= p.id %>)"><i class="bi bi-pencil-fill"></i></button>
                       <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delParty(<%= p.id %>, '<%= p.name.replace(/[\\'\"<>]/g, '') %>')"><i class="bi bi-trash"></i></button>
                       <% } %>
                     </div>
@@ -470,7 +470,7 @@
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-arrow-repeat"></i> 下一步流程</span>
         <% if (can('cases.remind')) { %>
-        <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-pencil"></i> 更新</button>
+        <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-pencil-fill"></i> 更新</button>
         <% } %>
       </div>
       <div class="card-body py-2">
@@ -836,7 +836,7 @@
           '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
             (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
-            (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ' : '') +
+            (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil-fill"></i></button> ' : '') +
             (CAN_DELETE_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
           '</td></tr>').join('') +
         '</tbody></table></div>';
@@ -955,7 +955,7 @@
               </div>
               <div class="d-flex gap-1 flex-shrink-0">
                 ${CAN_MANAGE_PARTIES ? `
-                <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-light" title="编辑" onclick="openPartyEdit(${p.id})"><i class="bi bi-pencil-fill"></i></button>
                 <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delParty(${p.id}, '${p.name.replace(/[\\'"<>]/g, '')}')"><i class="bi bi-trash"></i></button>` : ''}
               </div>
             </div>

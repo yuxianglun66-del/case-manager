@@ -32,7 +32,7 @@
               <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= u.case_count %></span></td>
               <td class="hide-mobile text-muted"><%= new Date(u.created_at).toLocaleDateString('zh-CN') %></td>
               <td class="text-end">
-                <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>, '<%= (u.wecom_userid || "").replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>, '<%= (u.wecom_userid || "").replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-pencil-fill"></i></button>
                 <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-key"></i></button>
                 <button class="btn btn-ico btn-light" title="设置安全问题" onclick="editSecurityQuestion(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-question-circle"></i></button>
                 <button class="btn btn-ico btn-outline-danger" title="停用" onclick="disableUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-person-x"></i></button>
@@ -71,7 +71,7 @@
               <% if (rp.locked) { %><span class="text-muted small ms-1">全部权限</span><% } %>
               <span class="ms-auto"></span>
               <% if (roles[rkey] && !roles[rkey].builtin) { %>
-                <button class="btn btn-ico btn-sm btn-light" title="编辑角色" onclick="editRole('<%= rkey %>')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-ico btn-sm btn-light" title="编辑角色" onclick="editRole('<%= rkey %>')"><i class="bi bi-pencil-fill"></i></button>
                 <button class="btn btn-ico btn-sm btn-outline-danger" title="删除角色" onclick="delRole('<%= rkey %>', '<%= roles[rkey].label %>')"><i class="bi bi-trash"></i></button>
               <% } %>
             </div>

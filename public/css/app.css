@@ -606,6 +606,7 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--radius-sm); transition: all .2s;
 }
+.btn-ico .bi { font-size: 1.08em; line-height: 1; }
 .btn-ico.btn-light {
   background: rgba(59, 130, 246, .06);
   border: 1px solid rgba(59, 130, 246, .12);
