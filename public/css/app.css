@@ -332,7 +332,7 @@ a:hover { color: var(--bs-link-hover-color); }
 /* ============================================================
    表格 — 科技风
    ============================================================ */
-.table { font-size: 14px; --bs-table-hover-bg: rgba(59,130,246,.06); margin-bottom: 0; color: var(--text-color); }
+.table { font-size: 14px; --bs-table-bg: transparent; --bs-table-hover-bg: rgba(59,130,246,.06); margin-bottom: 0; color: var(--text-color); background-color: transparent; }
 .table thead th {
   background: rgba(59, 130, 246, .06);
   color: var(--content-muted);
