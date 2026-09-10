@@ -79,6 +79,7 @@ const EVENT_TITLES = {
   reminder_due: '流程提醒',
   new_attachment: '新附件',
   contract_signed: '合同签署',
+  fee_changed: '费用变更',
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

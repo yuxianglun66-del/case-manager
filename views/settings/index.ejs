@@ -304,6 +304,12 @@
                 <label class="form-check-label" for="evtContractSigned"><i class="bi bi-file-earmark-check"></i> 合同签署：当事人完成合同签署时通知</label>
               </div>
             </div>
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="evtFeeChanged" value="fee_changed">
+                <label class="form-check-label" for="evtFeeChanged"><i class="bi bi-coin"></i> 费用变更：新增、修改或删除费用时通知</label>
+              </div>
+            </div>
             <button type="button" class="btn btn-primary" id="btnSaveEvents"><i class="bi bi-save"></i> 保存事件设置</button>
             <hr>
             <h6 class="mt-3">测试推送</h6>
@@ -853,8 +859,8 @@
   });
 
   /* ---- 企业微信推送 ---- */
-  const WE_EVENT_KEYS = ['case_assigned', 'status_changed', 'reminder_due', 'new_attachment', 'contract_signed'];
-  const WE_EVENT_IDS = { case_assigned: 'evtCaseAssigned', status_changed: 'evtStatusChanged', reminder_due: 'evtReminderDue', new_attachment: 'evtNewAttachment', contract_signed: 'evtContractSigned' };
+  const WE_EVENT_KEYS = ['case_assigned', 'status_changed', 'reminder_due', 'new_attachment', 'contract_signed', 'fee_changed'];
+  const WE_EVENT_IDS = { case_assigned: 'evtCaseAssigned', status_changed: 'evtStatusChanged', reminder_due: 'evtReminderDue', new_attachment: 'evtNewAttachment', contract_signed: 'evtContractSigned', fee_changed: 'evtFeeChanged' };
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('wecomWebhook').value = SETTINGS.wecom_webhook || '';
     document.getElementById('wecomCorpid').value = SETTINGS.wecom_corpid || '';
@@ -898,7 +904,7 @@
   });
 
   // ====== 推送投递日志 ======
-  const EVT_LABELS = { case_assigned: '案件分配', status_changed: '状态变更', reminder_due: '流程提醒', new_attachment: '新增附件', contract_signed: '合同签署' };
+  const EVT_LABELS = { case_assigned: '案件分配', status_changed: '状态变更', reminder_due: '流程提醒', new_attachment: '新增附件', contract_signed: '合同签署', fee_changed: '费用变更' };
   async function loadNotifyLogs() {
     const tbody = document.getElementById('notifyLogBody');
     if (!tbody) return;

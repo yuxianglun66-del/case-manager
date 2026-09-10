@@ -522,6 +522,7 @@ router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUplo
        note || null, req.session.user.id]
     );
     await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${fee_type} ¥${amount}` });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用新增\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + fee_type + '\n💰 金额：¥' + amount + (dir === 'income' ? '（收入）' : '（支出）') + '\n📌 状态：' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免') + (payer ? '\n👤 付款方：' + payer : '') + (note ? '\n📝 备注：' + note : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true, id: rows[0].id });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -555,6 +556,13 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
       [ft, amt, dir, payer != null ? payer : old.payer, st, paid_at != null ? paid_at : old.paid_at, filePath, fName, fMime, fSize, note != null ? note : old.note, fid]
     );
     await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status }, after: { fee_type: ft, amount: amt, direction: dir, status: st } });
+    const changes = [];
+    if (old.fee_type !== ft) changes.push('费用类型 ' + old.fee_type + ' → ' + ft);
+    if (Number(old.amount) !== Number(amt)) changes.push('金额 ¥' + old.amount + ' → ¥' + amt);
+    if ((old.direction || 'income') !== dir) changes.push('方向 ' + (old.direction === 'expense' ? '支出' : '收入') + ' → ' + (dir === 'expense' ? '支出' : '收入'));
+    if (old.payer !== (payer != null ? payer : old.payer)) changes.push('付款方 ' + (old.payer || '（空）') + ' → ' + ((payer != null ? payer : old.payer) || '（空）'));
+    if (old.status !== st) changes.push('状态 ' + (old.status === 'paid' ? '已收取' : old.status === 'pending' ? '待收取' : old.status === 'advanced' ? '垫付' : '减免') + ' → ' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免'));
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用修改\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n✏️ 变更内容：' + (changes.length ? changes.join('；') : '（无实质字段变化）') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -569,6 +577,7 @@ router.delete('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, 
     const old = rows[0];
     if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
     await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '🗑️ 费用删除\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + old.fee_type + '\n💰 金额：¥' + old.amount + (old.direction === 'expense' ? '（支出）' : '（收入）') + (old.payer ? '\n👤 付款方：' + old.payer : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
