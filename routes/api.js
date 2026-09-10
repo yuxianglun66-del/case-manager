@@ -1221,7 +1221,16 @@ router.post('/statuses/create', requirePermission('system.settings'), async (req
     const color = (req.body.color || '#0d6efd').trim();
     if (!name) return res.status(400).json({ error: '状态名称必填' });
     if (!CATEGORY_LABELS[category]) return res.status(400).json({ error: '状态分类不正确' });
-    const ins = await pool.query(`INSERT INTO statuses (name, category, color) VALUES ($1,$2,$3) RETURNING id`, [name, category, color]);
+    let sort = parseInt(req.body.sort, 10);
+    if (sort === undefined || sort === null || isNaN(sort)) sort = 0;
+    if (sort <= 0) {
+      const mx = (await pool.query(`SELECT COALESCE(MAX(sort), 0) AS mx FROM statuses`)).rows[0].mx;
+      sort = mx + 1;
+    } else {
+      const dup = (await pool.query(`SELECT id FROM statuses WHERE sort = $1`, [sort])).rows[0];
+      if (dup) return res.status(400).json({ error: '排序序号 ' + sort + ' 已被其他状态使用，请使用其他序号' });
+    }
+    const ins = await pool.query(`INSERT INTO statuses (name, category, color, sort) VALUES ($1,$2,$3,$4) RETURNING id`, [name, category, color, sort]);
     await audit(req, '新增状态', { entity_type: 'status', entity_id: ins.rows[0].id, detail: '状态「' + name + '」（' + (CATEGORY_LABELS[category] || category) + '）', after: { name, category, color } });
     res.json({ ok: true });
   } catch (e) { next(e); }
@@ -1238,6 +1247,10 @@ router.post('/statuses/:id/update', requirePermission('system.settings'), async 
     if (!name) return res.status(400).json({ error: '状态名称必填' });
     const old = (await pool.query(`SELECT name, category, active FROM statuses WHERE id=$1`, [id])).rows[0];
     if (!old) return res.status(404).json({ error: '状态不存在' });
+    if (sort > 0) {
+      const dup = (await pool.query(`SELECT id, name FROM statuses WHERE sort = $1 AND id <> $2`, [sort, id])).rows[0];
+      if (dup) return res.status(400).json({ error: '排序序号 ' + sort + ' 已被状态「' + dup.name + '」使用，请使用其他序号' });
+    }
     await pool.query(`UPDATE statuses SET name=$1, category=$2, color=$3, sort=$4, active=$5 WHERE id=$6`, [name, category, color, sort, active, id]);
     await audit(req, '编辑状态', { entity_type: 'status', entity_id: id, detail: '状态「' + old.name + '」→「' + name + '」', before: { name: old.name, category: old.category, active: old.active }, after: { name, category, active } });
     res.json({ ok: true });

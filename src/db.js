@@ -575,6 +575,21 @@ async function initDb() {
           [name, category, color, sort]
         );
       }
+    } else {
+      // 迁移：仅当存在重复排序序号时，按 sort,id 顺序重新编连续唯一序号
+      const { rows: dupCheck } = await client.query(
+        `SELECT COUNT(*)::int AS n FROM (
+           SELECT sort FROM statuses GROUP BY sort HAVING COUNT(*) > 1
+         ) d`
+      );
+      if (dupCheck[0].n > 0) {
+        await client.query(
+          `WITH ranked AS (
+             SELECT id, ROW_NUMBER() OVER (ORDER BY sort, id) AS new_sort FROM statuses
+           )
+           UPDATE statuses s SET sort = r.new_sort FROM ranked r WHERE s.id = r.id`
+        );
+      }
     }
 
     // 默认应用设置

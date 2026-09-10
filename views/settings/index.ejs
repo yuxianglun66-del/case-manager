@@ -785,6 +785,8 @@
     document.getElementById('statusModalTitle').textContent = '新增状态';
     document.getElementById('stColor').value = '#0d6efd';
     document.getElementById('stActiveWrap').style.display = 'none';
+    const mxSort = Math.max(0, ...STATUSES.map(s => parseInt(s.sort, 10) || 0));
+    document.getElementById('stSort').value = mxSort + 1;
     new bootstrap.Modal(document.getElementById('statusModal')).show();
   }
   function openStatusEdit(id) {
