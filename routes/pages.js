@@ -272,16 +272,21 @@ router.get('/cases/new', async (req, res, next) => {
     const staff = hasPermission(user, 'cases.assign')
       ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows
       : [];
-    const statuses = (await pool.query(`SELECT id, name, color FROM statuses WHERE active = TRUE ORDER BY sort`)).rows;
+    const statuses = (await pool.query(`SELECT id, name, color, category FROM statuses WHERE active = TRUE ORDER BY category, sort`)).rows;
 
     const allFields = (await pool.query(
-      `SELECT * FROM case_fields WHERE active = TRUE ORDER BY case_type_id, sort`
+      `SELECT * FROM case_fields WHERE active = TRUE ORDER BY case_type_id NULLS LAST, sort`
     )).rows;
+    const commonFields = allFields.filter((f) => !f.case_type_id);
     const fieldsByType = {};
     allFields.forEach((f) => {
+      if (!f.case_type_id) return;
       if (!fieldsByType[f.case_type_id]) fieldsByType[f.case_type_id] = [];
       fieldsByType[f.case_type_id].push(f);
     });
+    for (const key of Object.keys(fieldsByType)) {
+      fieldsByType[key] = [...commonFields, ...fieldsByType[key]];
+    }
 
     res.render('cases/form', {
       title: '新增案件',
@@ -292,6 +297,7 @@ router.get('/cases/new', async (req, res, next) => {
       staffAll: (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows,
       fieldsByType,
       values: {},
+      parties: [],
       errors: null,
     });
   } catch (e) { next(e); }
@@ -313,7 +319,10 @@ router.get('/cases/:id/edit', async (req, res, next) => {
     const staff = hasPermission(user, 'cases.assign')
       ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows
       : [];
-    const statuses = (await pool.query(`SELECT id, name, color FROM statuses WHERE active = TRUE ORDER BY sort`)).rows;
+    const statuses = (await pool.query(`SELECT id, name, color, category FROM statuses WHERE active = TRUE ORDER BY category, sort`)).rows;
+    const commonFields = (await pool.query(
+      `SELECT * FROM case_fields WHERE case_type_id IS NULL AND active = TRUE ORDER BY sort`
+    )).rows;
     const fields = (await pool.query(
       `SELECT * FROM case_fields WHERE case_type_id = $1 AND active = TRUE ORDER BY sort`, [c.case_type_id]
     )).rows;
@@ -322,6 +331,9 @@ router.get('/cases/:id/edit', async (req, res, next) => {
     )).rows;
     const values = {};
     fieldVals.forEach((v) => { values[v.field_id] = v.value; });
+    const parties = (await pool.query(
+      `SELECT * FROM case_parties WHERE case_id = $1 ORDER BY sort, id`, [id]
+    )).rows;
 
     // sign_date 为 DATE 类型，格式化为 YYYY-MM-DD 便于表单回显
     if (c.sign_date) {
@@ -336,8 +348,8 @@ router.get('/cases/:id/edit', async (req, res, next) => {
       caseTypeId: c.case_type_id,
       types, staff, statuses,
       staffAll: (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows,
-      fieldsByType: { [c.case_type_id]: fields },
-      values, errors: null,
+      fieldsByType: { [c.case_type_id]: [...commonFields, ...fields] },
+      values, parties, errors: null,
     });
   } catch (e) { next(e); }
 });
@@ -452,8 +464,9 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
 
     const fieldsByType = {};
     fields.forEach((f) => {
-      if (!fieldsByType[f.case_type_id]) fieldsByType[f.case_type_id] = [];
-      fieldsByType[f.case_type_id].push(f);
+      const key = f.case_type_id || 'common';
+      if (!fieldsByType[key]) fieldsByType[key] = [];
+      fieldsByType[key].push(f);
     });
 
     const templates = (await pool.query(

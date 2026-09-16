@@ -33,6 +33,29 @@ function parseJsonArray(v, fallback = []) {
   try { return JSON.parse(v) || fallback; } catch (e) { return fallback; }
 }
 
+// 解析表单提交的当事人数组（可为 JSON 字符串）
+function parseParties(v) {
+  const arr = parseJsonArray(v, []);
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((p) => p && (p.name || '').trim())
+    .map((p, i) => ({
+      id: p.id ? parseInt(p.id, 10) : null,
+      name: (p.name || '').trim(),
+      role: (p.role || '').trim() || '其他',
+      gender: (p.gender || '').trim() || null,
+      age: p.age || null,
+      id_card: (p.id_card || '').trim() || null,
+      phone: (p.phone || '').trim() || null,
+      address: (p.address || '').trim() || null,
+      contact_person: (p.contact_person || '').trim() || null,
+      contact_phone: (p.contact_phone || '').trim() || null,
+      injury_info: (p.injury_info || '').trim() || null,
+      hospital_dept: (p.hospital_dept || '').trim() || null,
+      remark: (p.remark || '').trim() || null,
+    }));
+}
+
 // 全文搜索：案号/标题/客户 + 自定义字段（备注/地点等）+ 当事人 + 历史备注
 function kwCond(params) {
   const p = params.length;
@@ -77,13 +100,15 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     const user = req.session.user;
     const title = (req.body.title || '').trim();
     const typeId = parseInt(req.body.case_type_id, 10);
-    const clientName = (req.body.client_name || '').trim();
     const assigneeId = hasPermission(user, 'cases.assign') ? (parseInt(req.body.assignee_id, 10) || user.id) : user.id;
     const statusId = parseInt(req.body.status_id, 10) || null;
     const nextAction = (req.body.next_action || '').trim() || null;
     const reminderAt = req.body.reminder_at ? new Date(req.body.reminder_at) : null;
     const signStaffId = parseInt(req.body.sign_staff_id, 10) || null;
     const signDate = (req.body.sign_date || '').trim() || null;
+    const parties = parseParties(req.body.parties);
+    let clientName = (req.body.client_name || '').trim();
+    if (!clientName && parties.length > 0) clientName = parties[0].name || '';
 
     if (!title || !typeId) {
       await client.query('ROLLBACK');
@@ -123,6 +148,15 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
       }
     }
 
+    for (let i = 0; i < parties.length; i++) {
+      const p = parties[i];
+      await client.query(
+        `INSERT INTO case_parties (case_id, name, role, gender, age, id_card, phone, address, contact_person, contact_phone, injury_info, hospital_dept, remark, sort)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [caseId, p.name, p.role, p.gender || null, p.age ? parseInt(p.age) : null, p.id_card || null, p.phone || null, p.address || null, p.contact_person || null, p.contact_phone || null, p.injury_info || null, p.hospital_dept || null, p.remark || null, i]
+      );
+    }
+
     await addHistory(client, caseId, 'created', user.id, { statusId, note: '创建案件' });
     await client.query('COMMIT');
     await audit(req, '创建案件', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + caseNo + '「' + title + '」', after: { case_no: caseNo, title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate } });
@@ -140,7 +174,6 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     const user = req.session.user;
     const id = req.caseRow.id;
     const title = (req.body.title || '').trim();
-    const clientName = (req.body.client_name || '').trim();
     const typeId = parseInt(req.body.case_type_id, 10);
     const assigneeId = hasPermission(user, 'cases.assign') ? (parseInt(req.body.assignee_id, 10) || null) : req.caseRow.assignee_id;
     const statusId = parseInt(req.body.status_id, 10) || null;
@@ -148,6 +181,9 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     const reminderAt = req.body.reminder_at ? new Date(req.body.reminder_at) : null;
     const signStaffId = parseInt(req.body.sign_staff_id, 10) || null;
     const signDate = (req.body.sign_date || '').trim() || null;
+    const parties = parseParties(req.body.parties);
+    let clientName = (req.body.client_name || '').trim();
+    if (!clientName && parties.length > 0) clientName = parties[0].name || '';
 
     if (!title || !typeId) { await client.query('ROLLBACK'); return res.status(400).json({ error: '请填写案件名称并选择案件类型' }); }
 
@@ -193,6 +229,33 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
         }
       } else if (val !== '') {
         await client.query(`INSERT INTO case_field_values (case_id, field_id, value) VALUES ($1,$2,$3)`, [id, f.id, val]);
+      }
+    }
+
+    // 同步当事人：存在则更新，新增插入，提交中未出现的删除
+    const clientHasParty = (await client.query(`SELECT id FROM case_parties WHERE case_id = $1`, [id])).rows;
+    const keptIds = new Set();
+    for (let i = 0; i < parties.length; i++) {
+      const p = parties[i];
+      if (p.id) {
+        keptIds.add(parseInt(p.id, 10));
+        await client.query(
+          `UPDATE case_parties SET name=$1, role=$2, gender=$3, age=$4, id_card=$5, phone=$6, address=$7, contact_person=$8, contact_phone=$9, injury_info=$10, hospital_dept=$11, remark=$12, sort=$13
+           WHERE id=$14 AND case_id=$15`,
+          [p.name, p.role, p.gender || null, p.age ? parseInt(p.age) : null, p.id_card || null, p.phone || null, p.address || null, p.contact_person || null, p.contact_phone || null, p.injury_info || null, p.hospital_dept || null, p.remark || null, i, parseInt(p.id, 10), id]
+        );
+      } else {
+        const ins = await client.query(
+          `INSERT INTO case_parties (case_id, name, role, gender, age, id_card, phone, address, contact_person, contact_phone, injury_info, hospital_dept, remark, sort)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+          [id, p.name, p.role, p.gender || null, p.age ? parseInt(p.age) : null, p.id_card || null, p.phone || null, p.address || null, p.contact_person || null, p.contact_phone || null, p.injury_info || null, p.hospital_dept || null, p.remark || null, i]
+        );
+        keptIds.add(ins.rows[0].id);
+      }
+    }
+    for (const row of clientHasParty) {
+      if (!keptIds.has(row.id)) {
+        await client.query(`DELETE FROM case_parties WHERE id = $1 AND case_id = $2`, [row.id, id]);
       }
     }
 
@@ -1148,13 +1211,14 @@ router.post('/types/:id/delete', requirePermission('system.settings'), async (re
 /* ---------- 动态字段 ---------- */
 router.post('/fields/create', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const typeId = parseInt(req.body.case_type_id, 10);
+    const typeIdRaw = req.body.case_type_id;
+    const typeId = typeIdRaw === '' || typeIdRaw === undefined || typeIdRaw === null ? null : parseInt(typeIdRaw, 10);
     const label = (req.body.label || '').trim();
     const fieldType = req.body.field_type || 'text';
     const required = req.body.required === '1';
     const placeholder = (req.body.placeholder || '').trim();
     const optionsRaw = (req.body.options || '').trim();
-    if (!typeId || !label) return res.status(400).json({ error: '所属类型和字段名称必填' });
+    if (!label) return res.status(400).json({ error: '字段名称必填' });
     if (!['text', 'textarea', 'number', 'date', 'select', 'phone'].includes(fieldType)) {
       return res.status(400).json({ error: '字段类型不正确' });
     }
@@ -1166,7 +1230,8 @@ router.post('/fields/create', requirePermission('system.settings'), async (req, 
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [typeId, label, fieldType, options, required, placeholder || null, sort]
     );
-    await audit(req, '新增动态字段', { entity_type: 'field', entity_id: ins.rows[0].id, detail: '字段「' + label + '」（类型 ' + fieldType + '）', after: { label, field_type: fieldType, case_type_id: typeId, required } });
+    const typeLabel = typeId ? (await pool.query(`SELECT name FROM case_types WHERE id=$1`, [typeId])).rows[0]?.name : '（通用）';
+    await audit(req, '新增动态字段', { entity_type: 'field', entity_id: ins.rows[0].id, detail: '字段「' + label + '」（类型 ' + fieldType + '，' + typeLabel + '）', after: { label, field_type: fieldType, case_type_id: typeId, required } });
     res.json({ ok: true, id: ins.rows[0].id });
   } catch (e) { next(e); }
 });
@@ -1212,18 +1277,23 @@ router.post('/fields/:id/delete', requirePermission('system.settings'), async (r
 
 router.post('/fields/reorder', requirePermission('system.settings'), async (req, res, next) => {
   try {
-    const typeId = parseInt(req.body.type_id, 10);
+    const typeIdRaw = req.body.type_id;
+    const typeId = typeIdRaw === '' || typeIdRaw === undefined || typeIdRaw === null ? null : parseInt(typeIdRaw, 10);
     const order = Array.isArray(req.body.order) ? req.body.order.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x)) : [];
-    if (!typeId || order.length === 0) return res.status(400).json({ error: '缺少类型或字段顺序' });
+    if (order.length === 0) return res.status(400).json({ error: '缺少字段顺序' });
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       for (let i = 0; i < order.length; i++) {
-        await client.query(`UPDATE case_fields SET sort=$1 WHERE id=$2 AND case_type_id=$3`, [i + 1, order[i], typeId]);
+        if (typeId == null) {
+          await client.query(`UPDATE case_fields SET sort=$1 WHERE id=$2 AND case_type_id IS NULL`, [i + 1, order[i]]);
+        } else {
+          await client.query(`UPDATE case_fields SET sort=$1 WHERE id=$2 AND case_type_id=$3`, [i + 1, order[i], typeId]);
+        }
       }
       await client.query('COMMIT');
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
-    await audit(req, '排序动态字段', { entity_type: 'case_type', entity_id: typeId, detail: '调整字段显示顺序' });
+    await audit(req, '排序动态字段', { entity_type: 'case_type', entity_id: typeId || 0, detail: '调整' + (typeId ? '类型字段' : '通用字段') + '显示顺序' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

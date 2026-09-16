@@ -26,11 +26,29 @@
         </div>
       </div>
 
-      <div class="row g-3 mb-4">
-        <div class="col-12 col-md-4">
-          <label class="form-label">客户/当事人</label>
-          <input type="text" name="client_name" class="form-control" placeholder="姓名" value="<%= caseData ? (caseData.client_name || '') : '' %>">
+      <div class="form-section-title"><i class="bi bi-people"></i> 当事人</div>
+      <div class="mb-4">
+        <div class="table-responsive">
+          <table class="table table-bordered mb-2" id="partyTable">
+            <thead>
+              <tr class="text-center small">
+                <th style="width:90px">角色</th>
+                <th>姓名 <span class="text-danger">*</span></th>
+                <th style="width:170px">联系电话</th>
+                <th style="width:190px">身份证号</th>
+                <th style="width:70px"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addParty()"><i class="bi bi-plus-lg"></i> 添加当事人</button>
+          <span class="text-muted small">保存后自动将第一位当事人姓名作为「客户/当事人」</span>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
           <label class="form-label">服务人员</label>
           <% if (can('cases.assign')) { %>
@@ -61,8 +79,15 @@
         <div class="col-6 col-md-3">
           <label class="form-label">当前状态</label>
           <select name="status_id" class="form-select">
-            <% statuses.forEach(s => { %>
-              <option value="<%= s.id %>" <%= caseData && caseData.status_id === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <option value="">未设置</option>
+            <% const STATUS_CATS = { signed:'已签约', processing:'理赔中', litigation:'诉讼中', closed:'已结案' }; %>
+            <% const catGroups = {}; statuses.forEach(s => { (catGroups[s.category] = catGroups[s.category] || []).push(s); }); %>
+            <% Object.keys(catGroups).forEach(cat => { %>
+              <optgroup label="<%= STATUS_CATS[cat] || cat %>">
+                <% catGroups[cat].forEach(s => { %>
+                  <option value="<%= s.id %>" <%= caseData && caseData.status_id === s.id ? 'selected' : '' %>><%= s.name %></option>
+                <% }) %>
+              </optgroup>
             <% }) %>
           </select>
         </div>
@@ -94,8 +119,46 @@
 <script>
   const FIELDS = <%- safeJson(fieldsByType) %>;
   const VALUES = <%- safeJson(values) %>;
+  const PARTIES = <%- safeJson(parties || []) %>;
   const CASE_ID = <%- mode === 'edit' ? caseData.id : 'null' %>;
   const IS_EDIT = <%- mode === 'edit' ? 'true' : 'false' %>;
+
+  const PARTY_ROLES = ['客户', '伤者', '被保险人', '投保人', '对方', '监护人', '其他'];
+
+  function addParty(p) {
+    p = p || {};
+    const role = p.role || '客户';
+    const options = PARTY_ROLES.map(r => `<option value="${r}" ${role === r ? 'selected' : ''}>${r}</option>`).join('');
+    const tr = document.createElement('tr');
+    tr.className = 'align-middle';
+    tr.innerHTML = `
+      <td><select class="form-select form-select-sm p-party-role">${options}</select></td>
+      <td><input type="text" class="form-control form-control-sm p-party-name" placeholder="姓名" value="${(p.name || '').replace(/"/g, '&quot;')}"></td>
+      <td><input type="tel" class="form-control form-control-sm p-party-phone" placeholder="联系电话" value="${(p.phone || '').replace(/"/g, '&quot;')}"></td>
+      <td><input type="text" class="form-control form-control-sm p-party-id" placeholder="身份证号" value="${(p.id_card || '').replace(/"/g, '&quot;')}"></td>
+      <td class="text-end"><button type="button" class="btn btn-ico btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>
+    `;
+    if (p.id) tr.dataset.id = p.id;
+    document.querySelector('#partyTable tbody').appendChild(tr);
+  }
+
+  function collectParties() {
+    const rows = document.querySelectorAll('#partyTable tbody tr');
+    const list = [];
+    rows.forEach(tr => {
+      const name = tr.querySelector('.p-party-name').value.trim();
+      if (!name) return;
+      const item = {
+        name,
+        role: tr.querySelector('.p-party-role').value,
+        phone: tr.querySelector('.p-party-phone').value.trim(),
+        id_card: tr.querySelector('.p-party-id').value.trim(),
+      };
+      if (tr.dataset.id) item.id = parseInt(tr.dataset.id, 10);
+      list.push(item);
+    });
+    return list;
+  }
 
   function renderFields(typeId) {
     const box = document.getElementById('dynamicFields');
@@ -131,6 +194,8 @@
   sel.addEventListener('change', () => renderFields(parseInt(sel.value, 10)));
   renderFields(<%= caseTypeId || 0 %>);
 
+  PARTIES.forEach(p => addParty(p));
+
   document.getElementById('caseForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type=submit]');
@@ -138,6 +203,8 @@
     const fd = new FormData(e.target);
     const data = {};
     fd.forEach((v, k) => { data[k] = v; });
+    const parties = collectParties();
+    if (parties.length > 0) data.parties = JSON.stringify(parties);
     const url = IS_EDIT ? '/api/cases/' + CASE_ID + '/update' : '/api/cases/create';
     try {
       const r = await postJSON(url, data);

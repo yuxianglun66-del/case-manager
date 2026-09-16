@@ -33,6 +33,58 @@
       <button class="btn btn-primary" onclick="openTypeCreate()"><i class="bi bi-plus-lg"></i> 新增案件类型</button>
     </div>
 
+    <!-- ============ 通用字段（所有类型共享） ============ -->
+    <div class="card mb-3 border-info">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-collection text-info"></i>
+          <strong>通用字段</strong>
+          <span class="text-muted small">自动出现在所有案件类型的新增/编辑表单顶部</span>
+        </div>
+        <div class="d-flex gap-1">
+          <button class="btn btn-ico btn-light" title="新增通用字段" onclick="openFieldCreate(null)"><i class="bi bi-plus-lg"></i></button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0 sortable-fields" data-type="">
+            <thead>
+              <tr><th style="width:34px"></th><th>字段名称</th><th>类型</th><th>必填</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr>
+            </thead>
+            <tbody>
+              <% const commonFields = fieldsByType['common'] || []; %>
+              <% if (commonFields.length === 0) { %>
+                <tr><td colspan="7" class="empty-tip"><i class="bi bi-collection"></i>暂无通用字段，点击「+」新增</td></tr>
+              <% } %>
+              <% commonFields.forEach(f => { %>
+                <tr draggable="true" data-id="<%= f.id %>" class="sortable-row">
+                  <td class="text-muted cursor-grab"><i class="bi bi-grip-vertical"></i></td>
+                  <td><%= f.label %></td>
+                  <td>
+                    <%= {text:'单行文本', textarea:'多行文本', number:'数字', date:'日期', select:'下拉选择', phone:'手机号'}[f.field_type] || f.field_type %>
+                  </td>
+                  <td><%= f.required ? '是' : '否' %></td>
+                  <td class="sort-num"><%= String(f.sort).padStart(3, '0') %></td>
+                  <td>
+                    <% if (f.active) { %>
+                      <span class="status-badge" style="background:#198754">启用</span>
+                    <% } else { %>
+                      <span class="status-badge" style="background:#dc3545">停用</span>
+                    <% } %>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-ico btn-light" title="编辑字段" onclick="openFieldEdit(<%= f.id %>)"><i class="bi bi-pencil-fill"></i></button>
+                    <button class="btn btn-ico btn-light" title="<%= f.active ? '停用' : '启用' %>" onclick="toggleField(<%= f.id %>, <%= f.active ? 'false' : 'true' %>)"><i class="bi bi-eye<%= f.active ? '-slash' : '' %>"></i></button>
+                    <button class="btn btn-ico btn-outline-danger" title="删除字段" onclick="delField(<%= f.id %>)"><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <% Object.values(types).forEach(t => { %>
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -652,7 +704,8 @@
     document.querySelectorAll('table.sortable-fields').forEach(tbl => {
       tbl.addEventListener('dragend', () => {
         if (dragRow) { dragRow.classList.remove('drag-over'); dragRow = null; }
-        const typeId = parseInt(tbl.dataset.type, 10);
+        const rawType = tbl.dataset.type;
+        const typeId = rawType === '' || rawType === undefined ? '' : parseInt(rawType, 10);
         saveOrder(tbl, '/api/fields/reorder', (ids) => ({ type_id: typeId, order: ids }));
       });
     });
@@ -790,7 +843,7 @@
   function openFieldCreate(typeId) {
     document.getElementById('fieldForm').reset();
     document.getElementById('fId').value = '';
-    document.getElementById('fTypeId').value = typeId;
+    document.getElementById('fTypeId').value = typeId === null ? '' : typeId;
     document.getElementById('fFieldType').value = 'text';
     document.getElementById('fOptionsWrap').style.display = 'none';
     document.getElementById('fieldModalTitle').textContent = '新增字段';
@@ -800,7 +853,7 @@
     const f = FIELDS.find(x => x.id === id);
     document.getElementById('fieldForm').reset();
     document.getElementById('fId').value = id;
-    document.getElementById('fTypeId').value = f.case_type_id;
+    document.getElementById('fTypeId').value = f.case_type_id || '';
     document.getElementById('fLabel').value = f.label;
     document.getElementById('fFieldType').value = f.field_type;
     let opts = '';

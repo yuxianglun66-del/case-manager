@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS case_types (
 
 CREATE TABLE IF NOT EXISTS case_fields (
   id SERIAL PRIMARY KEY,
-  case_type_id INT NOT NULL REFERENCES case_types(id) ON DELETE CASCADE,
+  case_type_id INT REFERENCES case_types(id) ON DELETE CASCADE,
   label VARCHAR(100) NOT NULL,
   field_type VARCHAR(30) NOT NULL DEFAULT 'text',
   options TEXT,
@@ -198,6 +198,9 @@ ALTER TABLE contract_signatures DROP CONSTRAINT IF EXISTS contract_signatures_si
 -- 安全问题（忘记密码）
 ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(200);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer VARCHAR(200);
+
+-- 通用字段：case_fields 支持不绑定具体类型（case_type_id NULL = 系统级通用字段）
+ALTER TABLE case_fields ALTER COLUMN case_type_id DROP NOT NULL;
 
 -- 可视化编辑器：模板文本字段 + 合同预填充 PDF
 ALTER TABLE contract_templates ADD COLUMN IF NOT EXISTS text_fields JSONB DEFAULT '[]';
