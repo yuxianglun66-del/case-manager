@@ -33,9 +33,9 @@
             <thead>
               <tr class="text-center small">
                 <th style="width:90px">角色</th>
-                <th>姓名 <span class="text-danger">*</span></th>
-                <th style="width:170px">联系电话</th>
-                <th style="width:190px">身份证号</th>
+                <th style="width:170px">姓名 <span class="text-danger">*</span></th>
+                <th style="width:150px">联系电话</th>
+                <th style="width:180px">身份证号</th>
                 <th style="width:70px"></th>
               </tr>
             </thead>
@@ -127,13 +127,13 @@
 
   function addParty(p) {
     p = p || {};
-    const role = p.role || '客户';
-    const options = PARTY_ROLES.map(r => `<option value="${r}" ${role === r ? 'selected' : ''}>${r}</option>`).join('');
+    const role = p.role || '';
+    const options = `<option value="">请选择</option>` + PARTY_ROLES.map(r => `<option value="${r}" ${role === r ? 'selected' : ''}>${r}</option>`).join('');
     const tr = document.createElement('tr');
     tr.className = 'align-middle';
     tr.innerHTML = `
-      <td><select class="form-select form-select-sm p-party-role">${options}</select></td>
-      <td><input type="text" class="form-control form-control-sm p-party-name" placeholder="姓名" value="${(p.name || '').replace(/"/g, '&quot;')}"></td>
+      <td><select class="form-select form-select-sm p-party-role" required>${options}</select></td>
+      <td><input type="text" class="form-control form-control-sm p-party-name" placeholder="姓名（必填）" value="${(p.name || '').replace(/"/g, '&quot;')}"></td>
       <td><input type="tel" class="form-control form-control-sm p-party-phone" placeholder="联系电话" value="${(p.phone || '').replace(/"/g, '&quot;')}"></td>
       <td><input type="text" class="form-control form-control-sm p-party-id" placeholder="身份证号" value="${(p.id_card || '').replace(/"/g, '&quot;')}"></td>
       <td class="text-end"><button type="button" class="btn btn-ico btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>
@@ -204,6 +204,8 @@
     const data = {};
     fd.forEach((v, k) => { data[k] = v; });
     const parties = collectParties();
+    const noRole = parties.find(p => !p.role);
+    if (noRole) { toast('请为当事人「' + noRole.name + '」选择角色', 'danger'); btn.disabled = false; return; }
     if (parties.length > 0) data.parties = JSON.stringify(parties);
     const url = IS_EDIT ? '/api/cases/' + CASE_ID + '/update' : '/api/cases/create';
     try {
