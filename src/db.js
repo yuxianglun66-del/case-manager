@@ -715,6 +715,32 @@ async function initDb() {
           await client.query(`UPDATE statuses SET sort = $1 WHERE id = $2`, [i + 1, ordered[i].id]);
         }
       } else {
+        // 补插：确保 40 个模板状态齐全（已有同名状态不再新增）
+        const { rows: curRows } = await client.query(`SELECT id, name FROM statuses`);
+        const curNames = new Set(curRows.map(r => r.name));
+        let insertedAny = false;
+        for (const tpl of SEED_STATUSES) {
+          if (curNames.has(tpl[0])) continue;
+          await client.query(
+            `INSERT INTO statuses (name, category, color, sort) VALUES ($1,$2,$3,$4)`,
+            [tpl[0], tpl[1], tpl[2], tpl[3]]
+          );
+          insertedAny = true;
+        }
+        // 仅当本次补插了缺失状态时重排，避免覆盖用户在设置页拖拽调整过的排序
+        if (insertedAny) {
+          const tplIdx = {};
+          SEED_STATUSES.forEach((t, i) => { tplIdx[t[0]] = i + 1; });
+          const { rows: fRows } = await client.query(`SELECT id, name, sort FROM statuses ORDER BY sort, id`);
+          const ordered = fRows.slice().sort((a, b) => {
+            const ai = tplIdx[a.name] !== undefined ? tplIdx[a.name] : 1000 + (a.sort || 0);
+            const bi = tplIdx[b.name] !== undefined ? tplIdx[b.name] : 1000 + (b.sort || 0);
+            return ai - bi;
+          });
+          for (let i = 0; i < ordered.length; i++) {
+            await client.query(`UPDATE statuses SET sort = $1 WHERE id = $2`, [i + 1, ordered[i].id]);
+          }
+        }
         // 迁移②：仅当存在重复排序序号时，按 sort,id 顺序重新编连续唯一序号
         const { rows: dupCheck } = await client.query(
           `SELECT COUNT(*)::int AS n FROM (
