@@ -338,9 +338,6 @@ const SEED_TYPE_FIELDS = {
   JT: [
     ['事故时间', 'date', false, '如 2026-01-01'],
     ['事故地点', 'text', false, ''],
-    ['当事人姓名', 'text', true, ''],
-    ['当事人手机号', 'phone', true, ''],
-    ['身份证号', 'text', false, ''],
     ['责任认定情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
     ['对方当事人/保险公司', 'text', false, ''],
     ['伤情部位', 'text', false, ''],
@@ -354,9 +351,6 @@ const SEED_TYPE_FIELDS = {
   GS: [
     ['工伤发生时间', 'date', true, ''],
     ['发生地点', 'text', false, ''],
-    ['伤者姓名', 'text', true, ''],
-    ['伤者手机号', 'phone', true, ''],
-    ['身份证号', 'text', false, ''],
     ['用人单位', 'text', true, ''],
     ['是否缴纳社保', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"未知"}]'],
     ['是否已做工伤认定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"办理中"}]'],
@@ -370,8 +364,6 @@ const SEED_TYPE_FIELDS = {
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
     ['投保人', 'text', false, ''],
-    ['被保人', 'text', true, ''],
-    ['联系电话', 'phone', false, ''],
     ['出险时间', 'date', false, ''],
     ['出险原因', 'textarea', false, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
@@ -384,9 +376,6 @@ const SEED_TYPE_FIELDS = {
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
     ['学校名称', 'text', true, ''],
-    ['学生姓名', 'text', true, ''],
-    ['家长姓名', 'text', true, ''],
-    ['家长手机号', 'phone', true, ''],
     ['出险时间', 'date', false, ''],
     ['出险地点', 'text', false, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
@@ -655,6 +644,22 @@ async function initDb() {
           );
         }
       }
+    }
+
+    // 迁移：移除旧类型中与当事人表格重复的人员信息字段（person info now lives in case_parties）
+    const OBSOLETE_REPEAT_FIELDS = {
+      JT: ['当事人姓名', '当事人手机号', '身份证号'],
+      GS: ['伤者姓名', '伤者手机号', '身份证号'],
+      YW: ['被保人', '联系电话'],
+      XP: ['学生姓名', '家长姓名', '家长手机号'],
+    };
+    for (const code of Object.keys(OBSOLETE_REPEAT_FIELDS)) {
+      const tRows = await client.query(`SELECT id FROM case_types WHERE code = $1`, [code]);
+      if (tRows.rows.length === 0) continue;
+      await client.query(
+        `DELETE FROM case_fields WHERE case_type_id = $1 AND label = ANY($2::text[])`,
+        [tRows.rows[0].id, OBSOLETE_REPEAT_FIELDS[code]]
+      );
     }
 
     const { rows: statusRows } = await client.query(`SELECT id FROM statuses LIMIT 1`);
