@@ -131,9 +131,10 @@
         <div class="row align-items-center">
           <div class="col-6">
             <canvas id="chartStatus" height="200"></canvas>
+            <div id="chartStatusEmpty" class="text-center text-muted small d-none" style="padding:60px 0">暂无案件数据</div>
           </div>
           <div class="col-6">
-            <div id="statusLegend"></div>
+            <div id="statusLegend" style="max-height:260px;overflow-y:auto;padding-right:2px"></div>
           </div>
         </div>
       </div>
@@ -209,6 +210,7 @@
     labels: <%- safeJson(byStatus.map(s => s.name)) %>,
     colors: <%- safeJson(byStatus.map(s => s.color)) %>,
     counts: <%- safeJson(byStatus.map(s => s.n)) %>,
+    cats: <%- safeJson(byStatus.map(s => s.category)) %>,
   };
 
   Chart.defaults.color = '#64748b';
@@ -231,22 +233,39 @@
     },
   });
 
+  const visIdxs = statusData.counts.map((n, i) => n > 0 ? i : -1).filter(i => i >= 0);
+  if (visIdxs.length === 0) {
+    document.getElementById('chartStatus').classList.add('d-none');
+    document.getElementById('chartStatusEmpty').classList.remove('d-none');
+  }
+
   new Chart(document.getElementById('chartStatus'), {
     type: 'doughnut',
     data: {
-      labels: statusData.labels,
-      datasets: [{ data: statusData.counts, backgroundColor: statusData.colors, borderWidth: 2, borderColor: '#0f172a' }],
+      labels: visIdxs.map(i => statusData.labels[i]),
+      datasets: [{ data: visIdxs.map(i => statusData.counts[i]), backgroundColor: visIdxs.map(i => statusData.colors[i]), borderWidth: 2, borderColor: '#0f172a' }],
     },
     options: { plugins: { legend: { display: false } }, cutout: '62%' },
   });
 
+  const CAT_LABELS = { signed: '已签约', processing: '理赔中', litigation: '诉讼中', closed: '已结案' };
+  const CAT_ORDER = ['signed', 'processing', 'litigation', 'closed'];
   const legend = document.getElementById('statusLegend');
-  legend.innerHTML = statusData.labels.map((l, i) =>
-    `<div class="d-flex align-items-center mb-2 small">
-      <span style="width:12px;height:12px;border-radius:3px;background:${statusData.colors[i]};display:inline-block;margin-right:8px;box-shadow:0 0 6px ${statusData.colors[i]}40"></span>
-      <span class="text-truncate" style="flex:1;color:#94a3b8">${l}</span>
-      <b style="color:#e2e8f0">${statusData.counts[i]}</b>
-    </div>`).join('');
+  const groups = {};
+  visIdxs.forEach(i => { const c = statusData.cats[i]; (groups[c] = groups[c] || []).push(i); });
+  legend.innerHTML = CAT_ORDER.filter(c => groups[c] && groups[c].length)
+    .map(c => `
+      <div class="mb-3">
+        <div class="small fw-bold text-uppercase" style="letter-spacing:.6px;color:#8b9bb4;margin-bottom:6px">${CAT_LABELS[c] || c}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px">
+          ${groups[c].map(i => `
+            <div class="d-flex align-items-center small" title="${statusData.labels[i]}">
+              <span style="width:12px;height:12px;border-radius:3px;background:${statusData.colors[i]};display:inline-block;margin-right:6px;box-shadow:0 0 6px ${statusData.colors[i]}40;flex:none"></span>
+              <span class="text-truncate" style="flex:1;color:#94a3b8">${statusData.labels[i]}</span>
+              <b style="color:#e2e8f0">${statusData.counts[i]}</b>
+            </div>`).join('')}
+        </div>
+      </div>`).join('') || '<div class="text-muted small">暂无案件数据</div>';
 
   async function ackReminder(caseId, btn) {
     if (!(await confirmBox('确认已处理该提醒？签收后此提醒将从待办列表中移除。', '签收提醒'))) return;
