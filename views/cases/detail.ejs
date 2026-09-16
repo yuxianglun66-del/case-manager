@@ -448,11 +448,17 @@
         <% if (can('cases.edit')) { %>
         <form id="statusForm">
           <div class="mb-2">
-            <select name="status_id" class="form-select" id="statusSelect">
-              <% statuses.forEach(s => { %>
-                <option value="<%= s.id %>" <%= caseData.status_id === s.id ? 'selected' : '' %>><%= s.name %></option>
+            <select class="form-select" id="statusCatSelect" onchange="filterStatusByCat()">
+              <option value="">请选择分类</option>
+              <% const DCATS = { signed:'已签约', processing:'理赔中', litigation:'诉讼中', closed:'已结案' }; %>
+              <% ['signed','processing','litigation','closed'].forEach(cat => { %>
+                <option value="<%= cat %>"><%= DCATS[cat] || cat %></option>
               <% }) %>
             </select>
+          </div>
+          <div class="mb-2">
+            <select name="status_id" class="form-select" id="statusSelect" required>
+          </select>
           </div>
           <div class="mb-2">
             <textarea name="note" class="form-control" rows="3" placeholder="填写本次进度说明（如：已提交理赔材料，等待审核）"></textarea>
@@ -695,6 +701,35 @@
     const h = document.getElementById('pwaPickHint');
     if (h) h.classList.remove('d-none');
   }
+
+  const STATUS_CATS_DATA = <%- safeJson(['signed','processing','litigation','closed'].map(cat => ({
+    cat,
+    statuses: (statuses || []).filter(s => s.category === cat).map(s => ({ id: s.id, name: s.name })),
+  }))) %>;
+  const D_CAT_LABELS = { signed: '已签约', processing: '理赔中', litigation: '诉讼中', closed: '已结案' };
+  const currentStatusId = <%- caseData.status_id || 'null' %>;
+
+  function filterStatusByCat() {
+    const catSel = document.getElementById('statusCatSelect');
+    const stSel = document.getElementById('statusSelect');
+    const group = STATUS_CATS_DATA.find(g => g.cat === catSel.value);
+    stSel.innerHTML = group && group.statuses.length
+      ? group.statuses.map(s => `<option value="${s.id}">${s.name}</option>`).join('')
+      : '<option value="">暂无该分类下的状态</option>';
+    if (group && group.statuses.length) stSel.value = group.statuses[0].id;
+  }
+
+  (function initStatusSelect() {
+    const catSel = document.getElementById('statusCatSelect');
+    const stSel = document.getElementById('statusSelect');
+    const cur = STATUS_CATS_DATA.find(g => g.statuses.some(s => s.id === currentStatusId && currentStatusId != null));
+    if (cur) {
+      catSel.value = cur.cat;
+      stSel.innerHTML = cur.statuses.map(s => `<option value="${s.id}" ${s.id === currentStatusId ? 'selected' : ''}>${s.name}</option>`).join('');
+    } else {
+      filterStatusByCat();
+    }
+  })();
 
   const statusFormEl = document.getElementById('statusForm');
   if (statusFormEl) statusFormEl.addEventListener('submit', async (e) => {

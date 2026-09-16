@@ -129,7 +129,6 @@
             <th>案件名称</th>
             <th>类型</th>
             <th>状态</th>
-            <th class="hide-mobile">客户</th>
             <th class="hide-mobile">服务人员</th>
             <th class="hide-mobile">签单人员</th>
             <th class="hide-mobile">签单日期</th>
@@ -148,8 +147,7 @@
               <td class="fw-bold" style="color:var(--bs-primary, #3b82f6) !important; letter-spacing:.3px"><%= c.case_no %></td>
               <td><%= c.title %></td>
               <td><span class="type-badge" style="background:<%= c.type_color %>"><%= c.type_name %></span></td>
-              <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_name || '未设置' %></span></td>
-              <td class="hide-mobile"><i class="bi bi-person text-muted me-1"></i><%= c.client_name || '—' %></td>
+              <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_category ? ({signed:'已签约',processing:'理赔中',litigation:'诉讼中',closed:'已结案'}[c.status_category] || c.status_category) : '' %><%= c.status_name ? (' · ' + c.status_name) : '' %></span></td>
               <td class="hide-mobile"><i class="bi bi-briefcase text-muted me-1"></i><%= c.assignee_name || '—' %></td>
               <td class="hide-mobile"><i class="bi bi-person-check text-muted me-1"></i><%= c.sign_staff_name || '—' %></td>
               <td class="hide-mobile"><i class="bi bi-calendar-check text-muted me-1"></i><%= c.sign_date ? new Date(c.sign_date).toLocaleDateString('zh-CN') : '—' %></td>
@@ -162,7 +160,7 @@
             </tr>
           <% }) %>
           <% if (cases.length === 0) { %>
-            <tr><td colspan="<%= can('cases.delete') ? 13 : 12 %>" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的案件</td></tr>
+            <tr><td colspan="<%= can('cases.delete') ? 12 : 11 %>" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的案件</td></tr>
           <% } %>
         </tbody>
       </table>

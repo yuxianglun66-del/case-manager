@@ -185,7 +185,7 @@ router.get('/cases', async (req, res, next) => {
       `SELECT c.id, c.case_no, c.title, c.client_name, c.updated_at, c.next_action, c.reminder_at, c.fee_agreement, c.fee_details,
               c.sign_date, c.sign_staff_id,
               t.name AS type_name, t.color AS type_color, t.code AS type_code,
-              s.name AS status_name, s.color AS status_color,
+              s.name AS status_name, s.color AS status_color, s.category AS status_category,
               u.display_name AS assignee_name,
               us.display_name AS sign_staff_name,
               (SELECT COUNT(*)::int FROM attachments a WHERE a.case_id = c.id) AS file_count
@@ -414,7 +414,7 @@ router.get('/cases/:id', async (req, res, next) => {
        WHERE c.case_id = $1 ORDER BY c.created_at DESC`, [id]
     )).rows;
 
-    const statuses = (await pool.query(`SELECT id, name, color FROM statuses WHERE active = TRUE ORDER BY sort`)).rows;
+    const statuses = (await pool.query(`SELECT id, name, color, category FROM statuses WHERE active = TRUE ORDER BY category, sort`)).rows;
 
     res.render('cases/detail', {
       title: c.case_no,
