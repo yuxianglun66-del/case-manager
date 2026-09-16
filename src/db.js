@@ -395,13 +395,61 @@ const SEED_TYPE_FIELDS = {
 };
 
 const SEED_STATUSES = [
-  ['待受理', 'pending', '#6c757d', 1],
-  ['理赔中', 'processing', '#0d6efd', 2],
-  ['诉讼中', 'litigation', '#fd7e14', 3],
-  ['调解中', 'processing', '#20c997', 4],
-  ['已结案', 'closed', '#198754', 5],
-  ['已归档', 'archived', '#6f42c1', 6],
+  // 已签约
+  ['住院中', 'signed', '#0dcaf0', 1],
+  ['已出院', 'signed', '#20c997', 2],
+  ['材料收集中', 'signed', '#6f42c1', 3],
+  ['材料补充中', 'signed', '#fd7e14', 4],
+  ['材料已齐全', 'signed', '#198754', 5],
+  // 理赔中
+  ['已报案', 'processing', '#0d6efd', 6],
+  ['材料待提交', 'processing', '#0d6efd', 7],
+  ['材料已提交', 'processing', '#6f42c1', 8],
+  ['材料审核中', 'processing', '#fd7e14', 9],
+  ['赔偿方案沟通', 'processing', '#0dcaf0', 10],
+  ['赔偿方案已确认', 'processing', '#198754', 11],
+  ['理赔协议签署', 'processing', '#20c997', 12],
+  ['赔偿钱款待支付', 'processing', '#fd7e14', 13],
+  ['赔偿钱款已支付', 'processing', '#198754', 14],
+  // 诉讼中
+  ['待立案', 'litigation', '#6f42c1', 15],
+  ['立案中', 'litigation', '#0d6efd', 16],
+  ['已立案', 'litigation', '#198754', 17],
+  ['待质证', 'litigation', '#6f42c1', 18],
+  ['已质证', 'litigation', '#198754', 19],
+  ['待鉴定', 'litigation', '#6f42c1', 20],
+  ['已鉴定', 'litigation', '#198754', 21],
+  ['代排庭', 'litigation', '#fd7e14', 22],
+  ['待开庭', 'litigation', '#0d6efd', 23],
+  ['已开庭', 'litigation', '#198754', 24],
+  ['待判决', 'litigation', '#6f42c1', 25],
+  ['已判决', 'litigation', '#198754', 26],
+  ['调解中', 'litigation', '#0dcaf0', 27],
+  ['调解已确认', 'litigation', '#198754', 28],
+  ['待支付', 'litigation', '#fd7e14', 29],
+  ['赔偿已支付', 'litigation', '#20c997', 30],
+  ['赔偿已到账', 'litigation', '#198754', 31],
+  ['上诉中', 'litigation', '#6f42c1', 32],
+  ['待二审开庭', 'litigation', '#0d6efd', 33],
+  ['二审开庭已开庭', 'litigation', '#198754', 34],
+  ['待二审判决', 'litigation', '#6f42c1', 35],
+  ['二审已判决', 'litigation', '#198754', 36],
+  // 已结案
+  ['待支付服务费', 'closed', '#fd7e14', 37],
+  ['已支付服务费', 'closed', '#198754', 38],
+  ['已结案', 'closed', '#198754', 39],
+  ['已归档', 'closed', '#6f42c1', 40],
 ];
+
+// 旧模板 → 新模板案件状态引用迁移映射（仅升级时使用）
+const LEGACY_STATUS_MAP = {
+  '待受理': '住院中',
+  '理赔中': '已报案',
+  '诉讼中': '待立案',
+  '调解中': '调解中',
+  '已结案': '已结案',
+  '已归档': '已归档',
+};
 
 // 合同模板种子（PDF 文件需手动上传到 uploads/contracts/，这里只建记录）
 const SEED_CONTRACT_TEMPLATES = [
@@ -576,19 +624,64 @@ async function initDb() {
         );
       }
     } else {
-      // 迁移：仅当存在重复排序序号时，按 sort,id 顺序重新编连续唯一序号
-      const { rows: dupCheck } = await client.query(
-        `SELECT COUNT(*)::int AS n FROM (
-           SELECT sort FROM statuses GROUP BY sort HAVING COUNT(*) > 1
-         ) d`
+      // 迁移①：旧模板（待受理/理赔中/诉讼中/调解中/已结案/已归档）→ 新 4 分类模板
+      // 触发条件：存在旧模板标志状态"待受理"（该名称新模板与自定义均不会使用）
+      const { rows: legacyCheck } = await client.query(
+        `SELECT id, name, sort FROM statuses WHERE name = '待受理' LIMIT 1`
       );
-      if (dupCheck[0].n > 0) {
-        await client.query(
-          `WITH ranked AS (
-             SELECT id, ROW_NUMBER() OVER (ORDER BY sort, id) AS new_sort FROM statuses
-           )
-           UPDATE statuses s SET sort = r.new_sort FROM ranked r WHERE s.id = r.id`
+      if (legacyCheck.length > 0) {
+        // 保留所有行 id（案件引用安全），将旧名行更新为新模板对应行
+        const { rows: allRows } = await client.query(`SELECT id, name FROM statuses`);
+        const byName = {};
+        allRows.forEach(r => { byName[r.name] = r.id; });
+        const LEGACY_MAP = LEGACY_STATUS_MAP;
+        for (const [oldName, newName] of Object.entries(LEGACY_MAP)) {
+          const rowId = byName[oldName];
+          if (!rowId) continue;
+          const tpl = SEED_STATUSES.find(s => s[0] === newName);
+          if (!tpl) continue;
+          await client.query(
+            `UPDATE statuses SET name=$1, category=$2, color=$3, sort=$4 WHERE id=$5`,
+            [tpl[0], tpl[1], tpl[2], tpl[3], rowId]
+          );
+        }
+        // 补齐新模板中缺失的状态
+        const { rows: afterRows } = await client.query(`SELECT id, name FROM statuses`);
+        const afterNames = new Set(afterRows.map(r => r.name));
+        for (const tpl of SEED_STATUSES) {
+          if (afterNames.has(tpl[0])) continue;
+          await client.query(
+            `INSERT INTO statuses (name, category, color, sort) VALUES ($1,$2,$3,$4)`,
+            [tpl[0], tpl[1], tpl[2], tpl[3]]
+          );
+        }
+        // 统一重排 sort：模板内状态按模板序号，其余（自定义/停用）排后
+        const tplIdx = {};
+        SEED_STATUSES.forEach((t, i) => { tplIdx[t[0]] = i + 1; });
+        const { rows: finalRows } = await client.query(`SELECT id, name, sort FROM statuses ORDER BY sort, id`);
+        const ordered = finalRows.slice().sort((a, b) => {
+          const ai = tplIdx[a.name] !== undefined ? tplIdx[a.name] : 1000 + (a.sort || 0);
+          const bi = tplIdx[b.name] !== undefined ? tplIdx[b.name] : 1000 + (b.sort || 0);
+          return ai - bi;
+        });
+        for (let i = 0; i < ordered.length; i++) {
+          await client.query(`UPDATE statuses SET sort = $1 WHERE id = $2`, [i + 1, ordered[i].id]);
+        }
+      } else {
+        // 迁移②：仅当存在重复排序序号时，按 sort,id 顺序重新编连续唯一序号
+        const { rows: dupCheck } = await client.query(
+          `SELECT COUNT(*)::int AS n FROM (
+             SELECT sort FROM statuses GROUP BY sort HAVING COUNT(*) > 1
+           ) d`
         );
+        if (dupCheck[0].n > 0) {
+          await client.query(
+            `WITH ranked AS (
+               SELECT id, ROW_NUMBER() OVER (ORDER BY sort, id) AS new_sort FROM statuses
+             )
+             UPDATE statuses s SET sort = r.new_sort FROM ranked r WHERE s.id = r.id`
+          );
+        }
       }
     }
 

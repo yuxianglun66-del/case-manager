@@ -166,10 +166,10 @@ router.get('/cases', async (req, res, next) => {
     if (dateFrom) { params.push(dateFrom); where.push(`c.sign_date >= $${params.length}`); }
     if (dateTo) { params.push(dateTo); where.push(`c.sign_date <= $${params.length}`); }
     const catSql = {
-      pending: `s2.category = 'pending'`,
+      signed: `s2.category = 'signed'`,
       processing: `s2.category = 'processing'`,
       litigation: `s2.category = 'litigation'`,
-      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+      closed: `s2.category = 'closed'`
     };
     if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (!canViewAll(user)) { params.push(user.id); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
@@ -671,11 +671,11 @@ router.get('/reports/finance', requirePermission('reports.view'), async (req, re
     const caseStats = (await pool.query(
       `SELECT
          COUNT(*)::int AS case_count,
-         COUNT(*) FILTER (WHERE s.category IN ('closed','archived')) AS settled_case_count,
+         COUNT(*) FILTER (WHERE s.category = 'closed') AS settled_case_count,
          COALESCE(SUM(c.target_amount), 0) AS target_total,
          COALESCE(SUM(c.received_amount), 0) AS received_total,
-         COALESCE(SUM(CASE WHEN s.category IN ('closed','archived') THEN c.target_amount ELSE 0 END), 0) AS settled_target,
-         COALESCE(SUM(CASE WHEN s.category IN ('closed','archived') THEN c.received_amount ELSE 0 END), 0) AS settled_received
+         COALESCE(SUM(CASE WHEN s.category = 'closed' THEN c.target_amount ELSE 0 END), 0) AS settled_target,
+         COALESCE(SUM(CASE WHEN s.category = 'closed' THEN c.received_amount ELSE 0 END), 0) AS settled_received
        FROM cases c
        LEFT JOIN statuses s ON s.id = c.status_id
        ${cWhereSql}`, cParams

@@ -50,23 +50,24 @@
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table mb-0">
+            <table class="table mb-0 sortable-fields" data-type="<%= t.id %>">
               <thead>
-                <tr><th>字段名称</th><th>类型</th><th>必填</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr>
+                <tr><th style="width:34px"></th><th>字段名称</th><th>类型</th><th>必填</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr>
               </thead>
               <tbody>
                 <% const fs = fieldsByType[t.id] || []; %>
                 <% if (fs.length === 0) { %>
-                  <tr><td colspan="6" class="empty-tip"><i class="bi bi-journal-text"></i>暂无字段，点击右上角「+」新增</td></tr>
+                  <tr><td colspan="7" class="empty-tip"><i class="bi bi-journal-text"></i>暂无字段，点击右上角「+」新增</td></tr>
                 <% } %>
                 <% fs.forEach(f => { %>
-                  <tr>
+                  <tr draggable="true" data-id="<%= f.id %>" class="sortable-row">
+                    <td class="text-muted cursor-grab"><i class="bi bi-grip-vertical"></i></td>
                     <td><%= f.label %></td>
                     <td>
                       <%= {text:'单行文本', textarea:'多行文本', number:'数字', date:'日期', select:'下拉选择', phone:'手机号'}[f.field_type] || f.field_type %>
                     </td>
                     <td><%= f.required ? '是' : '否' %></td>
-                    <td><%= f.sort %></td>
+                    <td class="sort-num"><%= String(f.sort).padStart(3, '0') %></td>
                     <td>
                       <% if (f.active) { %>
                         <span class="status-badge" style="background:#198754">启用</span>
@@ -100,15 +101,16 @@
     <div class="card">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table mb-0">
-            <thead><tr><th>状态名称</th><th>分类</th><th>颜色</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr></thead>
+          <table class="table mb-0" id="statusSortTable">
+            <thead><tr><th style="width:34px"></th><th>状态名称</th><th>分类</th><th>颜色</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr></thead>
             <tbody>
               <% statuses.forEach(s => { %>
-                <tr>
+                <tr draggable="true" data-id="<%= s.id %>" class="sortable-row">
+                  <td class="text-muted cursor-grab"><i class="bi bi-grip-vertical"></i></td>
                   <td><span class="status-badge" style="background:<%= s.color %>"><%= s.name %></span></td>
-                  <td><%= {pending:'待处理', processing:'处理中', litigation:'诉讼中', closed:'已结案', archived:'已归档'}[s.category] || s.category %></td>
+                  <td><%= {signed:'已签约', processing:'理赔中', litigation:'诉讼中', closed:'已结案'}[s.category] || s.category %></td>
                   <td><code><%= s.color %></code></td>
-                  <td><%= s.sort %></td>
+                  <td class="sort-num"><%= String(s.sort).padStart(3, '0') %></td>
                   <td>
                     <% if (s.active) { %>
                       <span class="status-badge" style="background:#198754">启用</span>
@@ -505,11 +507,10 @@
             <div class="col-6">
               <label class="form-label">分类（用于看板统计）</label>
               <select name="category" id="stCategory" class="form-select">
-                <option value="pending">待处理</option>
-                <option value="processing">处理中</option>
+                <option value="signed">已签约</option>
+                <option value="processing">理赔中</option>
                 <option value="litigation">诉讼中</option>
                 <option value="closed">已结案</option>
-                <option value="archived">已归档</option>
               </select>
             </div>
             <div class="col-6">
@@ -586,6 +587,76 @@
   const FIELDS = <%- safeJson(Object.values(fieldsByType).flat()) %>;
   const STATUSES = <%- safeJson(statuses) %>;
   const SETTINGS = <%- safeJson(settings) %>;
+
+  /* ---- 拖拽排序（状态表 + 字段表） ---- */
+  (function initDragSort() {
+    const csrf = document.querySelector('meta[name="csrf-token"]');
+    const csrfVal = csrf ? csrf.getAttribute('content') : '';
+    let dragRow = null;
+
+    document.querySelectorAll('tbody').forEach(tbody => {
+      tbody.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('tr.sortable-row');
+        if (!row) return;
+        dragRow = row;
+        row.classList.add('drag-over');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', row.dataset.id);
+      });
+      tbody.addEventListener('dragend', () => {
+        if (dragRow) { dragRow.classList.remove('drag-over'); dragRow = null; }
+      });
+      tbody.addEventListener('dragover', (e) => {
+        if (!dragRow) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.target.closest('tr.sortable-row');
+        if (!target || target === dragRow) return;
+        const rect = target.getBoundingClientRect();
+        const after = (e.clientY - rect.top) > (rect.height / 2);
+        tbody.insertBefore(dragRow, after ? target.nextSibling : target);
+      });
+    });
+
+    async function saveOrder(table, url, body) {
+      const ids = Array.from(table.querySelectorAll('tbody tr.sortable-row')).map(r => parseInt(r.dataset.id, 10));
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfVal },
+        credentials: 'same-origin',
+        body: JSON.stringify(body(ids))
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast((data && data.error) || '保存排序失败');
+        return;
+      }
+      table.querySelectorAll('tbody tr.sortable-row').forEach((row, i) => {
+        const cell = row.querySelector('.sort-num');
+        if (cell) cell.textContent = String(i + 1).padStart(3, '0');
+      });
+      toast('排序已保存');
+    }
+
+    document.addEventListener('drop', (e) => {
+      const row = e.target.closest ? e.target.closest('tr.sortable-row') : null;
+      if (row) { e.preventDefault(); e.stopPropagation(); }
+    });
+
+    const statusTable = document.getElementById('statusSortTable');
+    if (statusTable) statusTable.addEventListener('dragend', () => {
+      if (dragRow) { dragRow.classList.remove('drag-over'); dragRow = null; }
+      saveOrder(statusTable, '/api/statuses/reorder', (ids) => ({ order: ids }));
+    });
+
+    document.querySelectorAll('table.sortable-fields').forEach(tbl => {
+      tbl.addEventListener('dragend', () => {
+        if (dragRow) { dragRow.classList.remove('drag-over'); dragRow = null; }
+        const typeId = parseInt(tbl.dataset.type, 10);
+        saveOrder(tbl, '/api/fields/reorder', (ids) => ({ type_id: typeId, order: ids }));
+      });
+    });
+  })();
 
   /* ---- 预设配色（来自 themes.js 的 window.UI_THEMES，统一成套高对比主题） ---- */
   const PRESETS = window.UI_THEMES || [];

@@ -26,10 +26,10 @@
     <div class="d-flex flex-wrap align-items-center gap-2">
       <div class="btn-group flex-wrap" role="group" aria-label="状态分类">
         <a href="/cases" class="btn btn-sm <%= !filters.cat ? 'btn-primary' : 'btn-outline-secondary' %>">全部案件</a>
-        <a href="/cases?cat=pending" class="btn btn-sm <%= filters.cat === 'pending' ? 'btn-primary' : 'btn-outline-secondary' %>">待受理</a>
-        <a href="/cases?cat=processing" class="btn btn-sm <%= filters.cat === 'processing' ? 'btn-primary' : 'btn-outline-secondary' %>">处理中</a>
+        <a href="/cases?cat=signed" class="btn btn-sm <%= filters.cat === 'signed' ? 'btn-primary' : 'btn-outline-secondary' %>">已签约</a>
+        <a href="/cases?cat=processing" class="btn btn-sm <%= filters.cat === 'processing' ? 'btn-primary' : 'btn-outline-secondary' %>">理赔中</a>
         <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
-        <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案/归档</a>
+        <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案</a>
       </div>
       <div class="ms-auto d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterForm" aria-expanded="<%= hasFilter ? 'true' : 'false' %>" aria-controls="filterForm">

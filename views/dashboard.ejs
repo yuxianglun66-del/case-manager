@@ -7,10 +7,10 @@
 </div>
 
 <% 
-  const totalPending = byStatus.filter(s => s.category === 'pending').reduce((a,b) => a + b.n, 0);
+  const totalPending = byStatus.filter(s => s.category === 'signed').reduce((a,b) => a + b.n, 0);
   const totalProcessing = byStatus.filter(s => s.category === 'processing').reduce((a,b) => a + b.n, 0);
   const totalLitigation = byStatus.filter(s => s.category === 'litigation').reduce((a,b) => a + b.n, 0);
-  const totalClosed = byStatus.filter(s => s.category === 'closed' || s.category === 'archived').reduce((a,b) => a + b.n, 0);
+  const totalClosed = byStatus.filter(s => s.category === 'closed').reduce((a,b) => a + b.n, 0);
 %>
 
 <div class="row g-3 mb-4">
@@ -24,11 +24,11 @@
     </a>
   </div>
   <div class="col-6 col-lg">
-    <a href="/cases?cat=pending" class="stat-card stat-link">
+    <a href="/cases?cat=signed" class="stat-card stat-link">
       <div class="stat-icon" style="background:var(--grad-amber)"><i class="bi bi-hourglass-split"></i></div>
       <div>
         <div class="stat-num"><%= totalPending %></div>
-        <div class="stat-label">待受理</div>
+        <div class="stat-label">已签约</div>
       </div>
     </a>
   </div>
@@ -37,7 +37,7 @@
       <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-gear-wide-connected"></i></div>
       <div>
         <div class="stat-num"><%= totalProcessing %></div>
-        <div class="stat-label">处理中</div>
+        <div class="stat-label">理赔中</div>
       </div>
     </a>
   </div>
@@ -55,7 +55,7 @@
       <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-patch-check-fill"></i></div>
       <div>
         <div class="stat-num"><%= totalClosed %></div>
-        <div class="stat-label">已结案/归档</div>
+        <div class="stat-label">已结案</div>
       </div>
     </a>
   </div>

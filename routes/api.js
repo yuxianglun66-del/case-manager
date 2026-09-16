@@ -1210,9 +1210,27 @@ router.post('/fields/:id/delete', requirePermission('system.settings'), async (r
   } catch (e) { next(e); }
 });
 
+router.post('/fields/reorder', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const typeId = parseInt(req.body.type_id, 10);
+    const order = Array.isArray(req.body.order) ? req.body.order.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x)) : [];
+    if (!typeId || order.length === 0) return res.status(400).json({ error: '缺少类型或字段顺序' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < order.length; i++) {
+        await client.query(`UPDATE case_fields SET sort=$1 WHERE id=$2 AND case_type_id=$3`, [i + 1, order[i], typeId]);
+      }
+      await client.query('COMMIT');
+    } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    await audit(req, '排序动态字段', { entity_type: 'case_type', entity_id: typeId, detail: '调整字段显示顺序' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 /* ---------- 状态管理 ---------- */
 const CATEGORY_LABELS = {
-  pending: '待处理', processing: '处理中', litigation: '诉讼中', closed: '已结案', archived: '已归档',
+  signed: '已签约', processing: '理赔中', litigation: '诉讼中', closed: '已结案',
 };
 router.post('/statuses/create', requirePermission('system.settings'), async (req, res, next) => {
   try {
@@ -1266,6 +1284,23 @@ router.post('/statuses/:id/delete', requirePermission('system.settings'), async 
     await pool.query(`DELETE FROM case_history WHERE status_id = $1`, [id]);
     await pool.query(`DELETE FROM statuses WHERE id = $1`, [id]);
     if (old) await audit(req, '删除状态', { entity_type: 'status', entity_id: id, detail: '状态「' + old.name + '」' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/statuses/reorder', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const order = Array.isArray(req.body.order) ? req.body.order.map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x)) : [];
+    if (order.length === 0) return res.status(400).json({ error: '缺少状态顺序' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < order.length; i++) {
+        await client.query(`UPDATE statuses SET sort=$1 WHERE id=$2`, [i + 1, order[i]]);
+      }
+      await client.query('COMMIT');
+    } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    await audit(req, '排序状态', { entity_type: 'status', entity_id: null, detail: '调整状态先后顺序' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -1564,10 +1599,10 @@ router.get('/cases/export/csv', requirePermission('cases.import_export'), async 
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = ${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = ${params.length}`); }
     const catSql = {
-      pending: `s2.category = 'pending'`,
+      signed: `s2.category = 'signed'`,
       processing: `s2.category = 'processing'`,
       litigation: `s2.category = 'litigation'`,
-      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+      closed: `s2.category = 'closed'`
     };
     if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }
@@ -1622,10 +1657,10 @@ router.get('/cases/export/xlsx', requirePermission('cases.import_export'), async
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = ${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = ${params.length}`); }
     const catSql = {
-      pending: `s2.category = 'pending'`,
+      signed: `s2.category = 'signed'`,
       processing: `s2.category = 'processing'`,
       litigation: `s2.category = 'litigation'`,
-      closed: `(s2.category = 'closed' OR s2.category = 'archived')`
+      closed: `s2.category = 'closed'`
     };
     if (catSql[cat]) where.push(`EXISTS (SELECT 1 FROM statuses s2 WHERE s2.id = c.status_id AND ${catSql[cat]})`);
     if (assigneeId && canViewAll) { params.push(assigneeId); where.push(`(c.assignee_id = ${params.length} OR c.sign_staff_id = ${params.length})`); }

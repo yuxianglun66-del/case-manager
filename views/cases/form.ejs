@@ -78,10 +78,6 @@
           <label class="form-label">服务费约定方式</label>
           <textarea name="fee_agreement" class="form-control" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData ? (caseData.fee_agreement || '') : '' %></textarea>
         </div>
-        <div class="col-12">
-          <label class="form-label">费用明细</label>
-          <textarea name="fee_details" class="form-control" rows="3" placeholder="如：鉴定费由XX支付、诉讼费由XX支付、保全费由XX支付、律师费由XX支付"><%= caseData ? (caseData.fee_details || '') : '' %></textarea>
-        </div>
       </div>
 
       <div class="form-section-title"><i class="bi bi-file-earmark-text"></i> 案件信息</div>
