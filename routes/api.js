@@ -1312,8 +1312,15 @@ router.post('/statuses/create', requirePermission('system.settings'), async (req
     let sort = parseInt(req.body.sort, 10);
     if (sort === undefined || sort === null || isNaN(sort)) sort = 0;
     if (sort <= 0) {
-      const mx = (await pool.query(`SELECT COALESCE(MAX(sort), 0) AS mx FROM statuses`)).rows[0].mx;
-      sort = mx + 1;
+      const pref = { signed: 100, processing: 200, litigation: 300, closed: 400 };
+      const lo = pref[category] || 200;
+      const mx = (await pool.query(
+        `SELECT COALESCE(MAX(sort), $1) AS mx FROM statuses WHERE category = $2`,
+        [lo, category]
+      )).rows[0].mx;
+      sort = Math.max(mx + 1, lo + 1);
+      const dup = (await pool.query(`SELECT id FROM statuses WHERE sort = $1`, [sort])).rows[0];
+      if (dup) return res.status(400).json({ error: '排序序号 ' + sort + ' 已被其他状态使用，请使用其他序号' });
     } else {
       const dup = (await pool.query(`SELECT id FROM statuses WHERE sort = $1`, [sort])).rows[0];
       if (dup) return res.status(400).json({ error: '排序序号 ' + sort + ' 已被其他状态使用，请使用其他序号' });
@@ -1365,8 +1372,22 @@ router.post('/statuses/reorder', requirePermission('system.settings'), async (re
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      for (let i = 0; i < order.length; i++) {
-        await client.query(`UPDATE statuses SET sort=$1 WHERE id=$2`, [i + 1, order[i]]);
+      const { rows } = await client.query(`SELECT id, category FROM statuses`);
+      const catMap = {};
+      rows.forEach((r) => { catMap[r.id] = r.category; });
+      const pref = { signed: 100, processing: 200, litigation: 300, closed: 400 };
+      const doneCats = new Set();
+      for (const id of order) {
+        const cat = catMap[id] || 'processing';
+        if (doneCats.has(cat)) continue;
+        doneCats.add(cat);
+        const p = pref[cat] || 200;
+        let j = 1;
+        for (const sid of order) {
+          if ((catMap[sid] || 'processing') !== cat) continue;
+          await client.query(`UPDATE statuses SET sort=$1 WHERE id=$2`, [p + j, sid]);
+          j++;
+        }
       }
       await client.query('COMMIT');
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }

@@ -157,7 +157,7 @@
             <thead><tr><th style="width:34px"></th><th>状态名称</th><th>分类</th><th>颜色</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr></thead>
             <tbody>
               <% statuses.forEach(s => { %>
-                <tr draggable="true" data-id="<%= s.id %>" class="sortable-row">
+                <tr draggable="true" data-id="<%= s.id %>" class="sortable-row" data-cat="<%= s.category %>">
                   <td class="text-muted cursor-grab"><i class="bi bi-grip-vertical"></i></td>
                   <td><span class="status-badge" style="background:<%= s.color %>"><%= s.name %></span></td>
                   <td><%= {signed:'已签约', processing:'理赔中', litigation:'诉讼中', closed:'已结案'}[s.category] || s.category %></td>
@@ -683,9 +683,22 @@
         toast((data && data.error) || '保存排序失败');
         return;
       }
+      const STATUS_PREFIX = { signed: 100, processing: 200, litigation: 300, closed: 400 };
       table.querySelectorAll('tbody tr.sortable-row').forEach((row, i) => {
         const cell = row.querySelector('.sort-num');
-        if (cell) cell.textContent = String(i + 1).padStart(3, '0');
+        if (!cell) return;
+        if (table.id === 'statusSortTable') {
+          const cat = row.dataset.cat || 'processing';
+          let idx = 1;
+          for (const r of table.querySelectorAll('tbody tr.sortable-row')) {
+            if ((r.dataset.cat || 'processing') !== cat) continue;
+            if (r === row) break;
+            idx++;
+          }
+          cell.textContent = String((STATUS_PREFIX[cat] || 200) + idx).padStart(3, '0');
+        } else {
+          cell.textContent = String(i + 1).padStart(3, '0');
+        }
       });
       toast('排序已保存');
     }
@@ -903,16 +916,27 @@
   }
 
   /* ---- 状态 ---- */
+  const STATUS_PREFIX_FOR_NEW = { signed: 100, processing: 200, litigation: 300, closed: 400 };
+  function statusDefaultSort(cat) {
+    const lo = STATUS_PREFIX_FOR_NEW[cat] || 200;
+    const mx = Math.max(lo, ...STATUSES.filter(s => s.category === cat).map(s => parseInt(s.sort, 10) || 0));
+    return mx + 1;
+  }
   function openStatusCreate() {
     document.getElementById('statusFormModal').reset();
     document.getElementById('stId').value = '';
     document.getElementById('statusModalTitle').textContent = '新增状态';
     document.getElementById('stColor').value = '#0d6efd';
     document.getElementById('stActiveWrap').style.display = 'none';
-    const mxSort = Math.max(0, ...STATUSES.map(s => parseInt(s.sort, 10) || 0));
-    document.getElementById('stSort').value = mxSort + 1;
+    const cat = document.getElementById('stCategory').value || 'processing';
+    document.getElementById('stSort').value = statusDefaultSort(cat);
     new bootstrap.Modal(document.getElementById('statusModal')).show();
   }
+  document.getElementById('stCategory').addEventListener('change', () => {
+    if (document.getElementById('stId').value) return;
+    const cat = document.getElementById('stCategory').value || 'processing';
+    document.getElementById('stSort').value = statusDefaultSort(cat);
+  });
   function openStatusEdit(id) {
     const s = STATUSES.find(x => x.id === id);
     document.getElementById('statusFormModal').reset();
