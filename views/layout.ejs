@@ -144,8 +144,8 @@
           '.sidebar-footer{border-top-color:' + sBorder + '!important;background:' + sFootBg + '!important;}' +
           '.user-meta strong{color:' + sFg + '!important;}' +
           '.user-meta small{color:' + sMuted + '!important;}' +
-          '.btn-primary{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;}' +
-          '.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;}' +
+'.btn-primary{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;}' +
+'.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;background:' + (bodyDark ? 'rgba(59,130,246,.16)' : 'rgba(59,130,246,.09)') + '!important;background-image:' + (bodyDark ? 'linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.04))' : 'linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.04))') + '!important;}' +
           '.pagination .page-link{color:' + primText + '!important;border-color:' + cBorder + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.5)' : 'rgba(255,255,255,.8)') + '!important;}' +
           '.pagination .page-item.active .page-link{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;border-color:' + primary + '!important;}' +
           '.pagination .page-item.disabled .page-link{color:' + cFaint + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.3)' : 'rgba(241,245,249,.6)') + '!important;}' +
@@ -164,9 +164,10 @@
           '.page-head h1,.stat-num{background:linear-gradient(135deg,' + headingA + ' 22%,' + headingB + ')!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:' + cFg + '!important;}' +
           '.form-section-title{background:linear-gradient(135deg,' + headingA + ',' + headingB + ')!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:' + headingB + '!important;}' +
           '.card-header i,.info-label i{background:none!important;-webkit-text-fill-color:' + headingB + '!important;background-clip:initial!important;color:' + headingB + '!important;}' +
-          '.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.12)' : '#ffffff') + '!important;border-color:' + (bodyDark ? 'rgba(255,255,255,.22)' : cBorder) + '!important;}' +
-          '.btn-outline-secondary{color:' + cMuted + '!important;border-color:' + cBorder + '!important;}' +
-          '.btn-ico.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.12)' : '#ffffff') + '!important;border-color:' + (bodyDark ? 'rgba(255,255,255,.22)' : cBorder) + '!important;}' +
+          '.btn-light{color:' + cFg + '!important;background:' + (bodyDark ? 'rgba(148,163,184,.20)' : 'linear-gradient(180deg,#f2f4f8,#dfe4ec)') + '!important;border-color:' + (bodyDark ? 'rgba(148,163,184,.4)' : '#cbd5e1') + '!important;}' +
+          '.btn-outline-secondary{color:' + cMuted + '!important;border-color:' + cBorder + '!important;background:' + (bodyDark ? 'rgba(148,163,184,.16)' : 'rgba(148,163,184,.14)') + '!important;background-image:linear-gradient(180deg,' + (bodyDark ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.5)') + ',' + (bodyDark ? 'rgba(0,0,0,.08)' : 'rgba(0,0,0,.06)') + ')!important;}' +
+          '.btn-outline-secondary:hover{background:' + (bodyDark ? 'rgba(148,163,184,.28)' : 'rgba(148,163,184,.22)') + '!important;color:' + cFg + '!important;border-color:' + cMuted + '!important;}' +
+          '.btn-ico.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(148,163,184,.20)' : 'linear-gradient(180deg,#f2f4f8,#dfe4ec)') + '!important;border-color:' + (bodyDark ? 'rgba(148,163,184,.32)' : '#c3cdd9') + '!important;}' +
           '.form-control,.form-select{background:' + inputBg + '!important;color:' + cFg + '!important;border-color:' + (bodyDark ? 'rgba(59,130,246,.12)' : cBorder) + '!important;}' +
           '.form-control:focus,.form-select:focus{background:' + inputFocusBg + '!important;color:' + cFg + '!important;border-color:' + accent + '!important;box-shadow:0 0 0 3px ' + rgba(ar, .12) + '!important;}' +
           '.form-select option{background:' + cSurfaceSolid + '!important;color:' + cFg + '!important;}' +

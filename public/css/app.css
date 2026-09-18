@@ -641,49 +641,48 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
 .btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); border: none; color: #fff; }
 
 .btn-light {
-  background-color: rgba(59, 130, 246, .08);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.05));
-  border: 1px solid rgba(59, 130, 246, .16);
-  color: #94a3b8;
+  background: linear-gradient(180deg, #f2f4f8, #dfe4ec);
+  border: 1px solid #cbd5e1;
+  color: #334155;
 }
-.btn-light:hover { background-color: rgba(59, 130, 246, .15); border-color: rgba(59,130,246,.28); color: var(--accent); }
+.btn-light:hover { background: linear-gradient(180deg, #e9edf4, #d3dae5); border-color: #b4c1d4; color: #1e293b; }
 
 .btn-outline-primary {
-  background-color: rgba(59,130,246,.07);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(59, 130, 246, .32); color: var(--primary-text);
+  background-color: rgba(59,130,246,.14);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));
+  border: 1px solid rgba(59, 130, 246, .48); color: var(--primary-text);
 }
-.btn-outline-primary:hover { background-color: rgba(59, 130, 246, .16); border-color: var(--accent); color: var(--accent); }
+.btn-outline-primary:hover { background-color: rgba(59, 130, 246, .24); border-color: var(--accent); color: var(--accent); }
 .btn-outline-success {
-  background-color: rgba(16,185,129,.07);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(16, 185, 129, .3); color: var(--neon-green);
+  background-color: rgba(16,185,129,.15);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));
+  border: 1px solid rgba(16, 185, 129, .5); color: var(--neon-green);
 }
-.btn-outline-success:hover { background-color: rgba(16, 185, 129, .16); border-color: var(--neon-green); }
+.btn-outline-success:hover { background-color: rgba(16, 185, 129, .26); border-color: var(--neon-green); }
 .btn-outline-danger {
-  background-color: rgba(239,68,68,.07);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(239, 68, 68, .28); color: #f87171;
+  background-color: rgba(239,68,68,.13);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,.05));
+  border: 1px solid rgba(239, 68, 68, .48); color: #f87171;
 }
-.btn-outline-danger:hover { background-color: rgba(239, 68, 68, .16); border-color: #ef4444; }
+.btn-outline-danger:hover { background-color: rgba(239, 68, 68, .24); border-color: #ef4444; }
 .btn-outline-secondary {
-  background-color: rgba(148,163,184,.08);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(148, 163, 184, .28); color: var(--content-muted);
+  background-color: rgba(148,163,184,.16);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,.05));
+  border: 1px solid rgba(148, 163, 184, .5); color: var(--content-muted);
 }
-.btn-outline-secondary:hover { background-color: rgba(148, 163, 184, .18); border-color: rgba(148,163,184,.5); color: var(--content-fg); }
+.btn-outline-secondary:hover { background-color: rgba(148, 163, 184, .28); border-color: rgba(148,163,184,.7); color: var(--content-fg); }
 .btn-outline-warning {
-  background-color: rgba(245,158,11,.08);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(245, 158, 11, .3); color: #fbbf24;
+  background-color: rgba(245,158,11,.15);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));
+  border: 1px solid rgba(245, 158, 11, .5); color: #fbbf24;
 }
-.btn-outline-warning:hover { background-color: rgba(245, 158, 11, .18); border-color: #f59e0b; }
+.btn-outline-warning:hover { background-color: rgba(245, 158, 11, .26); border-color: #f59e0b; }
 .btn-outline-info {
-  background-color: rgba(14,165,233,.08);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
-  border: 1px solid rgba(14, 165, 233, .3); color: #38bdf8;
+  background-color: rgba(14,165,233,.15);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));
+  border: 1px solid rgba(14, 165, 233, .5); color: #38bdf8;
 }
-.btn-outline-info:hover { background-color: rgba(14, 165, 233, .18); border-color: #0ea5e9; }
+.btn-outline-info:hover { background-color: rgba(14, 165, 233, .26); border-color: #0ea5e9; }
 
 /* ============================================================
    分页
