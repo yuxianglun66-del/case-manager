@@ -39,7 +39,7 @@
       </form>
       <div class="ms-auto d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterForm" aria-expanded="<%= hasFilter ? 'true' : 'false' %>" aria-controls="filterForm">
-          <i class="bi bi-funnel"></i> 筛选
+          <i class="bi bi-funnel"></i> 更多条件搜索
           <% if (filterCount) { %><span class="badge rounded-pill text-bg-primary ms-1"><%= filterCount %></span><% } %>
         </button>
         <% if (can('cases.edit')) { %>
@@ -53,10 +53,6 @@
 
     <!-- 筛选条件（可折叠） -->
     <form method="GET" action="/cases" class="row g-2 align-items-end collapse <%= hasFilter ? 'show' : '' %> mt-3" id="filterForm">
-      <div class="col-12 col-md-4 col-lg-3">
-        <label class="form-label mb-1">关键词</label>
-        <input type="text" name="kw" class="form-control" placeholder="搜索案号/名称/客户" value="<%= filters.kw %>">
-      </div>
       <div class="col-6 col-md-3 col-lg-2">
         <label class="form-label mb-1">类型</label>
         <select name="type" class="form-select">
