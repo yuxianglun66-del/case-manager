@@ -459,49 +459,49 @@ const SEED_TYPE_FIELDS = {
 
 const SEED_STATUSES = [
   // 已签约（1XX）
-  ['住院中', 'signed', '#227ad3', 101],
-  ['已出院', 'signed', '#e47525', 102],
-  ['材料收集中', 'signed', '#6828c3', 103],
-  ['材料补充中', 'signed', '#e84b17', 104],
-  ['材料已齐全', 'signed', '#28c361', 105],
+  ['住院中', 'signed', '#9F9114', 101],
+  ['已出院', 'signed', '#0D3BC5', 102],
+  ['材料收集中', 'signed', '#BA7D21', 103],
+  ['材料补充中', 'signed', '#0667B7', 104],
+  ['材料已齐全', 'signed', '#E9591C', 105],
   // 理赔中（2XX）
-  ['已报案', 'processing', '#27a59b', 201],
-  ['材料待提交', 'processing', '#e49525', 202],
-  ['材料已提交', 'processing', '#2256bf', 203],
-  ['材料审核中', 'processing', '#ca2191', 204],
-  ['赔偿方案沟通', 'processing', '#29ae6b', 205],
-  ['赔偿方案已确认', 'processing', '#e78523', 206],
-  ['理赔协议签署', 'processing', '#4228c3', 207],
-  ['赔偿钱款待支付', 'processing', '#e83b2c', 208],
-  ['赔偿钱款已支付', 'processing', '#28b84c', 209],
+  ['已报案', 'processing', '#099AB3', 201],
+  ['材料待提交', 'processing', '#E44949', 202],
+  ['材料已提交', 'processing', '#149F8A', 203],
+  ['材料审核中', 'processing', '#E10E4E', 204],
+  ['赔偿方案沟通', 'processing', '#1CA065', 205],
+  ['赔偿方案已确认', 'processing', '#F820A2', 206],
+  ['理赔协议签署', 'processing', '#10A235', 207],
+  ['赔偿钱款待支付', 'processing', '#F312DC', 208],
+  ['赔偿钱款已支付', 'processing', '#20A419', 209],
   // 诉讼中（3XX）
-  ['待立案', 'litigation', '#6b24b2', 301],
-  ['立案中', 'litigation', '#e88a2c', 302],
-  ['已立案', 'litigation', '#2fc6ad', 303],
-  ['待质证', 'litigation', '#9c25a7', 304],
-  ['已质证', 'litigation', '#e8992c', 305],
-  ['待鉴定', 'litigation', '#7123a9', 306],
-  ['已鉴定', 'litigation', '#e3b11c', 307],
-  ['代排庭', 'litigation', '#2bb67c', 308],
-  ['待开庭', 'litigation', '#6625a7', 309],
-  ['已开庭', 'litigation', '#e86a2c', 310],
-  ['待判决', 'litigation', '#5b25a7', 311],
-  ['已判决', 'litigation', '#2fc694', 312],
-  ['调解中', 'litigation', '#9526ba', 313],
-  ['调解已确认', 'litigation', '#e7a523', 314],
-  ['待支付', 'litigation', '#29ae76', 315],
-  ['赔偿已支付', 'litigation', '#8823a9', 316],
-  ['赔偿已到账', 'litigation', '#e7b623', 317],
-  ['上诉中', 'litigation', '#28c39c', 318],
-  ['待二审开庭', 'litigation', '#7c25a7', 319],
-  ['二审开庭已开庭', 'litigation', '#e7d623', 320],
-  ['待二审判决', 'litigation', '#27b08d', 321],
-  ['二审已判决', 'litigation', '#7d26ba', 322],
+  ['待立案', 'litigation', '#C745E8', 301],
+  ['立案中', 'litigation', '#3E9E0A', 302],
+  ['已立案', 'litigation', '#7824CC', 303],
+  ['待质证', 'litigation', '#659905', 304],
+  ['已质证', 'litigation', '#542EEA', 305],
+  ['待鉴定', 'litigation', '#8F9608', 306],
+  ['已鉴定', 'litigation', '#2638DF', 307],
+  ['代排庭', 'litigation', '#B18A16', 308],
+  ['待开庭', 'litigation', '#3A84F2', 309],
+  ['已开庭', 'litigation', '#BA6621', 310],
+  ['待判决', 'litigation', '#0797D5', 311],
+  ['已判决', 'litigation', '#BE2D13', 312],
+  ['调解中', 'litigation', '#08A0A0', 313],
+  ['调解已确认', 'litigation', '#A4192D', 314],
+  ['待支付', 'litigation', '#149F75', 315],
+  ['赔偿已支付', 'litigation', '#D80E69', 316],
+  ['赔偿已到账', 'litigation', '#1CA051', 317],
+  ['上诉中', 'litigation', '#D507A1', 318],
+  ['待二审开庭', 'litigation', '#10A21F', 319],
+  ['二审开庭已开庭', 'litigation', '#BD0AC7', 320],
+  ['待二审判决', 'litigation', '#34A419', 321],
+  ['二审已判决', 'litigation', '#7415A8', 322],
   // 已结案（4XX）
-  ['待支付服务费', 'closed', '#e48525', 401],
-  ['已支付服务费', 'closed', '#28b870', 402],
-  ['已结案', 'closed', '#8f28c3', 403],
-  ['已归档', 'closed', '#4db390', 404],
+  ['待支付服务费', 'closed', '#549E0A', 401],
+  ['已支付服务费', 'closed', '#5B22C3', 402],
+  ['已结案', 'closed', '#7C9905', 403],
+  ['已归档', 'closed', '#1D14C8', 404],
 ];
 
 // 旧模板 → 新模板案件状态引用迁移映射（仅升级时使用）
@@ -853,6 +853,23 @@ async function initDb() {
         }
         await client.query(
           `INSERT INTO app_settings (key, value, description) VALUES ('status_palette_v3', '1', '调色板 v2 优化（相邻≥100°、40色唯一）已应用') ON CONFLICT (key) DO NOTHING`
+        );
+      }
+      // 迁移⑤：调色板 v3 丰富化（40色均匀色相网格，列表相邻色相差≈171°，色相族均衡）
+      const { rows: paletteV4Flag } = await client.query(
+        `SELECT value FROM app_settings WHERE key = 'status_palette_v4' LIMIT 1`
+      );
+      if (paletteV4Flag.length === 0) {
+        const { rows: cur4 = [] } = await client.query(`SELECT id, name FROM statuses`);
+        const byName4 = {};
+        cur4.forEach((r) => { byName4[r.name] = r; });
+        for (const tpl of SEED_STATUSES) {
+          const row = byName4[tpl[0]];
+          if (!row) continue;
+          await client.query(`UPDATE statuses SET color=$1 WHERE id=$2`, [tpl[2], row.id]);
+        }
+        await client.query(
+          `INSERT INTO app_settings (key, value, description) VALUES ('status_palette_v4', '1', '调色板 v3 丰富化（均匀色相网格、相邻≈171°）已应用') ON CONFLICT (key) DO NOTHING`
         );
       }
     }
