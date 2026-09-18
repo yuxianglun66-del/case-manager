@@ -726,7 +726,10 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
   border-bottom: 1px solid var(--content-border);
   background: linear-gradient(180deg, rgba(59,130,246,.06), transparent);
   border-radius: var(--radius) var(--radius) 0 0;
+  cursor: grab;
 }
+.modal-header:active { cursor: grabbing; }
+.modal-header button, .modal-header a, .modal-header input { cursor: pointer; }
 .modal-title { font-weight: 700; color: var(--content-fg); }
 .modal-body { color: var(--content-fg); }
 .modal-footer { border-top: 1px solid var(--content-border); }
