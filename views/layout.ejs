@@ -103,9 +103,18 @@
         var cMuted = bodyDark ? '#94a3b8' : '#475569';
         var cFaint = bodyDark ? '#64748b' : '#64748b';
         var cBorder = bodyDark ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.1)';
-        var cSurface = bodyDark ? 'rgba(15,23,42,.85)' : 'rgba(255,255,255,.92)';
-        var cSurfaceSolid = bodyDark ? '#0f172a' : '#ffffff';
-        var cSurfaceElevated = bodyDark ? 'rgba(20,30,55,.92)' : 'rgba(241,245,249,.95)';
+        // 主题配套的卡片/强调色 token（themes.js 写入），无 token 时回退到明暗模式默认
+        function tvw(name, fbDark, fbLight) { var x = (cs.getPropertyValue(name) || '').trim(); return x || (bodyDark ? fbDark : fbLight); }
+        var themeAccent = (cs.getPropertyValue('--theme-accent') || '').trim();
+        var accent = themeAccent || (bodyDark ? '#00e5ff' : primText);
+        var ar = hexToRgb(accent);
+        var cSurface = tvw('--theme-surface', 'rgba(15,23,42,.85)', 'rgba(255,255,255,.92)');
+        var cSurfaceSolid = tvw('--theme-surface-solid', '#0f172a', '#ffffff');
+        var cSurfaceElevated = tvw('--theme-surface-elevated', 'rgba(20,30,55,.92)', 'rgba(241,245,249,.95)');
+        var headingA = bodyDark ? '#f8fafc' : cFg;
+        var headingB = bodyDark ? accent : primText;
+        var inputBg = bodyDark ? 'rgba(15,23,42,.6)' : 'rgba(255,255,255,.9)';
+        var inputFocusBg = bodyDark ? 'rgba(15,23,42,.8)' : '#ffffff';
         root.style.setProperty('--surface', cSurface);
         root.style.setProperty('--surface-solid', cSurfaceSolid);
         root.style.setProperty('--surface-elevated', cSurfaceElevated);
@@ -114,6 +123,15 @@
         root.style.setProperty('--content-faint', cFaint);
         root.style.setProperty('--content-border', cBorder);
         root.style.setProperty('--text-color', cFg);
+        // 强调色 + 立体层次（分层阴影/顶部高光）变量，为卡片/统计卡/弹窗提供统一的柔和深度
+        root.style.setProperty('--accent', accent);
+        root.style.setProperty('--accent-rgb', ar.join(', '));
+        root.style.setProperty('--card-shadow', bodyDark ? '0 10px 30px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.30)' : '0 12px 32px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.06)');
+        root.style.setProperty('--card-shadow-hover', bodyDark ? '0 18px 46px rgba(0,0,0,.55)' : '0 20px 46px rgba(15,23,42,.16)');
+        root.style.setProperty('--card-inset', bodyDark ? 'inset 0 1px 0 rgba(255,255,255,.06)' : 'inset 0 1px 0 rgba(255,255,255,.75)');
+        root.style.setProperty('--glass-sheen', bodyDark ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.65)');
+        root.style.setProperty('--input-bg', inputBg);
+        root.style.setProperty('--input-fg', cFg);
         // 直接写入解析后颜色，规避浏览器对 var 依赖的延迟重算，保证文字始终清晰
         var css = '' +
           '.sidebar{background:' + sidebar + '!important;color:' + sFaint + '!important;}' +
@@ -128,8 +146,9 @@
           '.user-meta small{color:' + sMuted + '!important;}' +
           '.btn-primary{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;}' +
           '.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;}' +
-          '.pagination .page-link{color:' + primText + '!important;}' +
+          '.pagination .page-link{color:' + primText + '!important;border-color:' + cBorder + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.5)' : 'rgba(255,255,255,.8)') + '!important;}' +
           '.pagination .page-item.active .page-link{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;border-color:' + primary + '!important;}' +
+          '.pagination .page-item.disabled .page-link{color:' + cFaint + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.3)' : 'rgba(241,245,249,.6)') + '!important;}' +
           '.text-primary{color:' + primText + '!important;}' +
           '.text-muted{color:' + cMuted + '!important;}' +
           '.small,.text-sm{color:' + cMuted + '!important;}' +
@@ -142,10 +161,15 @@
           '.card-body{color:' + cFg + '!important;}' +
           '.fw-semibold,.fw-bold,.fw-medium{color:' + cFg + '!important;}' +
           '.lead{color:' + cMuted + '!important;}' +
-          '.page-head h1{color:' + cFg + '!important;}' +
+          '.page-head h1,.stat-num{background:linear-gradient(135deg,' + headingA + ' 22%,' + headingB + ')!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:' + cFg + '!important;}' +
+          '.form-section-title{background:linear-gradient(135deg,' + headingA + ',' + headingB + ')!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:' + headingB + '!important;}' +
+          '.card-header i,.info-label i{background:none!important;-webkit-text-fill-color:' + headingB + '!important;background-clip:initial!important;color:' + headingB + '!important;}' +
           '.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.12)' : '#ffffff') + '!important;border-color:' + (bodyDark ? 'rgba(255,255,255,.22)' : cBorder) + '!important;}' +
           '.btn-outline-secondary{color:' + cMuted + '!important;border-color:' + cBorder + '!important;}' +
           '.btn-ico.btn-light{color:var(--text-color)!important;background:' + (bodyDark ? 'rgba(255,255,255,.12)' : '#ffffff') + '!important;border-color:' + (bodyDark ? 'rgba(255,255,255,.22)' : cBorder) + '!important;}' +
+          '.form-control,.form-select{background:' + inputBg + '!important;color:' + cFg + '!important;border-color:' + (bodyDark ? 'rgba(59,130,246,.12)' : cBorder) + '!important;}' +
+          '.form-control:focus,.form-select:focus{background:' + inputFocusBg + '!important;color:' + cFg + '!important;border-color:' + accent + '!important;box-shadow:0 0 0 3px ' + rgba(ar, .12) + '!important;}' +
+          '.form-select option{background:' + cSurfaceSolid + '!important;color:' + cFg + '!important;}' +
           '.info-label{color:' + cMuted + '!important;}' +
           '.info-value{color:' + cFg + '!important;}' +
           '.file-item{background:var(--surface)!important;border-color:' + cBorder + '!important;color:' + cFg + '!important;}' +
@@ -162,7 +186,9 @@
           '.modal-content{background:var(--surface-elevated)!important;border-color:' + cBorder + '!important;}' +
           '.modal-title{color:' + cFg + '!important;}' +
           '.modal-header{border-bottom-color:' + cBorder + '!important;}' +
-          '.modal-footer{border-top-color:' + cBorder + '!important;}';
+          '.modal-footer{border-top-color:' + cBorder + '!important;}' +
+          '.app-shell{position:relative;z-index:1;}' +
+          'body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(' + rgba(p, .05) + ' 1px,transparent 1px),linear-gradient(90deg,' + rgba(p, .05) + ' 1px,transparent 1px);background-size:46px 46px;}';
         applyStyle(css);
       };
       // 注：window.applyThemeContrast() 由 body 开头的脚本调用，
@@ -347,11 +373,11 @@
           renderList();
         } catch (err) { /* toast handled inside */ }
       });
-      /* 启动时：如果本地保存了主题，则立刻覆盖页面主题 */
+      /* 启动时：本地保存的主题或服务端默认主题（若是预设）都应用配套的卡片/强调色 token */
       const savedTheme = localStorage.getItem('uiTheme');
-      if (savedTheme && window.uiTheme && window.uiTheme.find(savedTheme)) {
-        window.uiTheme.applyNow(window.uiTheme.find(savedTheme));
-      }
+      let startKey = (savedTheme && window.uiTheme && window.uiTheme.find(savedTheme)) ? savedTheme : null;
+      if (!startKey && window.uiTheme && window.uiTheme.detect) startKey = window.uiTheme.detect();
+      if (startKey && window.uiTheme) window.uiTheme.applyNow(window.uiTheme.find(startKey));
     })();
   </script>
   <!-- ============ 站内通知（红点） ============ -->

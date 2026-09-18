@@ -15,6 +15,10 @@
       bg: 'radial-gradient(1100px 520px at 18% -8%, rgba(59,130,246,.22), transparent 60%), radial-gradient(900px 500px at 85% 108%, rgba(37,132,252,.10), transparent 55%), linear-gradient(180deg, #04060f, #0c1f47 78%, #15356f 100%)',
       fg: '#e2e8f0',
       muted: '#8fa8c8',
+      accent: '#22d3ee',
+      surface: 'rgba(12,21,44,.72)',
+      surfaceSolid: '#0c152c',
+      surfaceElevated: 'rgba(16,27,54,.94)',
     },
     {
       key: 'matrix-green',
@@ -26,6 +30,10 @@
       bg: 'radial-gradient(1000px 480px at 50% 0%, rgba(21,128,61,.18), transparent 60%), linear-gradient(180deg, #7d998a, #96af9f 55%, #adc4b5 100%)',
       fg: '#0e2116',
       muted: '#3d5849',
+      accent: '#22c55e',
+      surface: 'rgba(243,250,245,.86)',
+      surfaceSolid: '#f3faf5',
+      surfaceElevated: 'rgba(255,255,255,.94)',
     },
     {
       key: 'sunset-amber',
@@ -37,6 +45,10 @@
       bg: 'radial-gradient(1000px 500px at 80% -6%, rgba(194,65,12,.18), transparent 58%), linear-gradient(180deg, #a0836a, #b9a087 55%, #d0b9a1 100%)',
       fg: '#24150a',
       muted: '#6d4f36',
+      accent: '#f59e0b',
+      surface: 'rgba(253,245,238,.88)',
+      surfaceSolid: '#fdf5ee',
+      surfaceElevated: 'rgba(255,255,255,.95)',
     },
     {
       key: 'plasma-purple',
@@ -48,6 +60,10 @@
       bg: 'radial-gradient(1000px 520px at 22% -10%, rgba(168,85,247,.20), transparent 60%), linear-gradient(180deg, #0a0418, #1a0f45 55%, #3d2a96 100%)',
       fg: '#eeebfe',
       muted: '#c4b5fd',
+      accent: '#e879f9',
+      surface: 'rgba(24,15,52,.72)',
+      surfaceSolid: '#180f34',
+      surfaceElevated: 'rgba(31,19,66,.94)',
     },
     {
       key: 'clean-light',
@@ -59,6 +75,10 @@
       bg: 'radial-gradient(1000px 460px at 80% -10%, rgba(29,78,216,.10), transparent 55%), linear-gradient(180deg, #eef2ff, #e7eefc 60%, #dbe5f9 100%)',
       fg: '#0f172a',
       muted: '#5b6b84',
+      accent: '#38bdf8',
+      surface: 'rgba(247,250,255,.88)',
+      surfaceSolid: '#f7faff',
+      surfaceElevated: 'rgba(255,255,255,.96)',
     },
     {
       key: 'paper-amber',
@@ -70,6 +90,10 @@
       bg: 'radial-gradient(1000px 460px at 70% -8%, rgba(180,83,9,.10), transparent 55%), linear-gradient(180deg, #f5ecd8, #f6eeda 60%, #ecdfbe 100%)',
       fg: '#292524',
       muted: '#78716c',
+      accent: '#d97706',
+      surface: 'rgba(252,248,238,.9)',
+      surfaceSolid: '#fcf8ee',
+      surfaceElevated: 'rgba(255,253,247,.97)',
     },
   ];
 
@@ -81,9 +105,17 @@
   function applyThemeNow(theme) {
     if (!theme) return;
     const root = document.documentElement;
+    const setVar = (name, v) => {
+      if (v) root.style.setProperty(name, v);
+      else root.style.removeProperty(name);
+    };
     root.style.setProperty('--bs-primary', theme.primary);
     root.style.setProperty('--sidebar-bg', theme.sidebar);
     root.style.setProperty('--body-bg-gradient', theme.bg);
+    setVar('--theme-accent', theme.accent);
+    setVar('--theme-surface', theme.surface);
+    setVar('--theme-surface-solid', theme.surfaceSolid);
+    setVar('--theme-surface-elevated', theme.surfaceElevated);
     const mode = theme.mode || 'dark';
     if (mode === 'dark') {
       document.body.classList.add('theme-dark');
@@ -91,6 +123,25 @@
       document.body.classList.remove('theme-dark');
     }
     if (typeof window.applyThemeContrast === 'function') window.applyThemeContrast();
+  }
+
+  /* 仅当服务端默认主题精确匹配某套预设时返回其 key，否则 null（避免覆盖管理员自定义主题）。 */
+  function detectKey() {
+    const root = getComputedStyle(document.documentElement);
+    const p = (root.getPropertyValue('--bs-primary') || '').trim().toLowerCase();
+    const s = (root.getPropertyValue('--sidebar-bg') || '').trim().toLowerCase();
+    const exact = window.UI_THEMES.find(t => t.primary.toLowerCase() === p && t.sidebar.toLowerCase() === s);
+    return exact ? exact.key : null;
+  }
+
+  /* 返回当前激活的 theme key（读取 localStorage，回退至匹配 DB 默认值的项） */
+  function currentKey() {
+    const saved = localStorage.getItem('uiTheme');
+    if (saved && findTheme(saved)) return saved;
+    const k = detectKey();
+    if (k) return k;
+    const m = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
+    return m === 'dark' ? 'circuit-blue' : 'clean-light';
   }
 
   /* 将 theme.primary / sidebar 写入设置页表单字段（如果当前正在设置页面）。 */
@@ -164,6 +215,7 @@
   window.uiTheme = {
     list: window.UI_THEMES,
     find: findTheme,
+    detect: detectKey,
     currentKey: currentKey,
     applyNow: applyThemeNow,
     quickApply: quickApplyTheme,
