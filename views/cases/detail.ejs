@@ -1,4 +1,4 @@
-<%
+﻿<%
   const roleColors = { 原告:'#4361ee', 被告:'#dc3545', 第三人:'#0ea5e9', 伤者:'#f59e0b', 用人单位:'#6f42c1', 保险公司:'#0d9488', 肇事方:'#ef4444', 受害人:'#e11d48', 其他:'#64748b' };
   const roleColor = r => roleColors[r] || '#64748b';
   const isImg = (a) => {
@@ -18,11 +18,11 @@
 <div class="page-head">
   <div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <h1 class="me-1"><%= caseData.case_no %></h1>
       <span class="type-badge" style="background:<%= caseData.type_color %>"><%= caseData.type_name %></span>
+      <h1 class="me-1 m-0 fw-bold" style="letter-spacing:.3px"><%= caseData.client_name || caseData.title %></h1>
       <span class="status-badge" style="background:<%= caseData.status_color || '#6c757d' %>"><%= caseData.status_name || '未设置' %></span>
     </div>
-    <div class="lead"><i class="bi bi-folder2-open me-1"></i><%= caseData.title %></div>
+    <div class="lead"><i class="bi bi-folder2-open me-1"></i><%= caseData.title %> <span class="text-muted small ms-2"><i class="bi bi-hash"></i> 编号 <%= caseData.case_no %></span></div>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <% if (can('cases.edit')) { %>
@@ -471,12 +471,12 @@
       </div>
     </div>
 
-    <!-- ============ 下一步流程（紧凑·内联编辑） ============ -->
+    <!-- ============ 进度提醒（紧凑·内联编辑） ============ -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-arrow-repeat"></i> 下一步流程</span>
-        <% if (can('cases.remind')) { %>
-        <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-pencil-fill"></i> 更新</button>
+          <span><i class="bi bi-bell"></i> 进度提醒</span>
+          <% if (can('cases.remind')) { %>
+          <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-sliders"></i> 设置</button>
         <% } %>
       </div>
       <div class="card-body py-2">
@@ -503,12 +503,12 @@
               </div>
             </div>
           <% } else { %>
-            <div class="text-muted small">暂无下一步流程，点击「更新」设置</div>
+            <div class="text-muted small">暂无进度提醒，点击「设置」添加</div>
           <% } %>
         </div>
         <div id="naEdit" style="display:none">
           <div class="mb-2">
-            <textarea name="next_action" id="naNextAction" class="form-control form-control-sm" rows="2" placeholder="描述下一步要做什么"><%= caseData.next_action || '' %></textarea>
+            <textarea name="next_action" id="naNextAction" class="form-control form-control-sm" rows="2" placeholder="描述需要提醒什么"><%= caseData.next_action || '' %></textarea>
           </div>
           <div class="mb-2">
             <label class="form-label small">提醒时间</label>
@@ -784,7 +784,7 @@
     }
   });
 
-  /* ============ 下一步流程（内联编辑） ============ */
+  /* ============ 进度提醒（内联编辑） ============ */
   function toggleNextActionEdit() {
     const display = document.getElementById('naDisplay');
     const edit = document.getElementById('naEdit');
@@ -801,12 +801,12 @@
   async function saveNextAction() {
     const nextAction = document.getElementById('naNextAction').value.trim();
     const reminderAt = document.getElementById('naReminderAt').value || null;
-    if (!nextAction) return toast('请填写下一步流程', 'warning');
+    if (!nextAction) return toast('请填写进度提醒','warning');
     try {
       const res = await postJSON('/api/cases/<%= caseData.id %>/next-action', { next_action: nextAction, reminder_at: reminderAt });
       if (!res.ok) throw new Error((await res.json()).error || '更新失败');
       toggleNextActionEdit();
-      toast('下一步流程已更新', 'success');
+      toast('进度提醒已更新','success');
       setTimeout(() => location.reload(), 400);
     } catch (err) { toast(err.message, 'danger'); }
   }

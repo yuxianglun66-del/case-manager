@@ -1,4 +1,4 @@
-<div class="page-head">
+﻿<div class="page-head">
   <div>
     <h1><%= mode === 'new' ? '新增案件' : '编辑案件' %></h1>
     <div class="lead"><%= caseData ? caseData.case_no : '' %></div>
@@ -92,7 +92,7 @@
           </select>
         </div>
         <div class="col-6 col-md-3">
-          <label class="form-label">下一步流程</label>
+          <label class="form-label">进度提醒</label>
           <textarea name="next_action" class="form-control" rows="2" placeholder="描述下一步要做什么"><%= caseData ? (caseData.next_action || '') : '' %></textarea>
         </div>
         <div class="col-6 col-md-3">
