@@ -560,11 +560,11 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
   border-radius: var(--radius-sm); padding: 13px;
   font-weight: 700; letter-spacing: 4px;
   background: var(--grad-primary); border: none;
-  box-shadow: 0 0 20px rgba(59, 130, 246, .3);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, .3), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -7px 12px rgba(0,0,0,.16);
   transition: all .25s;
 }
 .login-card .btn-primary:hover {
-  box-shadow: 0 0 30px rgba(59, 130, 246, .5), 0 4px 16px rgba(59,130,246,.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, .5), inset 0 1px 0 rgba(255,255,255,.26), inset 0 -7px 12px rgba(0,0,0,.16);
   transform: translateY(-1px);
 }
 .login-tip { text-align: center; margin-top: 20px; font-size: 12px; color: #475569; }
@@ -612,79 +612,78 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
 /* ============================================================
    按钮 — 霓虹光效
    ============================================================ */
-.btn { border-radius: var(--radius-sm); font-weight: 500; transition: all .2s; }
+.btn {
+  border-radius: var(--radius-sm); font-weight: 500;
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease, color .2s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -7px 12px rgba(0,0,0,.14);
+}
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 18px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -7px 12px rgba(0,0,0,.14);
+}
+.btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 4px rgba(0,0,0,.20), inset 0 2px 6px rgba(0,0,0,.20);
+}
+.btn:disabled, .btn.disabled, fieldset:disabled .btn { transform: none; box-shadow: none; }
 .btn-ico {
   width: 34px; height: 34px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--radius-sm); transition: all .2s;
+  border-radius: var(--radius-sm);
 }
 .btn-ico .bi { font-size: 1.08em; line-height: 1; }
-.btn-ico.btn-light {
-  background: rgba(59, 130, 246, .06);
-  border: 1px solid rgba(59, 130, 246, .12);
-  color: #94a3b8;
-}
-.btn-ico.btn-light:hover {
-  background: rgba(59, 130, 246, .12);
-  border-color: rgba(59, 130, 246, .25);
-  color: var(--accent);
-  box-shadow: 0 0 12px rgba(59, 130, 246, .15);
-}
+
 .btn-primary {
-  background: linear-gradient(135deg, var(--bs-primary), var(--primary-edge)); border: none;
-  color: var(--primary-contrast);
-  box-shadow: 0 4px 14px rgba(59, 130, 246, .25), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -10px 16px rgba(0,0,0,.18);
+  background: linear-gradient(135deg, var(--bs-primary), var(--primary-edge));
+  border: none; color: var(--primary-contrast);
 }
-.btn-primary:hover {
-  box-shadow: 0 8px 22px rgba(59, 130, 246, .4), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -10px 16px rgba(0,0,0,.18);
-  transform: translateY(-1px);
-}
-.btn-outline-primary {
-  border-color: rgba(59, 130, 246, .3);
-  color: var(--primary-text);
-  background: transparent;
-}
-.btn-outline-primary:hover {
-  background: rgba(59, 130, 246, .1);
-  border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 12px rgba(59, 130, 246, .15);
-}
-.btn-success {
-  background: var(--grad-green); border: none;
-  box-shadow: 0 0 12px rgba(16, 185, 129, .2);
-}
-.btn-success:hover {
-  box-shadow: 0 0 20px rgba(16, 185, 129, .35);
-  transform: translateY(-1px);
-}
-.btn-outline-success {
-  border-color: rgba(16, 185, 129, .3);
-  color: var(--neon-green);
-}
-.btn-outline-success:hover {
-  background: rgba(16, 185, 129, .1);
-  border-color: var(--neon-green);
-  box-shadow: 0 0 12px rgba(16, 185, 129, .15);
-}
+.btn-success { background: var(--grad-green); border: none; color: #fff; }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); border: none; color: #fff; }
+
 .btn-light {
-  background: rgba(59, 130, 246, .06);
-  border: 1px solid rgba(59, 130, 246, .12);
+  background-color: rgba(59, 130, 246, .08);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.05));
+  border: 1px solid rgba(59, 130, 246, .16);
   color: #94a3b8;
 }
-.btn-light:hover {
-  background: rgba(59, 130, 246, .12);
-  color: var(--accent);
+.btn-light:hover { background-color: rgba(59, 130, 246, .15); border-color: rgba(59,130,246,.28); color: var(--accent); }
+
+.btn-outline-primary {
+  background-color: rgba(59,130,246,.07);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(59, 130, 246, .32); color: var(--primary-text);
 }
+.btn-outline-primary:hover { background-color: rgba(59, 130, 246, .16); border-color: var(--accent); color: var(--accent); }
+.btn-outline-success {
+  background-color: rgba(16,185,129,.07);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(16, 185, 129, .3); color: var(--neon-green);
+}
+.btn-outline-success:hover { background-color: rgba(16, 185, 129, .16); border-color: var(--neon-green); }
 .btn-outline-danger {
-  border-color: rgba(239, 68, 68, .25);
-  color: #f87171;
+  background-color: rgba(239,68,68,.07);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(239, 68, 68, .28); color: #f87171;
 }
-.btn-outline-danger:hover {
-  background: rgba(239, 68, 68, .1);
-  border-color: #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, .15);
+.btn-outline-danger:hover { background-color: rgba(239, 68, 68, .16); border-color: #ef4444; }
+.btn-outline-secondary {
+  background-color: rgba(148,163,184,.08);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(148, 163, 184, .28); color: var(--content-muted);
 }
+.btn-outline-secondary:hover { background-color: rgba(148, 163, 184, .18); border-color: rgba(148,163,184,.5); color: var(--content-fg); }
+.btn-outline-warning {
+  background-color: rgba(245,158,11,.08);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(245, 158, 11, .3); color: #fbbf24;
+}
+.btn-outline-warning:hover { background-color: rgba(245, 158, 11, .18); border-color: #f59e0b; }
+.btn-outline-info {
+  background-color: rgba(14,165,233,.08);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.09), rgba(0,0,0,.05));
+  border: 1px solid rgba(14, 165, 233, .3); color: #38bdf8;
+}
+.btn-outline-info:hover { background-color: rgba(14, 165, 233, .18); border-color: #0ea5e9; }
 
 /* ============================================================
    分页
