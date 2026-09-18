@@ -187,8 +187,7 @@
           '.modal-title{color:' + cFg + '!important;}' +
           '.modal-header{border-bottom-color:' + cBorder + '!important;}' +
           '.modal-footer{border-top-color:' + cBorder + '!important;}' +
-          '.app-shell{position:relative;z-index:1;}' +
-          'body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(' + rgba(p, .05) + ' 1px,transparent 1px),linear-gradient(90deg,' + rgba(p, .05) + ' 1px,transparent 1px);background-size:46px 46px;}';
+          'body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background-image:linear-gradient(' + rgba(p, .05) + ' 1px,transparent 1px),linear-gradient(90deg,' + rgba(p, .05) + ' 1px,transparent 1px);background-size:46px 46px;}';
         applyStyle(css);
       };
       // 注：window.applyThemeContrast() 由 body 开头的脚本调用，
