@@ -293,7 +293,7 @@ router.post('/cases/:id/status', requirePermission('cases.edit'), needCase, asyn
     await client.query('COMMIT');
     await audit(req, '变更状态', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 状态变更为「' + st.name + '」' + (note ? '（' + note + '）' : ''), before: { status_id: req.caseRow.status_id }, after: { status_id: statusId } });
     if (req.caseRow.assignee_id) {
-      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」' + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -308,8 +308,11 @@ router.post('/cases/:id/delete', requirePermission('cases.delete'), needCase, as
     await pool.query(
       `UPDATE cases SET deleted_at = now(), deleted_by = $2, updated_at = now() WHERE id = $1`,
       [id, req.session.user.id]
-    );
-    await audit(req, '移入回收站', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' });
+      );
+      if (req.caseRow.assignee_id) {
+        pushEvent('status_changed', req.caseRow.assignee_id, '🗑️ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases' });
+      }
+      await audit(req, '移入回收站', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

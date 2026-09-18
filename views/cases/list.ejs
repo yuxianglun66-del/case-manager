@@ -31,6 +31,12 @@
         <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
         <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案</a>
       </div>
+      <form method="GET" action="/cases" class="d-flex align-items-center gap-1 ms-1">
+        <div class="input-group input-group-sm" style="width:240px">
+          <input type="text" name="kw" class="form-control" placeholder="搜索案号/名称/客户" value="<%= filters.kw || '' %>" aria-label="搜索案件">
+          <button class="btn btn-outline-secondary" type="submit" title="搜索"><i class="bi bi-search"></i></button>
+        </div>
+      </form>
       <div class="ms-auto d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterForm" aria-expanded="<%= hasFilter ? 'true' : 'false' %>" aria-controls="filterForm">
           <i class="bi bi-funnel"></i> 筛选
