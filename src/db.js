@@ -459,49 +459,49 @@ const SEED_TYPE_FIELDS = {
 
 const SEED_STATUSES = [
   // 已签约（1XX）
-  ['住院中', 'signed', '#24dbdb', 101],
-  ['已出院', 'signed', '#24aadb', 102],
-  ['材料收集中', 'signed', '#2478db', 103],
-  ['材料补充中', 'signed', '#2446db', 104],
-  ['材料已齐全', 'signed', '#3324db', 105],
+  ['住院中', 'signed', '#227ad3', 101],
+  ['已出院', 'signed', '#e47525', 102],
+  ['材料收集中', 'signed', '#6828c3', 103],
+  ['材料补充中', 'signed', '#e84b17', 104],
+  ['材料已齐全', 'signed', '#28c361', 105],
   // 理赔中（2XX）
-  ['已报案', 'processing', '#5b24db', 201],
-  ['材料待提交', 'processing', '#7c24db', 202],
-  ['材料已提交', 'processing', '#9d24db', 203],
-  ['材料审核中', 'processing', '#bf24db', 204],
-  ['赔偿方案沟通', 'processing', '#db24d7', 205],
-  ['赔偿方案已确认', 'processing', '#db24b5', 206],
-  ['理赔协议签署', 'processing', '#db2494', 207],
-  ['赔偿钱款待支付', 'processing', '#db2473', 208],
-  ['赔偿钱款已支付', 'processing', '#db2452', 209],
+  ['已报案', 'processing', '#27a59b', 201],
+  ['材料待提交', 'processing', '#e49525', 202],
+  ['材料已提交', 'processing', '#2256bf', 203],
+  ['材料审核中', 'processing', '#ca2191', 204],
+  ['赔偿方案沟通', 'processing', '#29ae6b', 205],
+  ['赔偿方案已确认', 'processing', '#e78523', 206],
+  ['理赔协议签署', 'processing', '#4228c3', 207],
+  ['赔偿钱款待支付', 'processing', '#e83b2c', 208],
+  ['赔偿钱款已支付', 'processing', '#28b84c', 209],
   // 诉讼中（3XX）
-  ['待立案', 'litigation', '#db5224', 301],
-  ['立案中', 'litigation', '#db6424', 302],
-  ['已立案', 'litigation', '#db7624', 303],
-  ['待质证', 'litigation', '#db8824', 304],
-  ['已质证', 'litigation', '#db9a24', 305],
-  ['待鉴定', 'litigation', '#dbad24', 306],
-  ['已鉴定', 'litigation', '#dbbf24', 307],
-  ['代排庭', 'litigation', '#dbd124', 308],
-  ['待开庭', 'litigation', '#d3db24', 309],
-  ['已开庭', 'litigation', '#c1db24', 310],
-  ['待判决', 'litigation', '#afdb24', 311],
-  ['已判决', 'litigation', '#9ddb24', 312],
-  ['调解中', 'litigation', '#8adb24', 313],
-  ['调解已确认', 'litigation', '#78db24', 314],
-  ['待支付', 'litigation', '#66db24', 315],
-  ['赔偿已支付', 'litigation', '#54db24', 316],
-  ['赔偿已到账', 'litigation', '#42db24', 317],
-  ['上诉中', 'litigation', '#2fdb24', 318],
-  ['待二审开庭', 'litigation', '#24db2a', 319],
-  ['二审开庭已开庭', 'litigation', '#24db3c', 320],
-  ['待二审判决', 'litigation', '#24db4f', 321],
-  ['二审已判决', 'litigation', '#24db61', 322],
+  ['待立案', 'litigation', '#6b24b2', 301],
+  ['立案中', 'litigation', '#e88a2c', 302],
+  ['已立案', 'litigation', '#2fc6ad', 303],
+  ['待质证', 'litigation', '#9c25a7', 304],
+  ['已质证', 'litigation', '#e8992c', 305],
+  ['待鉴定', 'litigation', '#7123a9', 306],
+  ['已鉴定', 'litigation', '#e3b11c', 307],
+  ['代排庭', 'litigation', '#2bb67c', 308],
+  ['待开庭', 'litigation', '#6625a7', 309],
+  ['已开庭', 'litigation', '#e86a2c', 310],
+  ['待判决', 'litigation', '#5b25a7', 311],
+  ['已判决', 'litigation', '#2fc694', 312],
+  ['调解中', 'litigation', '#9526ba', 313],
+  ['调解已确认', 'litigation', '#e7a523', 314],
+  ['待支付', 'litigation', '#29ae76', 315],
+  ['赔偿已支付', 'litigation', '#8823a9', 316],
+  ['赔偿已到账', 'litigation', '#e7b623', 317],
+  ['上诉中', 'litigation', '#28c39c', 318],
+  ['待二审开庭', 'litigation', '#7c25a7', 319],
+  ['二审开庭已开庭', 'litigation', '#e7d623', 320],
+  ['待二审判决', 'litigation', '#27b08d', 321],
+  ['二审已判决', 'litigation', '#7d26ba', 322],
   // 已结案（4XX）
-  ['待支付服务费', 'closed', '#24db86', 401],
-  ['已支付服务费', 'closed', '#24db9a', 402],
-  ['已结案', 'closed', '#24dbae', 403],
-  ['已归档', 'closed', '#24dbc3', 404],
+  ['待支付服务费', 'closed', '#e48525', 401],
+  ['已支付服务费', 'closed', '#28b870', 402],
+  ['已结案', 'closed', '#8f28c3', 403],
+  ['已归档', 'closed', '#4db390', 404],
 ];
 
 // 旧模板 → 新模板案件状态引用迁移映射（仅升级时使用）
@@ -815,6 +815,44 @@ async function initDb() {
         }
         await client.query(
           `INSERT INTO app_settings (key, value, description) VALUES ('status_palette_v2', '1', '状态前缀排序与调色板已应用') ON CONFLICT (key) DO NOTHING`
+        );
+      }
+      // 迁移④：调色板 v2 优化（按名称重新应用语义色，相邻状态色相间距≥100°，40色全唯一）
+      const { rows: paletteV3Flag } = await client.query(
+        `SELECT value FROM app_settings WHERE key = 'status_palette_v3' LIMIT 1`
+      );
+      if (paletteV3Flag.length === 0) {
+        const { rows: cur3 = [] } = await client.query(`SELECT id, name, category FROM statuses`);
+        const byName3 = {};
+        cur3.forEach((r) => { byName3[r.name] = r; });
+        const hasV2 = paletteFlag.length > 0;
+        for (const tpl of SEED_STATUSES) {
+          const row = byName3[tpl[0]];
+          if (!row) continue;
+          // 若 v2 已应用（前缀排序已完成），只改颜色不碰 sort；否则连 sort 一起修正
+          if (hasV2) {
+            await client.query(
+              `UPDATE statuses SET color=$1 WHERE id=$2`, [tpl[2], row.id]
+            );
+          } else {
+            await client.query(
+              `UPDATE statuses SET color=$1, sort=$2 WHERE id=$3`, [tpl[2], tpl[3], row.id]
+            );
+          }
+        }
+        if (!hasV2) {
+          // 非种子状态（自定义/停用）保持相对顺序，排到 4XX 之后（从 900 起）
+          const seedNames3 = SEED_STATUSES.map((t) => t[0]);
+          const { rows: customRows3 } = await client.query(
+            `SELECT id FROM statuses WHERE NOT (name = ANY($1::text[])) ORDER BY sort, id`,
+            [seedNames3]
+          );
+          for (let i = 0; i < customRows3.length; i++) {
+            await client.query(`UPDATE statuses SET sort = $1 WHERE id = $2`, [900 + i + 1, customRows3[i].id]);
+          }
+        }
+        await client.query(
+          `INSERT INTO app_settings (key, value, description) VALUES ('status_palette_v3', '1', '调色板 v2 优化（相邻≥100°、40色唯一）已应用') ON CONFLICT (key) DO NOTHING`
         );
       }
     }
