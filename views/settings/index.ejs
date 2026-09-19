@@ -13,6 +13,9 @@
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStatuses" type="button">案件状态</button>
   </li>
   <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFeeTypes" type="button">费用类型</button>
+  </li>
+  <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabBrand" type="button">品牌与主题</button>
   </li>
   <li class="nav-item">
@@ -178,6 +181,45 @@
               <% }) %>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 费用类型 ============ -->
+  <div class="tab-pane fade" id="tabFeeTypes">
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" onclick="openFeeTypeCreate()"><i class="bi bi-plus-lg"></i> 新增费用类型</button>
+    </div>
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th style="width:34px"></th><th>类型名称</th><th>排序</th><th>状态</th><th class="text-end">操作</th></tr></thead>
+            <tbody>
+              <% feeTypes.forEach(ft => { %>
+                <tr>
+                  <td class="text-muted"><i class="bi bi-receipt"></i></td>
+                  <td><span class="fw-bold"><%= ft.name %></span></td>
+                  <td><%= ft.sort %></td>
+                  <td>
+                    <% if (ft.active) { %>
+                      <span class="status-badge" style="background:#198754">启用</span>
+                    <% } else { %>
+                      <span class="status-badge" style="background:#dc3545">停用</span>
+                    <% } %>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-ico btn-light" title="编辑" onclick="openFeeTypeEdit(<%= ft.id %>, '<%= ft.name %>', <%= ft.sort %>, <%= ft.active %>)"><i class="bi bi-pencil-fill"></i></button>
+                    <button class="btn btn-ico btn-outline-danger" title="删除" onclick="delFeeType(<%= ft.id %>)"><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body border-top py-2 text-muted small">
+          系统预设 9 类（保全费/鉴定费/诉讼费/律师费/差旅费等）。费用类型即费用记录里可选的类型；已有费用记录引用的类型禁止删除，可改为「停用」。
         </div>
       </div>
     </div>
@@ -965,6 +1007,37 @@
     const s = STATUSES.find(x => x.id === id);
     if (!(await confirmBox('删除状态「' + s.name + '」？<br>注意：还有案件处于该状态时无法删除。', '删除状态'))) return;
     try { await postJSON('/api/statuses/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
+    catch (err) { toast(err.message, 'danger'); }
+  }
+
+  /* ---- 费用类型 ---- */
+  function openFeeTypeCreate() {
+    const html = '<div class="mb-2"><label class="form-label">类型名称</label><input type="text" class="form-control" id="ftName" maxlength="50" placeholder="如：诉讼保全担保费"></div><div class="mb-2"><label class="form-label">排序（越小越靠前）</label><input type="number" class="form-control" id="ftSort" value="0"></div>';
+    const mb = modalBox('新增费用类型', html, { okText: '保存' });
+    mb.show();
+    mb.okBtn.addEventListener('click', async () => {
+      const name = document.getElementById('ftName').value.trim();
+      if (!name) return toast('名称不能为空', 'warning');
+      mb.okBtn.disabled = true;
+      try { await postJSON('/api/fee-types/create', { name, sort: document.getElementById('ftSort').value }); toast('已保存', 'success'); mb.hide(); setTimeout(() => location.reload(), 300); }
+      catch (err) { toast(err.message, 'danger'); mb.okBtn.disabled = false; }
+    });
+  }
+  function openFeeTypeEdit(id, name, sort, active) {
+    const html = '<div class="mb-2"><label class="form-label">类型名称</label><input type="text" class="form-control" id="ftName" maxlength="50" value="' + (name || '').replace(/"/g, '&quot;') + '"></div><div class="mb-2"><label class="form-label">排序（越小越靠前）</label><input type="number" class="form-control" id="ftSort" value="' + sort + '"></div><div class="form-check"><input type="checkbox" class="form-check-input" id="ftActive" ' + (active ? 'checked' : '') + '><label class="form-check-label" for="ftActive">启用</label></div>';
+    const mb = modalBox('编辑费用类型', html, { okText: '保存' });
+    mb.show();
+    mb.okBtn.addEventListener('click', async () => {
+      const name0 = document.getElementById('ftName').value.trim();
+      if (!name0) return toast('名称不能为空', 'warning');
+      mb.okBtn.disabled = true;
+      try { await postJSON('/api/fee-types/' + id + '/update', { name: name0, sort: document.getElementById('ftSort').value, active: document.getElementById('ftActive').checked ? '1' : '0' }); toast('已保存', 'success'); mb.hide(); setTimeout(() => location.reload(), 300); }
+      catch (err) { toast(err.message, 'danger'); mb.okBtn.disabled = false; }
+    });
+  }
+  async function delFeeType(id) {
+    if (!(await confirmBox('删除费用类型？<br>已有费用记录引用的类型无法删除，可改为「停用」。', '删除费用类型'))) return;
+    try { await postJSON('/api/fee-types/' + id + '/delete', {}); toast('已删除', 'success'); setTimeout(() => location.reload(), 300); }
     catch (err) { toast(err.message, 'danger'); }
   }
 

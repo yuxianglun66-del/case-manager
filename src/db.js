@@ -325,6 +325,18 @@ CREATE TABLE IF NOT EXISTS notify_logs (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_notify_logs_created ON notify_logs(created_at DESC);
+
+-- 费用类型字典表（可后台增删改，替代代码内硬编码 FEE_TYPES）
+CREATE TABLE IF NOT EXISTS fee_types (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50) NOT NULL UNIQUE,
+  sort INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 费用付款方：case_fees 未区分当事人支付/员工垫付。旧行默认 'client'（当事人支付，不扣减）
+ALTER TABLE case_fees ADD COLUMN IF NOT EXISTS paid_by VARCHAR(16) NOT NULL DEFAULT 'client';
 `;
 
 const SEED_TYPES = [
@@ -656,6 +668,15 @@ async function initDb() {
           [role, perm]
         );
       }
+    }
+
+    // 种子费用类型字典（幂等；用户可在后台新增/停用）
+    const SEED_FEE_TYPES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+    for (let i = 0; i < SEED_FEE_TYPES.length; i++) {
+      await client.query(
+        `INSERT INTO fee_types (name, sort, active) VALUES ($1, $2, TRUE) ON CONFLICT (name) DO NOTHING`,
+        [SEED_FEE_TYPES[i], i + 1]
+      ).catch(() => {});
     }
 
     for (const t of SEED_TYPES) {

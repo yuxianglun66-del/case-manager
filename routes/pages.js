@@ -459,6 +459,7 @@ router.get('/users', requirePermission('system.users'), async (req, res, next) =
 router.get('/settings', requirePermission('system.settings'), async (req, res, next) => {
   try {
     const types = (await pool.query(`SELECT * FROM case_types ORDER BY sort`)).rows;
+    const feeTypes = (await pool.query(`SELECT * FROM fee_types ORDER BY sort, id`)).rows;
     const fields = (await pool.query(`SELECT * FROM case_fields ORDER BY case_type_id, sort`)).rows;
     const statuses = (await pool.query(`SELECT * FROM statuses ORDER BY sort`)).rows;
 
@@ -475,7 +476,7 @@ router.get('/settings', requirePermission('system.settings'), async (req, res, n
        WHERE ct.active = TRUE ORDER BY ct.id`
     )).rows;
 
-    res.render('settings/index', { title: '系统设置', types, fieldsByType, statuses, settings: res.locals.settings, templates });
+    res.render('settings/index', { title: '系统设置', types, feeTypes, fieldsByType, statuses, settings: res.locals.settings, templates });
   } catch (e) { next(e); }
 });
 
@@ -721,6 +722,8 @@ router.get('/reports/finance', requirePermission('reports.view'), async (req, re
       `SELECT
          COALESCE(SUM(CASE WHEN f.direction='income' THEN f.amount ELSE 0 END),0) AS income_total,
          COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense_total,
+         COALESCE(SUM(CASE WHEN f.direction='expense' AND f.paid_by='staff' THEN f.amount ELSE 0 END),0) AS staff_fee_total,
+         COALESCE(SUM(CASE WHEN f.direction='expense' AND f.paid_by='client' THEN f.amount ELSE 0 END),0) AS client_fee_total,
          COUNT(*)::int AS fee_count
        FROM case_fees f
        JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
@@ -731,7 +734,9 @@ router.get('/reports/finance', requirePermission('reports.view'), async (req, re
       `SELECT f.fee_type,
          COUNT(*)::int AS cnt,
          COALESCE(SUM(CASE WHEN f.direction='income' THEN f.amount ELSE 0 END),0) AS income,
-         COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense
+         COALESCE(SUM(CASE WHEN f.direction='expense' THEN f.amount ELSE 0 END),0) AS expense,
+         COALESCE(SUM(CASE WHEN f.direction='expense' AND f.paid_by='staff' THEN f.amount ELSE 0 END),0) AS staff_fee,
+         COALESCE(SUM(CASE WHEN f.direction='expense' AND f.paid_by='client' THEN f.amount ELSE 0 END),0) AS client_fee
        FROM case_fees f
        JOIN cases c ON c.id = f.case_id AND c.deleted_at IS NULL
        ${fWhereSql}${fScopeSql}
@@ -751,7 +756,7 @@ router.get('/reports/finance', requirePermission('reports.view'), async (req, re
     )).rows;
 
     const feeRows = (await pool.query(
-      `SELECT f.id, f.case_id, f.fee_type, f.direction, f.amount, f.payer, f.status, f.note,
+      `SELECT f.id, f.case_id, f.fee_type, f.direction, f.amount, f.payer, f.paid_by, f.status, f.note,
               TO_CHAR(f.paid_at, 'YYYY-MM-DD') AS paid_at, f.created_at,
               c.case_no, c.title, c.assignee_id,
               u.display_name AS assignee_name
@@ -764,7 +769,8 @@ router.get('/reports/finance', requirePermission('reports.view'), async (req, re
 
     const freqFeeTypes = (await pool.query(`SELECT DISTINCT fee_type FROM case_fees ORDER BY fee_type`)).rows.map(r => r.fee_type);
     const staff = viewAll ? (await pool.query(`SELECT id, display_name FROM users WHERE active = TRUE ORDER BY display_name`)).rows : [];
-    const FEE_TYPE_NAMES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+    const FEE_TYPE_NAMES = (await pool.query(`SELECT name FROM fee_types WHERE active = TRUE ORDER BY sort`)).rows.map(r => r.name);
+    if (!FEE_TYPE_NAMES.length) FEE_TYPE_NAMES.push('其他');
 
     const fmt = (n) => { const v = parseFloat(n) || 0; return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: 2 }); };
     const rate = (received, target) => target > 0 ? ((received / target) * 100).toFixed(1) + '%' : '—';

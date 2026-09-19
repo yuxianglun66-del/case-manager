@@ -227,6 +227,13 @@
                 <input type="text" id="feePayer" class="form-control form-control-sm" placeholder="如：委托人XX">
               </div>
               <div class="col-6">
+                <label class="form-label small">付款方类型 *</label>
+                <select id="feePaidBy" class="form-select form-select-sm">
+                  <option value="client">当事人/家属支付</option>
+                  <option value="staff">员工/公司垫付</option>
+                </select>
+              </div>
+              <div class="col-6">
                 <label class="form-label small">日期</label>
                 <input type="date" id="feePaidAt" class="form-control form-control-sm">
               </div>
@@ -846,11 +853,22 @@
       const s = data.summary || {};
       const incomeTotal = parseFloat(s.income_total) || 0;
       const expenseTotal = parseFloat(s.expense_total) || 0;
-      const net = incomeTotal - expenseTotal;
+      const clientFee = parseFloat(s.client_fee_total) || 0;
+      const staffFee = parseFloat(s.staff_fee_total) || 0;
+      const received = parseFloat(s.received_amount) || 0;
+      const net = parseFloat(s.net) != null ? parseFloat(s.net) : (incomeTotal - expenseTotal);
       document.getElementById('feeSummary').innerHTML =
-        '<span class="fw-bold" style="color:#198754">应收: ¥' + incomeTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span class="fw-bold" style="color:#dc3545">应付: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span class="fw-bold">净: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
+        '<span class="fw-bold" style="color:#198754">实收: ¥' + received.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span>费用总计: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span style="color:#0ea5e9">当事人付: ¥' + clientFee.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span style="color:#dc3545">员工垫付: ¥' + staffFee.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
+        '<span class="fw-bold" style="color:' + (net >= 0 ? '#198754' : '#dc3545') + '">净收入: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
+      if (data.feeTypes && Array.isArray(data.feeTypes) && data.feeTypes.length) {
+        const sel = document.getElementById('feeType');
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">请选择</option>' + data.feeTypes.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
+        if (cur) sel.value = cur;
+      }
       if (!fees.length) {
         document.getElementById('feeList').innerHTML = '<div class="empty-tip"><i class="bi bi-cash-stack"></i>暂无费用记录</div>';
         return;
@@ -866,7 +884,7 @@
             '<span style="display:inline-block;background:' + (f.direction === 'income' ? '#198754' : '#dc3545') + ';color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.95em">' +
             (f.direction === 'income' ? '+' : '-') + '¥' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
             '</span></td>' +
-          '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + '</td>' +
+          '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + (f.paid_by === 'staff' ? ' <span class="badge" style="background:#dc3545">员工垫付</span>' : ' <span class="badge" style="background:#0ea5e9">当事人付</span>') + '</td>' +
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
           '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
@@ -886,6 +904,7 @@
     document.getElementById('feeAmount').value = fee ? fee.amount : '';
     document.getElementById('feeStatus').value = fee ? fee.status : 'pending';
     document.getElementById('feePayer').value = fee ? (fee.payer || '') : '';
+    document.getElementById('feePaidBy').value = fee ? (fee.paid_by || 'client') : 'client';
     document.getElementById('feePaidAt').value = fee ? (fee.paid_at || '') : '';
     document.getElementById('feeNote').value = fee ? (fee.note || '') : '';
     document.getElementById('feeFileInput').value = '';
@@ -915,6 +934,7 @@
     fd.append('amount', document.getElementById('feeAmount').value);
     fd.append('status', document.getElementById('feeStatus').value);
     fd.append('payer', document.getElementById('feePayer').value);
+    fd.append('paid_by', document.getElementById('feePaidBy').value);
     fd.append('paid_at', document.getElementById('feePaidAt').value);
     fd.append('note', document.getElementById('feeNote').value);
     var fileInput = document.getElementById('feeFileInput');

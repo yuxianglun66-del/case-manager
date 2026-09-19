@@ -91,19 +91,19 @@
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
     <div class="stat-card">
-      <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-people"></i></div>
       <div>
-        <div class="stat-num"><%= fmt(feeSummary.income_total) %></div>
-        <div class="stat-label">应收费用（收入）</div>
+        <div class="stat-num"><%= fmt(feeSummary.client_fee_total) %></div>
+        <div class="stat-label">当事人/家属支付（不扣减）</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="stat-card">
-      <div class="stat-icon" style="background:var(--grad-red)"><i class="bi bi-graph-down-arrow"></i></div>
+      <div class="stat-icon" style="background:var(--grad-red)"><i class="bi bi-briefcase"></i></div>
       <div>
-        <div class="stat-num"><%= fmt(feeSummary.expense_total) %></div>
-        <div class="stat-label">应付费用（支出）</div>
+        <div class="stat-num"><%= fmt(feeSummary.staff_fee_total) %></div>
+        <div class="stat-label">员工/公司垫付（需扣减）</div>
       </div>
     </div>
   </div>
@@ -112,16 +112,16 @@
       <div class="stat-icon" style="background:var(--grad-purple)"><i class="bi bi-wallet2"></i></div>
       <div>
         <div class="stat-num"><%= fmt(feeSummary.income_total - feeSummary.expense_total) %></div>
-        <div class="stat-label">费用净额</div>
+        <div class="stat-label">费用总收入 − 总支出</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card">
-      <div class="stat-icon" style="background:var(--grad-cyan)"><i class="bi bi-list-check"></i></div>
+    <div class="stat-card" style="border-color:rgba(67,97,238,.4)!important">
+      <div class="stat-icon" style="background:var(--grad-green)"><i class="bi bi-cash-stack"></i></div>
       <div>
-        <div class="stat-num"><%= feeSummary.fee_count %></div>
-        <div class="stat-label">费用记录数</div>
+        <div class="stat-num"><%= fmt(caseStats.received_total - feeSummary.staff_fee_total) %></div>
+        <div class="stat-label">净收入 = 实收 − 垫付</div>
       </div>
     </div>
   </div>
@@ -202,8 +202,8 @@
             <th>费用类型</th>
             <th class="text-end">笔数</th>
             <th class="text-end">应收(收入)</th>
-            <th class="text-end">应付(支出)</th>
-            <th class="text-end">净额</th>
+            <th class="text-end" style="color:#0ea5e9">当事人付</th>
+            <th class="text-end" style="color:#dc3545">员工垫付</th>
           </tr>
         </thead>
         <tbody>
@@ -212,8 +212,8 @@
             <td><span class="ms-2"><%= r.fee_type %></span></td>
             <td class="text-end"><%= r.cnt %></td>
             <td class="text-end fw-bold" style="color:#198754"><%= fmt(r.income) %></td>
-            <td class="text-end" style="color:#dc3545"><%= fmt(r.expense) %></td>
-            <td class="text-end"><%= fmt(r.income - r.expense) %></td>
+            <td class="text-end" style="color:#0ea5e9"><%= fmt(r.client_fee) %></td>
+            <td class="text-end" style="color:#dc3545"><%= fmt(r.staff_fee) %></td>
           </tr>
           <% }) %>
           <% if (!byFeeType.length) { %><tr><td colspan="5" class="empty-tip">暂无数据</td></tr><% } %>
@@ -251,7 +251,7 @@
             <td class="text-end">
               <span style="display:inline-block;background:<%= f.direction === 'income' ? '#198754' : '#dc3545' %>;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.95em"><%= f.direction === 'income' ? '+' : '-' %>¥<%= parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) %></span>
             </td>
-            <td class="hide-mobile"><%= f.payer || '—' %></td>
+            <td class="hide-mobile"><%= f.payer || '—' %><% if (f.direction === 'expense') { %> <span class="badge" style="background:<%= f.paid_by === 'staff' ? '#dc3545' : '#0ea5e9' %>"><%= f.paid_by === 'staff' ? '员工垫付' : '当事人付' %></span><% } %></td>
             <td class="hide-mobile text-muted"><%= f.paid_at || (f.created_at ? new Date(f.created_at).toLocaleDateString('zh-CN') : '') %></td>
           </tr>
           <% }) %>

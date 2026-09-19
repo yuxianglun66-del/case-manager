@@ -551,7 +551,11 @@ router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (r
 });
 
 /* ---------- 结构化费用 CRUD ---------- */
-const FEE_TYPES = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+const FEE_TYPES_FALLBACK = ['保全费', '鉴定费', '一审诉讼费', '二审诉讼费', '律师费', '差旅费', '茶水费', '公证费', '其他'];
+async function getFeeTypeNames() {
+  const { rows } = await pool.query(`SELECT name FROM fee_types WHERE active = TRUE ORDER BY sort`);
+  return rows.length ? rows.map(r => r.name) : FEE_TYPES_FALLBACK;
+}
 
 router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (req, res, next) => {
   try {
@@ -565,32 +569,40 @@ router.get('/cases/:id/fees', requirePermission('cases.view'), needCase, async (
          COALESCE(SUM(CASE WHEN direction='income' THEN amount ELSE 0 END),0) AS income_total,
          COALESCE(SUM(CASE WHEN direction='expense' THEN amount ELSE 0 END),0) AS expense_total,
          COALESCE(SUM(CASE WHEN direction='income' AND status='paid' THEN amount ELSE 0 END),0) AS income_paid,
-         COALESCE(SUM(CASE WHEN direction='expense' AND status='paid' THEN amount ELSE 0 END),0) AS expense_paid
+         COALESCE(SUM(CASE WHEN direction='expense' AND status='paid' THEN amount ELSE 0 END),0) AS expense_paid,
+         COALESCE(SUM(CASE WHEN direction='expense' AND paid_by='client' THEN amount ELSE 0 END),0) AS client_fee_total,
+         COALESCE(SUM(CASE WHEN direction='expense' AND paid_by='staff' THEN amount ELSE 0 END),0) AS staff_fee_total
        FROM case_fees WHERE case_id = $1`, [req.caseRow.id]
     );
-    res.json({ ok: true, fees: rows, summary: agg[0], feeTypes: FEE_TYPES });
+    const feeTypes = await getFeeTypeNames();
+    const receivedAmount = req.caseRow.received_amount || 0;
+    const staffFeeTotal = agg[0].staff_fee_total || 0;
+    const net = receivedAmount - staffFeeTotal;
+    res.json({ ok: true, fees: rows, summary: { ...agg[0], received_amount: receivedAmount, net }, feeTypes });
   } catch (e) { next(e); }
 });
 
 router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUpload.single('file'), validateUploadedFiles, async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { fee_type, amount, direction, payer, status, paid_at, note } = req.body;
-    if (!fee_type || !FEE_TYPES.includes(fee_type)) return res.status(400).json({ error: '费用类型无效' });
+    const { fee_type, amount, direction, payer, status, paid_at, note, paid_by } = req.body;
+    const feeTypes = await getFeeTypeNames();
+    if (!fee_type || !feeTypes.includes(fee_type)) return res.status(400).json({ error: '费用类型无效' });
     if (!amount || isNaN(amount)) return res.status(400).json({ error: '金额无效' });
     const dir = direction === 'income' ? 'income' : 'expense';
     const st = ['pending', 'paid', 'advanced', 'waived'].includes(status) ? status : 'pending';
+    const pb = paid_by === 'staff' ? 'staff' : 'client';
     const f = req.file || null;
     const { rows } = await client.query(
-      `INSERT INTO case_fees (case_id, fee_type, amount, direction, payer, status, paid_at, file_path, file_original_name, file_mime, file_size, note, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-      [req.caseRow.id, fee_type, amount, dir, payer || null, st, paid_at || null,
+      `INSERT INTO case_fees (case_id, fee_type, amount, direction, payer, paid_by, status, paid_at, file_path, file_original_name, file_mime, file_size, note, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+      [req.caseRow.id, fee_type, amount, dir, payer || null, pb, st, paid_at || null,
        f ? (caseFolder(req.caseRow) + '/fees/' + f.filename) : null,
        f ? f.originalname : null, f ? f.mimetype : null, f ? f.size : 0,
        note || null, req.session.user.id]
     );
     await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${fee_type} ¥${amount}` });
-    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用新增\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + fee_type + '\n💰 金额：¥' + amount + (dir === 'income' ? '（收入）' : '（支出）') + '\n📌 状态：' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免') + (payer ? '\n👤 付款方：' + payer : '') + (note ? '\n📝 备注：' + note : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用新增\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + fee_type + '\n💰 金额：¥' + amount + (dir === 'income' ? '（收入）' : '（支出）') + '\n👥 付款方：' + (pb === 'staff' ? '员工/公司垫付' : '当事人/家属支付') + (payer ? '（' + payer + '）' : '') + '\n📌 状态：' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免') + (note ? '\n📝 备注：' + note : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true, id: rows[0].id });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -603,11 +615,12 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
     const { rows: existing } = await client.query('SELECT * FROM case_fees WHERE id=$1 AND case_id=$2', [fid, req.caseRow.id]);
     if (!existing.length) return res.status(404).json({ error: '费用记录不存在' });
     const old = existing[0];
-    const { fee_type, amount, direction, payer, status, paid_at, note, remove_file } = req.body;
+    const { fee_type, amount, direction, payer, status, paid_at, note, remove_file, paid_by } = req.body;
     const ft = fee_type || old.fee_type;
     const amt = amount != null ? amount : old.amount;
     const dir = direction || old.direction;
     const st = ['pending', 'paid', 'advanced', 'waived'].includes(status) ? status : old.status;
+    const pb = paid_by === 'staff' ? 'staff' : paid_by === 'client' ? 'client' : old.paid_by || 'client';
     const f = req.file || null;
     let filePath = old.file_path, fName = old.file_original_name, fMime = old.file_mime, fSize = old.file_size;
     if (remove_file === '1' && !f) {
@@ -620,15 +633,17 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
       fName = f.originalname; fMime = f.mimetype; fSize = f.size;
     }
     await client.query(
-      `UPDATE case_fees SET fee_type=$1, amount=$2, direction=$3, payer=$4, status=$5, paid_at=$6, file_path=$7, file_original_name=$8, file_mime=$9, file_size=$10, note=$11, updated_at=now() WHERE id=$12`,
-      [ft, amt, dir, payer != null ? payer : old.payer, st, paid_at != null ? paid_at : old.paid_at, filePath, fName, fMime, fSize, note != null ? note : old.note, fid]
+      `UPDATE case_fees SET fee_type=$1, amount=$2, direction=$3, payer=$4, status=$5, paid_at=$6, file_path=$7, file_original_name=$8, file_mime=$9, file_size=$10, note=$11, paid_by=$12, updated_at=now() WHERE id=$13`,
+      [ft, amt, dir, payer != null ? payer : old.payer, st, paid_at != null ? paid_at : old.paid_at, filePath, fName, fMime, fSize, note != null ? note : old.note, pb, fid]
     );
-    await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status }, after: { fee_type: ft, amount: amt, direction: dir, status: st } });
+    await audit(req, '修改费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${ft} ¥${amt}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction, status: old.status, paid_by: old.paid_by }, after: { fee_type: ft, amount: amt, direction: dir, status: st, paid_by: pb } });
     const changes = [];
     if (old.fee_type !== ft) changes.push('费用类型 ' + old.fee_type + ' → ' + ft);
     if (Number(old.amount) !== Number(amt)) changes.push('金额 ¥' + old.amount + ' → ¥' + amt);
     if ((old.direction || 'income') !== dir) changes.push('方向 ' + (old.direction === 'expense' ? '支出' : '收入') + ' → ' + (dir === 'expense' ? '支出' : '收入'));
-    if (old.payer !== (payer != null ? payer : old.payer)) changes.push('付款方 ' + (old.payer || '（空）') + ' → ' + ((payer != null ? payer : old.payer) || '（空）'));
+    const newPayer = payer != null ? payer : old.payer;
+    if (old.payer !== newPayer) changes.push('付款方 ' + (old.payer || '（空）') + ' → ' + (newPayer || '（空）'));
+    if ((old.paid_by || 'client') !== pb) changes.push('垫付方 ' + ((old.paid_by || 'client') === 'staff' ? '员工/公司垫付' : '当事人/家属支付') + ' → ' + (pb === 'staff' ? '员工/公司垫付' : '当事人/家属支付'));
     if (old.status !== st) changes.push('状态 ' + (old.status === 'paid' ? '已收取' : old.status === 'pending' ? '待收取' : old.status === 'advanced' ? '垫付' : '减免') + ' → ' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免'));
     pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用修改\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n✏️ 变更内容：' + (changes.length ? changes.join('；') : '（无实质字段变化）') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
@@ -1209,6 +1224,48 @@ router.post('/types/:id/delete', requirePermission('system.settings'), async (re
     const old = (await pool.query(`SELECT code, name FROM case_types WHERE id = $1`, [id])).rows[0];
     await pool.query(`DELETE FROM case_types WHERE id = $1`, [id]);
     if (old) await audit(req, '删除案件类型', { entity_type: 'case_type', entity_id: id, detail: '类型「' + old.name + '」（' + old.code + '）' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+/* ---------- 费用类型 ---------- */
+router.post('/fee-types/create', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const name = (req.body.name || '').trim();
+    const sort = parseInt(req.body.sort, 10) || 0;
+    if (!name) return res.status(400).json({ error: '费用类型名称必填' });
+    const dup = (await pool.query(`SELECT id FROM fee_types WHERE name = $1`, [name])).rows;
+    if (dup.length) return res.status(400).json({ error: '类型已存在' });
+    const ins = await pool.query(`INSERT INTO fee_types (name, sort, active) VALUES ($1,$2,TRUE) RETURNING id`, [name, sort]);
+    await audit(req, '新增费用类型', { entity_type: 'fee_type', entity_id: ins.rows[0].id, detail: '费用类型「' + name + '」', after: { name, sort } });
+    res.json({ ok: true, id: ins.rows[0].id });
+  } catch (e) { next(e); }
+});
+
+router.post('/fee-types/:id/update', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const name = (req.body.name || '').trim();
+    const sort = parseInt(req.body.sort, 10) || 0;
+    const active = req.body.active === '1';
+    if (!name) return res.status(400).json({ error: '费用类型名称不能为空' });
+    const old = (await pool.query(`SELECT name, sort, active FROM fee_types WHERE id=$1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '费用类型不存在' });
+    await pool.query(`UPDATE fee_types SET name=$1, sort=$2, active=$3 WHERE id=$4`, [name, sort, active, id]);
+    await audit(req, '编辑费用类型', { entity_type: 'fee_type', entity_id: id, detail: '费用类型「' + old.name + '」→「' + name + '」', before: { name: old.name, sort: old.sort, active: old.active }, after: { name, sort, active } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/fee-types/:id/delete', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const cnt = (await pool.query(`SELECT COUNT(*)::int AS n FROM case_fees WHERE fee_type = (SELECT name FROM fee_types WHERE id = $1)`, [id])).rows[0].n;
+    if (cnt > 0) return res.status(400).json({ error: `已有 ${cnt} 条费用记录使用该类型，无法删除。可将类型设为停用。` });
+    const old = (await pool.query(`SELECT name FROM fee_types WHERE id = $1`, [id])).rows[0];
+    if (!old) return res.status(404).json({ error: '费用类型不存在' });
+    await pool.query(`DELETE FROM fee_types WHERE id = $1`, [id]);
+    await audit(req, '删除费用类型', { entity_type: 'fee_type', entity_id: id, detail: '费用类型「' + old.name + '」' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
