@@ -148,37 +148,56 @@
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-cash"></i> 费用</span>
-        <div class="d-flex gap-2">
-          <% if (can('cases.fee')) { %>
-          <button class="btn btn-sm btn-primary" onclick="openFeeModal()"><i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">新增</span></button>
-          <% } %>
-        </div>
       </div>
       <div class="card-body py-2">
-        <div id="agreementBox" class="mb-3">
-          <label class="form-label small fw-bold">服务费约定方式</label>
-          <textarea id="feeAgreement" class="form-control form-control-sm" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData.fee_agreement || '' %></textarea>
-          <div class="row g-2 mt-1">
-            <div class="col-6">
-              <label class="form-label small fw-bold">标的金额</label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">¥</span>
-                <input type="number" id="targetAmount" class="form-control" step="0.01" min="0" placeholder="0.00" value="<%= caseData.target_amount || '' %>">
-              </div>
-            </div>
-            <div class="col-6">
-              <label class="form-label small fw-bold">实收金额</label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">¥</span>
-                <input type="number" id="receivedAmount" class="form-control" step="0.01" min="0" placeholder="0.00" value="<%= caseData.received_amount || '' %>">
-              </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+          <div style="flex:2 1 240px;min-width:220px">
+            <label class="form-label small fw-bold mb-0">服务费约定方式</label>
+            <input type="text" id="feeAgreement" class="form-control form-control-sm mt-1" placeholder="按标的额5%收取，或按件计费500元/件" value="<%= caseData.fee_agreement || '' %>">
+          </div>
+          <div style="flex:1 1 140px;min-width:130px">
+            <label class="form-label small fw-bold mb-0">标的金额</label>
+            <div class="input-group input-group-sm mt-1">
+              <span class="input-group-text">¥</span>
+              <input type="number" id="targetAmount" class="form-control" step="0.01" min="0" placeholder="0.00" value="<%= caseData.target_amount || '' %>">
             </div>
           </div>
-          <% if (can('cases.fee')) { %>
-          <button class="btn btn-sm btn-outline-primary mt-2" onclick="saveAgreement()"><i class="bi bi-check-lg"></i> 保存</button>
-          <% } %>
+          <div style="flex:1 1 140px;min-width:130px">
+            <label class="form-label small fw-bold mb-0">实收金额</label>
+            <div class="input-group input-group-sm mt-1">
+              <span class="input-group-text">¥</span>
+              <input type="number" id="receivedAmount" class="form-control" step="0.01" min="0" placeholder="0.00" value="<%= caseData.received_amount || '' %>">
+            </div>
+          </div>
+          <div class="ms-auto">
+            <% if (can('cases.fee')) { %>
+            <button class="btn btn-sm btn-outline-primary" onclick="saveAgreement()"><i class="bi bi-check-lg"></i> 保存</button>
+            <% } %>
+          </div>
         </div>
-        <div id="feeSummary" class="d-flex flex-wrap gap-3 small mb-2 fw-bold"></div>
+        <div class="d-flex flex-wrap align-items-stretch gap-2 mb-2">
+          <div style="flex:1 1 140px;min-width:130px;border:1px solid;border-color:rgba(128,128,128,.25);border-radius:8px;padding:6px 10px;background:var(--surface)">
+            <div class="text-muted" style="font-size:.72rem">实收金额</div>
+            <div class="fw-bold" style="font-size:1rem;color:#198754" id="statReceived">¥0.00</div>
+          </div>
+          <div style="flex:1 1 140px;min-width:130px;border:1px solid;border-color:rgba(128,128,128,.25);border-radius:8px;padding:6px 10px;background:var(--surface)">
+            <div class="text-muted" style="font-size:.72rem">当事人付（不扣减）</div>
+            <div class="fw-bold" style="font-size:1rem;color:#0ea5e9" id="statClient">¥0.00</div>
+          </div>
+          <div style="flex:1 1 140px;min-width:130px;border:1px solid;border-color:rgba(128,128,128,.25);border-radius:8px;padding:6px 10px;background:var(--surface)">
+            <div class="text-muted" style="font-size:.72rem">员工垫付（扣减）</div>
+            <div class="fw-bold" style="font-size:1rem;color:#dc3545" id="statStaff">¥0.00</div>
+          </div>
+          <div style="flex:1 1 140px;min-width:130px;border:1px solid;border-color:rgba(128,128,128,.25);border-radius:8px;padding:6px 10px;background:var(--surface)">
+            <div class="text-muted" style="font-size:.72rem">净收入</div>
+            <div class="fw-bold" style="font-size:1.15rem" id="statNet">¥0.00</div>
+          </div>
+          <div class="d-flex align-items-center ms-auto">
+            <% if (can('cases.fee')) { %>
+            <button class="btn btn-sm btn-primary" onclick="openFeeModal()"><i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">新增费用</span></button>
+            <% } %>
+          </div>
+        </div>
         <div id="feeList"><div class="text-muted small">加载中…</div></div>
       </div>
     </div>
@@ -195,6 +214,18 @@
             <input type="hidden" id="feeEditId">
             <div class="row g-2">
               <div class="col-6">
+                <label class="form-label small">付款方类型 *</label>
+                <select id="feePaidBy" class="form-select form-select-sm">
+                  <option value="client">当事人/家属支付</option>
+                  <option value="staff">员工/公司垫付</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">状态</label>
+                <select id="feeStatus" class="form-select form-select-sm"></select>
+                <div class="text-muted mt-1" style="font-size:.68rem">选项随付款方类型联动</div>
+              </div>
+              <div class="col-6">
                 <label class="form-label small">费用类型 *</label>
                 <select id="feeType" class="form-select form-select-sm" required>
                   <option value="">请选择</option>
@@ -210,23 +241,12 @@
                 </select>
               </div>
               <div class="col-6">
-                <label class="form-label small">金额 *</label>
-                <input type="number" id="feeAmount" class="form-control form-control-sm" step="0.01" min="0" required>
-              </div>
-              <div class="col-6">
-                <label class="form-label small">状态</label>
-                <select id="feeStatus" class="form-select form-select-sm"></select>
-              </div>
-              <div class="col-6">
                 <label class="form-label small">付款方</label>
                 <input type="text" id="feePayer" class="form-control form-control-sm" placeholder="如：委托人XX">
               </div>
               <div class="col-6">
-                <label class="form-label small">付款方类型 *</label>
-                <select id="feePaidBy" class="form-select form-select-sm">
-                  <option value="client">当事人/家属支付</option>
-                  <option value="staff">员工/公司垫付</option>
-                </select>
+                <label class="form-label small">金额 *</label>
+                <input type="number" id="feeAmount" class="form-control form-control-sm" step="0.01" min="0" required>
               </div>
               <div class="col-6">
                 <label class="form-label small">日期</label>
@@ -839,10 +859,6 @@
     return sel.value;
   }
 
-  function toggleAgreement() {
-    const box = document.getElementById('agreementBox');
-    box.style.display = box.style.display === 'none' ? '' : 'none';
-  }
   async function saveAgreement() {
     const v = document.getElementById('feeAgreement').value.trim();
     const ta = document.getElementById('targetAmount').value;
@@ -870,12 +886,13 @@
       const staffFee = parseFloat(s.staff_fee_total) || 0;
       const received = parseFloat(s.received_amount) || 0;
       const net = parseFloat(s.net) != null ? parseFloat(s.net) : (incomeTotal - expenseTotal);
-      document.getElementById('feeSummary').innerHTML =
-        '<span class="fw-bold" style="color:#198754">实收: ¥' + received.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span>费用总计: ¥' + expenseTotal.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span style="color:#0ea5e9">当事人付: ¥' + clientFee.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span style="color:#dc3545">员工垫付: ¥' + staffFee.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span> &nbsp; ' +
-        '<span class="fw-bold" style="color:' + (net >= 0 ? '#198754' : '#dc3545') + '">净收入: ¥' + net.toLocaleString('zh-CN', {minimumFractionDigits:2}) + '</span>';
+      const fmt = n => n.toLocaleString('zh-CN', {minimumFractionDigits:2});
+      document.getElementById('statReceived').textContent = '¥' + fmt(received);
+      document.getElementById('statClient').textContent = '¥' + fmt(clientFee);
+      document.getElementById('statStaff').textContent = '¥' + fmt(staffFee);
+      document.getElementById('statNet').textContent = '¥' + fmt(net);
+      document.getElementById('statNet').style.color = (net >= 0 ? '#198754' : '#dc3545');
+      document.getElementById('statNet').style.fontWeight = '700';
       if (data.feeTypes && Array.isArray(data.feeTypes) && data.feeTypes.length) {
         const sel = document.getElementById('feeType');
         const cur = sel.value;
