@@ -27,7 +27,7 @@
   <div class="preview-header">
     <div class="d-flex align-items-center gap-2">
       <% if (isLibrary) { %>
-        <button class="btn btn-light btn-sm" onclick="window.close()"><i class="bi bi-arrow-left"></i> 关闭</button>
+        <a href="/library" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回文库</a>
       <% } else { %>
         <a href="/cases/<%= caseId %>" class="btn btn-light btn-sm"><i class="bi bi-arrow-left"></i> 返回案件</a>
       <% } %>
