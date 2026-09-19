@@ -8,7 +8,7 @@ const { hasPermission, BUILTIN_ROLES, roleExists, createRole, updateRole, delete
 const { upload, feeUpload, libraryUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf, convertOfficeToPdfCached } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
-const { ZipArchive } = require('archiver');
+const archiver = require('archiver');
 const { audit } = require('../src/audit');
 const { pushEvent } = require('../src/wecom');
 
@@ -936,7 +936,7 @@ router.get('/cases/:id/attachments/zip', async (req, res, next) => {
     const files = (await pool.query(
       `SELECT a.id, a.original_name, a.stored_name FROM attachments a WHERE a.case_id = $1 ORDER BY a.created_at ASC, a.id ASC`, [id]
     )).rows;
-    const zip = new ZipArchive({ zlib: { level: 6 } });
+    const zip = archiver('zip', { zlib: { level: 6 } });
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent((c.case_no || 'case' + id) + '_附件.zip')}`);
     zip.on('error', (err) => next(err));
