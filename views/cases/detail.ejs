@@ -215,12 +215,7 @@
               </div>
               <div class="col-6">
                 <label class="form-label small">状态</label>
-                <select id="feeStatus" class="form-select form-select-sm">
-                  <option value="pending">待支付</option>
-                  <option value="paid">已支付</option>
-                  <option value="advanced">垫付</option>
-                  <option value="waived">减免</option>
-                </select>
+                <select id="feeStatus" class="form-select form-select-sm"></select>
               </div>
               <div class="col-6">
                 <label class="form-label small">付款方</label>
@@ -823,8 +818,26 @@
   const CAN_DELETE_FEE = <%= (user.role === 'super_admin' || user.role === 'admin') ? 'true' : 'false' %>;
   const CASE_ID = <%= caseData.id %>;
   const DIRECTION_LABELS = { income: '应收', expense: '应付' };
-  const STATUS_LABELS = { pending: '待支付', paid: '已支付', advanced: '垫付', waived: '减免' };
   const STATUS_COLORS = { pending: 'warning', paid: 'success', advanced: 'info', waived: 'secondary' };
+  const FEE_STATUS_OPTS_BY_PAYER = {
+    client: [['pending', '待收取'], ['paid', '已收取'], ['waived', '减免']],
+    staff: [['pending', '未垫付'], ['paid', '已垫付'], ['waived', '减免']]
+  };
+  function feeStatusLabel(status, paidBy) {
+    if (paidBy === 'staff') {
+      return ({ pending: '未垫付', paid: '已垫付', advanced: '已垫付', waived: '减免' })[status] || status;
+    }
+    return ({ pending: '待收取', paid: '已收取', advanced: '已垫付', waived: '减免' })[status] || status;
+  }
+  function renderFeeStatusOptions(paidBy, curStatus) {
+    const sel = document.getElementById('feeStatus');
+    const cur = curStatus || sel.value;
+    const valid = FEE_STATUS_OPTS_BY_PAYER[paidBy] || FEE_STATUS_OPTS_BY_PAYER.client;
+    sel.innerHTML = valid.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('');
+    const keep = valid.some(function (o) { return o[0] === cur; });
+    sel.value = keep ? cur : 'pending';
+    return sel.value;
+  }
 
   function toggleAgreement() {
     const box = document.getElementById('agreementBox');
@@ -885,7 +898,7 @@
             (f.direction === 'income' ? '+' : '-') + '¥' + parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) +
             '</span></td>' +
           '<td class="d-none d-md-table-cell">' + esc(f.payer || '-') + (f.paid_by === 'staff' ? ' <span class="badge" style="background:#dc3545">员工垫付</span>' : ' <span class="badge" style="background:#0ea5e9">当事人付</span>') + '</td>' +
-          '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + STATUS_LABELS[f.status] + '</span></td>' +
+          '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + feeStatusLabel(f.status, f.paid_by) + '</span></td>' +
           '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
             (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
@@ -905,6 +918,7 @@
     document.getElementById('feeStatus').value = fee ? fee.status : 'pending';
     document.getElementById('feePayer').value = fee ? (fee.payer || '') : '';
     document.getElementById('feePaidBy').value = fee ? (fee.paid_by || 'client') : 'client';
+    renderFeeStatusOptions(document.getElementById('feePaidBy').value, fee ? fee.status : 'pending');
     document.getElementById('feePaidAt').value = fee ? (fee.paid_at || '') : '';
     document.getElementById('feeNote').value = fee ? (fee.note || '') : '';
     document.getElementById('feeFileInput').value = '';
@@ -915,6 +929,10 @@
     } else { preview.innerHTML = ''; }
     new bootstrap.Modal(document.getElementById('feeModal')).show();
   }
+
+  document.getElementById('feePaidBy').addEventListener('change', function () {
+    renderFeeStatusOptions(this.value, null);
+  });
 
   var _feesCache = [];
   async function editFee(id) {

@@ -238,6 +238,7 @@
             <th>类型</th>
             <th class="text-end">金额</th>
             <th class="hide-mobile">收付方</th>
+            <th class="hide-mobile">状态</th>
             <th class="hide-mobile">日期</th>
           </tr>
         </thead>
@@ -252,10 +253,17 @@
               <span style="display:inline-block;background:<%= f.direction === 'income' ? '#198754' : '#dc3545' %>;color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.95em"><%= f.direction === 'income' ? '+' : '-' %>¥<%= parseFloat(f.amount).toLocaleString('zh-CN', {minimumFractionDigits:2}) %></span>
             </td>
             <td class="hide-mobile"><%= f.payer || '—' %><% if (f.direction === 'expense') { %> <span class="badge" style="background:<%= f.paid_by === 'staff' ? '#dc3545' : '#0ea5e9' %>"><%= f.paid_by === 'staff' ? '员工垫付' : '当事人付' %></span><% } %></td>
+            <td class="hide-mobile">
+              <% const _stLabel = f.paid_by === 'staff'
+                   ? ({ pending: '未垫付', paid: '已垫付', advanced: '已垫付', waived: '减免' })[f.status] || f.status
+                   : ({ pending: '待收取', paid: '已收取', advanced: '已垫付', waived: '减免' })[f.status] || f.status; %>
+              <% const _stColor = ({ pending: '#f59e0b', paid: '#198754', advanced: '#0ea5e9', waived: '#6c757d' })[f.status] || '#6c757d'; %>
+              <span class="badge" style="background:<%= _stColor %>"><%= _stLabel %></span>
+            </td>
             <td class="hide-mobile text-muted"><%= f.paid_at || (f.created_at ? new Date(f.created_at).toLocaleDateString('zh-CN') : '') %></td>
           </tr>
           <% }) %>
-          <% if (!feeRows.length) { %><tr><td colspan="7" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的费用记录</td></tr><% } %>
+          <% if (!feeRows.length) { %><tr><td colspan="8" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的费用记录</td></tr><% } %>
         </tbody>
       </table>
     </div>
