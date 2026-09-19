@@ -355,7 +355,9 @@ const SEED_TYPE_FIELDS = {
   JT: [
     ['事故时间', 'date', false, '如 2026-01-01'],
     ['事故地点', 'text', false, ''],
+    ['事发经过', 'textarea', false, '请简述事故发生经过（时间、经过、伤情结果）'],
     ['责任认定情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
+    ['事发经过', 'textarea', false, '请描述事故发生的经过（时间、经过、影响）'],
     ['对方当事人/保险公司', 'text', false, ''],
     ['伤情部位', 'text', false, ''],
     ['住院/门诊', 'select', false, '[{"label":"住院"},{"label":"门诊"},{"label":"未就医"}]'],
@@ -368,6 +370,7 @@ const SEED_TYPE_FIELDS = {
   GS: [
     ['工伤发生时间', 'date', true, ''],
     ['发生地点', 'text', false, ''],
+    ['事发经过', 'textarea', false, '请描述工伤发生的经过（时间、经过、现场情况）'],
     ['用人单位', 'text', true, ''],
     ['是否缴纳社保', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"未知"}]'],
     ['是否已做工伤认定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"办理中"}]'],
@@ -404,6 +407,7 @@ const SEED_TYPE_FIELDS = {
   RS: [
     ['损害发生时间', 'date', false, ''],
     ['损害发生地点', 'text', false, ''],
+    ['事发经过', 'textarea', false, '请描述人身损害发生的经过（时间、经过、受伤部位）'],
     ['侵权责任方', 'text', false, ''],
     ['责任/过错情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
     ['治疗情况', 'select', false, '[{"label":"门诊"},{"label":"住院"},{"label":"未就医"}]'],

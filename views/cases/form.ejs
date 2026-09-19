@@ -186,7 +186,7 @@
         const it = f.field_type === 'phone' ? 'tel' : 'text';
         control = `<input type="${it}" class="form-control" name="field_${f.id}" value="${val}" placeholder="${(f.placeholder || '').replace(/"/g,'&quot;')}">`;
       }
-      return `<div class="col-12 col-md-6"><div class="mb-3"><label class="form-label">${f.label} ${req}</label>${control}</div></div>`;
+      return `<div class="col-12 ${f.field_type === 'textarea' ? 'mt-1' : 'col-md-6'}"><div class="mb-3"><label class="form-label">${f.label} ${req}</label>${control}</div></div>`;
     }).join('');
   }
 
