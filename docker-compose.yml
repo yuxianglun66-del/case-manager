@@ -38,6 +38,8 @@ services:
       # 默认使用命名卷；如需复用宿主目录（如旧实例遗留数据），设置 UPLOADS_DIR=/mnt/case-manager/uploads
       - ${UPLOADS_DIR:-uploads}:/app/uploads
       - ${BACKUPS_DIR:-backups}:/app/backups
+      # 宿主预装依赖，容器不现场 npm ci（国内网络导致 build 卡死 2000s 的根因，现已移除镜像内 npm install）
+      - ./node_modules:/app/node_modules
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/healthz || exit 1"]
       interval: 30s
