@@ -183,12 +183,22 @@ async function getCaseForPermission(req) {
 async function generateCaseNo(client, caseTypeId, code) {
   const year = new Date().getFullYear();
   const prefix = `${code}-${year}-`;
-  const { rows } = await client.query(
-    `SELECT COUNT(*)::int AS cnt FROM cases WHERE case_type_id = $1 AND case_no LIKE $2`,
-    [caseTypeId, `${prefix}%`]
-  );
-  const seq = rows[0].cnt + 1;
-  return `${prefix}${String(seq).padStart(4, '0')}`;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const { rows } = await client.query(
+      `SELECT case_no FROM cases WHERE case_no LIKE $1 ORDER BY case_no DESC LIMIT 1`,
+      [`${prefix}%`]
+    );
+    let seq = 1;
+    if (rows.length > 0) {
+      const last = rows[0].case_no;
+      const num = parseInt(last.slice(prefix.length), 10);
+      if (Number.isFinite(num)) seq = num + 1;
+    }
+    const candidate = `${prefix}${String(seq).padStart(4, '0')}`;
+    const { rows: dup } = await client.query(`SELECT 1 FROM cases WHERE case_no = $1 FOR UPDATE`, [candidate]);
+    if (dup.length === 0) return candidate;
+  }
+  return `${prefix}${String(Date.now()).slice(-4)}`;
 }
 
 // 案件文件夹名：以案件编号命名（不可变、唯一、纯安全字符）
