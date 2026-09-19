@@ -703,6 +703,26 @@ async function initDb() {
       }
     }
 
+    // 迁移：存量库给 JT交通事故/GS工伤/RS人身损害 补「事发经过」textarea（幂等：以 类型+label 判存在；锚点字段后插入并顺移 sort）
+    const MIGRATE_TEXTAREA_CODES = { JT: ['责任认定情况', '事发经过', 'textarea', '请描述事发经过（时间、经过、现场情况）'], GS: ['发生地点', '事发经过', 'textarea', '请描述工伤发生的经过（时间、经过、现场情况）'], RS: ['损害发生地点', '事发经过', 'textarea', '请描述损害发生的经过（时间、经过、现场情况）'] };
+    for (const [code, [anchorLabel, mLabel, mType, mPlaceholder]] of Object.entries(MIGRATE_TEXTAREA_CODES)) {
+      const { rows: tRows } = await client.query(`SELECT id FROM case_types WHERE code = $1`, [code]);
+      if (tRows.length === 0) continue;
+      const tid = tRows[0].id;
+      const { rows: existRows } = await client.query(`SELECT id FROM case_fields WHERE case_type_id = $1 AND label = $2`, [tid, mLabel]);
+      if (existRows.length > 0) continue;
+      const { rows: aRows } = await client.query(`SELECT sort FROM case_fields WHERE case_type_id = $1 AND label = $2`, [tid, anchorLabel]);
+      const base = Number.isFinite(aRows[0] ? aRows[0].sort : NaN) ? aRows[0].sort + 1 : 1;
+      const { rows: maxRows } = await client.query(`SELECT COALESCE(MAX(sort), 0) AS m FROM case_fields WHERE case_type_id = $1`, [tid]);
+      const curMax = maxRows[0].m;
+      if (base <= curMax) await client.query(`UPDATE case_fields SET sort = sort + 1000 WHERE case_type_id = $1 AND sort >= $2`, [tid, base]);
+      await client.query(
+        `INSERT INTO case_fields (case_type_id, label, field_type, options, required, placeholder, sort, active)
+         VALUES ($1, $2, $3, NULL, FALSE, $4, $5, TRUE)`,
+        [tid, mLabel, mType, mPlaceholder, base]
+      );
+    }
+
     // 迁移：移除旧类型中与当事人表格重复的人员信息字段（person info now lives in case_parties）
     const OBSOLETE_REPEAT_FIELDS = {
       JT: ['当事人姓名', '当事人手机号', '身份证号'],
