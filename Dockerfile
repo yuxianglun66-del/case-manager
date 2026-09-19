@@ -1,18 +1,23 @@
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:20-slim
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \
     TZ=Asia/Shanghai
 
 # 系统依赖：中文字体（PDF 生成必需）+ LibreOffice（Word/Excel 转 PDF）
-# Node.js 20 已在 base image 中，无需再从 nodesource 下载（国内被墙）
 # apt 走阿里云镜像
-RUN sed -i 's@//.*deb.debian.org@//mirrors.aliyun.com@g; s@//security.debian.org/debian-security@//mirrors.aliyun.com/debian-security@g' /etc/apt/sources.list \
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list \
     && apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates gnupg tzdata \
+      curl ca-certificates gnupg tzdata xz-utils \
       fonts-wqy-microhei fonts-noto-cjk fonts-droid-fallback \
       libreoffice-writer libreoffice-calc libreoffice-core \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.js 20 从 npmmirror CDN 下载二进制包（绕过被墙的 deb.nodesource.com）
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then NODE_ARCH="x64"; elif [ "$ARCH" = "aarch64" ]; then NODE_ARCH="arm64"; fi && \
+    curl -fsSL "https://cdn.npmmirror.com/binaries/node/v20.18.0/node-v20.18.0-linux-${NODE_ARCH}.tar.xz" | tar -xJ -C /usr/local --strip-components=1 && \
+    node -v && npm -v
 
 WORKDIR /app
 
