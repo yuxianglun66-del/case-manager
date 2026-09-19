@@ -355,7 +355,6 @@ const SEED_TYPE_FIELDS = {
   JT: [
     ['事故时间', 'date', false, '如 2026-01-01'],
     ['事故地点', 'text', false, ''],
-    ['事发经过', 'textarea', false, '请简述事故发生经过（时间、经过、伤情结果）'],
     ['责任认定情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
     ['事发经过', 'textarea', false, '请描述事故发生的经过（时间、经过、影响）'],
     ['对方当事人/保险公司', 'text', false, ''],

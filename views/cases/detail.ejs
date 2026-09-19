@@ -66,12 +66,6 @@
             <div class="info-label"><i class="bi bi-clock-history"></i> 最近更新</div>
             <div class="info-value"><%= new Date(caseData.updated_at).toLocaleString('zh-CN') %></div>
           </div>
-          <% if (caseData.status_at) { %>
-          <div class="info-item">
-            <div class="info-label"><i class="bi bi-arrow-repeat"></i> 状态更新时间</div>
-            <div class="info-value"><%= new Date(caseData.status_at).toLocaleString('zh-CN') %></div>
-          </div>
-          <% } %>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-person-plus"></i> 创建人</div>
             <div class="info-value"><%= caseData.creator_name || '—' %></div>
