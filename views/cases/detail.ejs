@@ -920,11 +920,10 @@
         if (cur) sel.value = cur;
       }
       if (!fees.length) {
-        document.getElementById('feeList').innerHTML = '<div class="empty-tip"><i class="bi bi-cash-stack"></i>暂无费用记录</div>';
+        document.getElementById('feeTbody').innerHTML = '<tr><td colspan="6" class="text-center text-muted small py-3"><i class="bi bi-cash-stack me-2"></i>暂无费用记录</td></tr>';
         return;
       }
-      document.getElementById('feeList').innerHTML =
-        '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><tbody>' +
+      document.getElementById('feeTbody').innerHTML =
         fees.map(f => '<tr>' +
           '<td>' + esc(f.fee_type) + (f.file_path ? ' <i class="bi bi-paperclip text-muted"></i>' : '') + '</td>' +
           '<td class="text-end">' +
@@ -938,9 +937,8 @@
             (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
             (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil-fill"></i></button> ' : '') +
             (CAN_DELETE_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
-          '</td></tr>').join('') +
-        '</tbody></table></div>';
-    } catch (e) { document.getElementById('feeList').innerHTML = '<div class="text-danger small">加载失败</div>'; }
+            '</td></tr>').join('');
+    } catch (e) { document.getElementById('feeTbody').innerHTML = '<tr><td colspan="6" class="text-center text-muted small py-3"><i class="bi bi-exclamation-triangle me-1"></i>加载失败</td></tr>'; }
   }
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
