@@ -35,7 +35,7 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     volumes:
-      - ./uploads:/app/uploads
+      - /mnt/case-manager/uploads:/app/uploads
       - ./backups:/app/backups
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/healthz || exit 1"]
