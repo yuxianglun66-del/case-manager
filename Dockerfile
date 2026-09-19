@@ -17,10 +17,8 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm config set registry https://registry.npmmirror.com \
-    && npm ci --omit=dev --no-audit --no-fund \
-       --fetch-timeout=300000 --fetch-retries=3 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+# 依赖不在此处安装：宿主 npm ci 预装 node_modules，经 docker-compose bind mount 进容器
+# 目的：Docker build 阶段不再发起 npm 网络请求（国内网络 npm 源不稳是 build 2000s 卡死的真凶）
 
 COPY . .
 
