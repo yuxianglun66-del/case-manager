@@ -17,8 +17,17 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu
 
 WORKDIR /app
 
-# 依赖不在此处安装：宿主 npm ci 预装 node_modules，经 docker-compose bind mount 进容器
-# 目的：Docker build 阶段不再发起 npm 网络请求（国内网络 npm 源不稳是 build 2000s 卡死的真凶）
+COPY package*.json ./
+
+# 镜像内一场 npm ci（npmmirror + 超时/重试，国内网络下失败即带 [ERROR] 退出，不再 2000s 卡死）
+# 探针已实锤：宿主预装+bind 在无 node 的 Ubuntu 上只产出空目录 → 镜像依赖层被压成空 → app 无限 Restart(1)
+# 所以依赖必须/只能 ci 在镜像内这一层。
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm config set fetch-timeout 300000 \
+    && npm config set fetch-retries 3 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && npm ci --omit=dev --no-audit --no-fund
 
 COPY . .
 
