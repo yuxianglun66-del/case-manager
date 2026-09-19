@@ -19,7 +19,8 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm config set registry https://registry.npmmirror.com \
-    && npm ci --omit=dev --no-audit --no-fund
+    && npm ci --omit=dev --no-audit --no-fund \
+       --fetch-timeout=300000 --fetch-retries=3 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 
 COPY . .
 
