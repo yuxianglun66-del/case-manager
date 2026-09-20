@@ -1290,6 +1290,9 @@ router.post('/fee-types/:id/update', requirePermission('system.settings'), async
     const old = (await pool.query(`SELECT name, sort, active FROM fee_types WHERE id=$1`, [id])).rows[0];
     if (!old) return res.status(404).json({ error: '费用类型不存在' });
     await pool.query(`UPDATE fee_types SET name=$1, sort=$2, active=$3 WHERE id=$4`, [name, sort, active, id]);
+    if (old.name !== name) {
+      await pool.query(`UPDATE case_fees SET fee_type = $1 WHERE fee_type = $2`, [name, old.name]);
+    }
     await audit(req, '编辑费用类型', { entity_type: 'fee_type', entity_id: id, detail: '费用类型「' + old.name + '」→「' + name + '」', before: { name: old.name, sort: old.sort, active: old.active }, after: { name, sort, active } });
     res.json({ ok: true });
   } catch (e) { next(e); }
