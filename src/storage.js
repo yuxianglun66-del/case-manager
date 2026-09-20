@@ -3,7 +3,7 @@ const path = require('path');
 const { pool } = require('./db');
 const { caseFolder } = require('./util');
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+const { getUploadDir } = require('./paths');
 const FLAG = 'storage_migrated_v1';
 
 function moveFile(src, dest) {
@@ -18,6 +18,7 @@ async function migrateFilesToCaseFolders() {
   const flag = (await pool.query(`SELECT value FROM app_settings WHERE key = $1`, [FLAG])).rows[0];
   if (flag && flag.value === '1') return { migrated: false, moved: 0 };
 
+  const UPLOAD_DIR = getUploadDir();
   let moved = 0;
 
   // 1. 附件：stored_name 为纯文件名 → 移到 案件文件夹/文件名

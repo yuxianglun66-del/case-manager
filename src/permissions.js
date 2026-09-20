@@ -19,6 +19,9 @@ const PERMISSIONS = [
   { key: 'system.users', group: '系统管理', label: '用户管理', desc: '可以管理用户账号' },
   { key: 'system.roles', group: '系统管理', label: '角色与权限', desc: '可以配置角色的权限、新建自定义角色' },
   { key: 'system.settings', group: '系统管理', label: '系统设置', desc: '可以管理案件类型、状态、品牌主题等' },
+  { key: 'system.status', group: '系统管理', label: '运行状态', desc: '可以查看系统运行状态、数据库、进程信息' },
+  { key: 'system.backup', group: '系统管理', label: '备份与恢复', desc: '可以创建、下载、恢复、删除系统备份' },
+  { key: 'system.audit', group: '系统管理', label: '操作日志', desc: '可以查看系统操作日志、审计记录' },
 ];
 
 /* 内置角色元数据（自定义角色保存在 roles 表） */
@@ -35,7 +38,7 @@ const DEFAULT_PERMS = {
     'cases.view', 'cases.view_all', 'cases.create', 'cases.edit', 'cases.delete', 'cases.assign',
     'cases.remind', 'cases.fee', 'cases.import_export', 'cases.batch', 'reports.view',
     'parties.manage', 'attachments.manage', 'contracts.manage', 'library.manage',
-    'system.settings',
+    'system.settings', 'system.status', 'system.backup', 'system.audit',
   ],
   staff: [
     'cases.view', 'cases.create', 'cases.edit', 'cases.remind', 'cases.fee', 'cases.batch', 'reports.view',

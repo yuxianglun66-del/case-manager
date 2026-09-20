@@ -11,14 +11,14 @@ function fmtDate(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getT
 function fmtDateTime(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + _p(d.getHours()) + ':' + _p(d.getMinutes()); }
 
 const router = express.Router();
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+const { getUploadDir } = require('../src/paths');
 
 // 已签署 PDF 路径解析：兼容旧（contracts/signed/ 前缀）与新（案件文件夹相对路径）存储
 function resolveSignedPdf(p) {
   if (!p) return null;
-  const newPath = path.join(UPLOAD_DIR, p);
+  const newPath = path.join(getUploadDir(), p);
   if (fs.existsSync(newPath)) return newPath;
-  const oldPath = path.join(UPLOAD_DIR, 'contracts', 'signed', p);
+  const oldPath = path.join(getUploadDir(), 'contracts', 'signed', p);
   return fs.existsSync(oldPath) ? oldPath : null;
 }
 
@@ -156,7 +156,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       basePath = resolveSignedPdf(first.contract_pdf);
     } else {
       // 首次签署：以工作稿（含预填文本）或模板为底
-      basePath = path.join(UPLOAD_DIR, first.work_pdf_path || first.template_path);
+      basePath = path.join(getUploadDir(), first.work_pdf_path || first.template_path);
     }
     if (!fs.existsSync(basePath)) return res.status(500).json({ error: '模板 PDF 不存在' });
 
@@ -165,7 +165,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
     const cjkFont = await embedCjkFont(pdfDoc);
 
     // 保存签名图片并叠加到 PDF
-    const signDir = path.join(UPLOAD_DIR, 'signatures');
+    const signDir = path.join(getUploadDir(), 'signatures');
     if (!fs.existsSync(signDir)) fs.mkdirSync(signDir, { recursive: true });
     const nowTs = Date.now();
     const savedFiles = [];
@@ -212,7 +212,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
 
     const pdfBytes = await pdfDoc.save();
     const folder = caseFolder({ case_no: first.case_no });
-    const signedDir = path.join(UPLOAD_DIR, folder);
+    const signedDir = path.join(getUploadDir(), folder);
     if (!fs.existsSync(signedDir)) fs.mkdirSync(signedDir, { recursive: true });
     const signedFile = `signed_${first.contract_id}_${nowTs}.pdf`;
     fs.writeFileSync(path.join(signedDir, signedFile), pdfBytes);
@@ -269,7 +269,7 @@ router.get('/sign/:token/pdf', signReadLimiter, async (req, res, next) => {
     if (sig.pdf_path && resolveSignedPdf(sig.pdf_path)) {
       fp = resolveSignedPdf(sig.pdf_path);
     } else {
-      fp = path.join(UPLOAD_DIR, sig.work_pdf_path || sig.template_path);
+      fp = path.join(getUploadDir(), sig.work_pdf_path || sig.template_path);
     }
     if (!fs.existsSync(fp)) return res.status(404).send('模板文件不存在');
     res.setHeader('Content-Type', 'application/pdf');

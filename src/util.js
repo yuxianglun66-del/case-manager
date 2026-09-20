@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pool } = require('./db');
+const { getUploadDir } = require('./paths');
 
 const ALLOWED_EXT = [
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic',
@@ -82,7 +83,7 @@ function validateUploadedFiles(req, res, next) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let dir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    let dir = getUploadDir();
     // 附件按案件编号独立文件夹存放
     if (req && req.caseRow) {
       dir = path.join(dir, caseFolder(req.caseRow));
@@ -110,7 +111,7 @@ const upload = multer({
 
 const feeStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let dir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    let dir = getUploadDir();
     if (req && req.caseRow) {
       dir = path.join(dir, caseFolder(req.caseRow), 'fees');
     }
@@ -137,7 +138,7 @@ const feeUpload = multer({
 
 const libraryStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), 'library');
+    const dir = path.join(getUploadDir(), 'library');
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },

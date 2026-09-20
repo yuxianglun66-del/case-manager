@@ -9,6 +9,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const { pool, initDb } = require('./src/db');
 const { loadUser } = require('./src/auth');
+const { getUploadDir } = require('./src/paths');
 const expressLayouts = require('express-ejs-layouts');
 
 const app = express();
@@ -51,7 +52,7 @@ app.get('/healthz', async (req, res) => {
   }
 });
 
-const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+const uploadDir = getUploadDir();
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // ====== H5: 安全响应头 ======
@@ -251,7 +252,7 @@ app.get('/sw.js', (req, res, next) => {
 });
 
 // 上传文件静态访问（logo 等）
-const _uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+const _uploadDir = getUploadDir();
 app.use('/uploads', (req, res, next) => {
   const fp = path.join(_uploadDir, req.path);
   if (!fp.startsWith(path.resolve(_uploadDir))) return res.status(403).end();
@@ -292,6 +293,7 @@ app.use((err, req, res, next) => {
 
 async function start() {
   await initDb();
+  await require('./src/paths').loadPaths();
   await require('./src/permissions').loadPermissions();
   // 附件按案件文件夹存储：启动时执行一次性迁移
   try {

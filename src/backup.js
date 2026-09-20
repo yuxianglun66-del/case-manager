@@ -1,8 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pool } = require('./db');
-
-const BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), 'backups');
+const { getBackupDir } = require('./paths');
 
 const APP_NAME = 'case-manager';
 const BACKUP_VERSION = 1;
@@ -27,7 +26,7 @@ const SETTING_KEYS = [
 ];
 
 function ensureBackupDir() {
-  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  if (!fs.existsSync(getBackupDir())) fs.mkdirSync(getBackupDir(), { recursive: true });
 }
 
 function backupFileName(d = new Date()) {
@@ -37,10 +36,10 @@ function backupFileName(d = new Date()) {
 
 function listBackups() {
   ensureBackupDir();
-  return fs.readdirSync(BACKUP_DIR)
+  return fs.readdirSync(getBackupDir())
     .filter((f) => f.startsWith('backup-') && f.endsWith('.json'))
     .map((f) => {
-      const full = path.join(BACKUP_DIR, f);
+      const full = path.join(getBackupDir(), f);
       let size = 0;
       let mtime = null;
       try {
@@ -118,15 +117,15 @@ async function runBackup() {
     dump.tables[t] = res.rows;
   }
   const file = backupFileName();
-  fs.writeFileSync(path.join(BACKUP_DIR, file), JSON.stringify(dump, null, 2), 'utf8');
+  fs.writeFileSync(path.join(getBackupDir(), file), JSON.stringify(dump, null, 2), 'utf8');
   const cfg = await readBackupSettings();
   pruneOldBackups(cfg.backup_retention_days);
-  return { file, size: fs.statSync(path.join(BACKUP_DIR, file)).size };
+  return { file, size: fs.statSync(path.join(getBackupDir(), file)).size };
 }
 
 async function restoreBackup(file) {
   const safe = path.basename(file);
-  const full = path.join(BACKUP_DIR, safe);
+  const full = path.join(getBackupDir(), safe);
   if (!fs.existsSync(full)) throw new Error('备份文件不存在');
   const dump = JSON.parse(fs.readFileSync(full, 'utf8'));
   if (!dump || dump.app !== APP_NAME || !dump.tables) throw new Error('无效的备份文件');
@@ -215,9 +214,9 @@ function pruneOldBackups(retentionDays) {
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   let removed = 0;
   ensureBackupDir();
-  for (const f of fs.readdirSync(BACKUP_DIR)) {
+  for (const f of fs.readdirSync(getBackupDir())) {
     if (!f.startsWith('backup-') || !f.endsWith('.json')) continue;
-    const full = path.join(BACKUP_DIR, f);
+    const full = path.join(getBackupDir(), f);
     try {
       const st = fs.statSync(full);
       if (st.mtimeMs < cutoff) {
@@ -231,7 +230,7 @@ function pruneOldBackups(retentionDays) {
 
 function deleteBackup(file) {
   const safe = path.basename(file);
-  const full = path.join(BACKUP_DIR, safe);
+  const full = path.join(getBackupDir(), safe);
   if (!fs.existsSync(full)) throw new Error('备份文件不存在');
   fs.unlinkSync(full);
   return true;
@@ -274,7 +273,6 @@ function startBackupScheduler() {
 }
 
 module.exports = {
-  BACKUP_DIR,
   MAIN_TABLES,
   runBackup,
   restoreBackup,

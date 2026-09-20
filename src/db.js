@@ -567,7 +567,8 @@ async function ensureTemplatePdfs() {
   try {
     const fs = require('fs');
     const path = require('path');
-    const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    const { getUploadDir } = require('./paths');
+    const uploadDir = getUploadDir();
     const contractsDir = path.join(uploadDir, 'contracts');
     if (!fs.existsSync(contractsDir)) fs.mkdirSync(contractsDir, { recursive: true });
 

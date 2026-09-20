@@ -19,12 +19,12 @@ const { pushEvent } = require('../src/wecom');
 const router = express.Router();
 router.use(requireLogin);
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+const { getUploadDir } = require('../src/paths');
 
 // 删除存储文件：兼容新（案件文件夹相对路径）与旧（contracts/signed/ 前缀）两种存储位置
 function removeStoredFile(p) {
   if (!p) return;
-  for (const fp of [path.join(UPLOAD_DIR, p), path.join(UPLOAD_DIR, 'contracts', 'signed', p)]) {
+  for (const fp of [path.join(getUploadDir(), p), path.join(getUploadDir(), 'contracts', 'signed', p)]) {
     if (fs.existsSync(fp)) { try { fs.unlinkSync(fp); } catch {} }
   }
 }
@@ -628,11 +628,11 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
     const f = req.file || null;
     let filePath = old.file_path, fName = old.file_original_name, fMime = old.file_mime, fSize = old.file_size;
     if (remove_file === '1' && !f) {
-      if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+      if (old.file_path) { const abs = path.join(getUploadDir(), old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
       filePath = null; fName = null; fMime = null; fSize = 0;
     }
     if (f) {
-      if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+      if (old.file_path) { const abs = path.join(getUploadDir(), old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
       filePath = caseFolder(req.caseRow) + '/fees/' + f.filename;
       fName = f.originalname; fMime = f.mimetype; fSize = f.size;
     }
@@ -662,7 +662,7 @@ router.delete('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, 
     const { rows } = await client.query('DELETE FROM case_fees WHERE id=$1 AND case_id=$2 RETURNING *', [fid, req.caseRow.id]);
     if (!rows.length) return res.status(404).json({ error: '费用记录不存在' });
     const old = rows[0];
-    if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
+    if (old.file_path) { const abs = path.join(getUploadDir(), old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
     await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
     pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '🗑️ 费用删除\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + old.fee_type + '\n💰 金额：¥' + old.amount + (old.direction === 'expense' ? '（支出）' : '（收入）') + (old.payer ? '\n👤 付款方：' + old.payer : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
@@ -675,7 +675,7 @@ router.get('/cases/:id/fees/:fid/file', requirePermission('cases.view'), needCas
     const fid = parseInt(req.params.fid);
     const { rows } = await pool.query('SELECT * FROM case_fees WHERE id=$1 AND case_id=$2', [fid, req.caseRow.id]);
     if (!rows.length || !rows[0].file_path) return res.status(404).json({ error: '文件不存在' });
-    const filePath = path.join(UPLOAD_DIR, rows[0].file_path);
+    const filePath = path.join(getUploadDir(), rows[0].file_path);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: '文件已被删除' });
     res.setHeader('Content-Type', rows[0].file_mime || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(rows[0].file_original_name || 'file')}`);
@@ -725,7 +725,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     for (const f of files) {
       try {
         const origin = Buffer.from(f.originalname, 'latin1').toString('utf8');
-        const storedPath = path.join(UPLOAD_DIR, caseFolder(req.caseRow) + '/' + f.filename);
+        const storedPath = path.join(getUploadDir(), caseFolder(req.caseRow) + '/' + f.filename);
         const lower = origin.toLowerCase();
         const isOffice = (f.mimetype || '').includes('wordprocessing') || f.mimetype === 'application/msword'
           || (f.mimetype || '').includes('spreadsheet') || f.mimetype === 'application/vnd.ms-excel'
@@ -752,22 +752,22 @@ router.post('/attachments/:id/replace', requirePermission('attachments.manage'),
     if (!req.file) return res.status(400).json({ error: '未选择文件' });
     const id = parseInt(req.params.id, 10);
     const att = (await pool.query(`SELECT * FROM attachments WHERE id = $1`, [id])).rows[0];
-    if (!att) { if (req.file) fs.unlinkSync(path.join(UPLOAD_DIR, req.file.filename)); return res.status(404).json({ error: '附件不存在' }); }
+    if (!att) { if (req.file) fs.unlinkSync(path.join(getUploadDir(), req.file.filename)); return res.status(404).json({ error: '附件不存在' }); }
 
     const caseRow = await getCaseForPermission({ params: { id: att.case_id } });
     if (!canViewCase(req.session.user, caseRow)) {
-      if (req.file) fs.unlinkSync(path.join(UPLOAD_DIR, req.file.filename));
+      if (req.file) fs.unlinkSync(path.join(getUploadDir(), req.file.filename));
       return res.status(403).json({ error: '无权操作' });
     }
 
-    const oldPath = path.join(UPLOAD_DIR, att.stored_name);
+    const oldPath = path.join(getUploadDir(), att.stored_name);
     // 新文件先落到根目录，再移动到该案件文件夹
     const folder = caseFolder(caseRow);
     const newRel = folder + '/' + req.file.filename;
-    const newPath = path.join(UPLOAD_DIR, newRel);
-    if (path.join(UPLOAD_DIR, req.file.filename) !== newPath) {
+    const newPath = path.join(getUploadDir(), newRel);
+    if (path.join(getUploadDir(), req.file.filename) !== newPath) {
       fs.mkdirSync(path.dirname(newPath), { recursive: true });
-      fs.renameSync(path.join(UPLOAD_DIR, req.file.filename), newPath);
+      fs.renameSync(path.join(getUploadDir(), req.file.filename), newPath);
     }
     // 同理兜底 mime
     let mime = req.file.mimetype || 'application/octet-stream';
@@ -816,7 +816,7 @@ router.post('/attachments/:id/delete', requirePermission('attachments.manage'), 
       `INSERT INTO case_history (case_id, action, note, operator_id) VALUES ($1,'attachment-del',$2,$3)`,
       [att.case_id, `删除附件：${att.original_name}`, req.session.user.id]
     );
-    const fp = path.join(UPLOAD_DIR, att.stored_name);
+    const fp = path.join(getUploadDir(), att.stored_name);
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
     const cachePath = fp + '.preview.pdf';
     if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
@@ -835,7 +835,7 @@ async function serveAttachment(req, res, inline) {
     const caseRow = await getCaseForPermission({ params: { id: att.case_id } });
     if (!caseRow || !canViewCase(req.session.user, caseRow)) return res.status(403).json({ error: '无权访问' });
 
-    const fp = path.join(UPLOAD_DIR, att.stored_name);
+    const fp = path.join(getUploadDir(), att.stored_name);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件已被删除' });
 
     const safeName = Buffer.from(att.original_name, 'utf8').toString('latin1');
@@ -864,7 +864,7 @@ router.get('/attachments/:id/preview', async (req, res, next) => {
     const caseRow = await getCaseForPermission({ params: { id: att.case_id } });
     if (!caseRow || !canViewCase(req.session.user, caseRow)) return res.status(403).render('error', { title: '无权访问', message: '您无权查看该附件。', user: req.session.user });
 
-    const fp = path.join(UPLOAD_DIR, att.stored_name);
+    const fp = path.join(getUploadDir(), att.stored_name);
     if (!fs.existsSync(fp)) return res.status(404).render('error', { title: '文件丢失', message: '文件已被删除。', user: req.session.user });
 
     const mime = att.mime_type || '';
@@ -900,7 +900,7 @@ router.get('/attachments/:id/preview-file', async (req, res, next) => {
     const caseRow = await getCaseForPermission({ params: { id: att.case_id } });
     if (!caseRow || !canViewCase(req.session.user, caseRow)) return res.status(403).json({ error: '无权访问' });
 
-    const fp = path.join(UPLOAD_DIR, att.stored_name);
+    const fp = path.join(getUploadDir(), att.stored_name);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件已被删除' });
 
     const lower = att.original_name.toLowerCase();
@@ -912,7 +912,7 @@ router.get('/attachments/:id/preview-file', async (req, res, next) => {
     let mime = att.mime_type || 'application/octet-stream';
 
     if (isOffice) {
-      const cached = path.join(UPLOAD_DIR, att.stored_name + '.preview.pdf');
+      const cached = path.join(getUploadDir(), att.stored_name + '.preview.pdf');
       if (!fs.existsSync(cached)) {
         try {
           await convertOfficeToPdfCached(fp, cached);
@@ -946,7 +946,7 @@ router.get('/cases/:id/attachments/zip', async (req, res, next) => {
     zip.on('error', (err) => next(err));
     zip.pipe(res);
     for (const f of files) {
-      const fp = path.join(UPLOAD_DIR, f.stored_name);
+      const fp = path.join(getUploadDir(), f.stored_name);
       if (!fs.existsSync(fp)) continue;
       zip.append(fs.createReadStream(fp), { name: path.basename(f.original_name) });
     }
@@ -1501,20 +1501,50 @@ router.post('/settings', requirePermission('system.settings'), async (req, res, 
   } catch (e) { next(e); }
 });
 
+/* ---------- 存储路径设置 ---------- */
+router.get('/settings/paths', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const { getUploadDir, getBackupDir, DEFAULT_UPLOAD_DIR, DEFAULT_BACKUP_DIR } = require('../src/paths');
+    res.json({ ok: true, uploadDir: getUploadDir(), backupDir: getBackupDir(), defaultUploadDir: DEFAULT_UPLOAD_DIR, defaultBackupDir: DEFAULT_BACKUP_DIR });
+  } catch (e) { next(e); }
+});
+
+router.post('/settings/paths', requirePermission('system.settings'), async (req, res, next) => {
+  try {
+    const { savePaths } = require('../src/paths');
+    const fs = require('fs');
+    const uploadDir = String(req.body.uploadDir || '').trim();
+    const backupDir = String(req.body.backupDir || '').trim();
+    if (uploadDir && !fs.existsSync(uploadDir)) {
+      try { fs.mkdirSync(uploadDir, { recursive: true }); } catch (e) {
+        return res.status(400).json({ error: '附件路径无法创建: ' + e.message });
+      }
+    }
+    if (backupDir && !fs.existsSync(backupDir)) {
+      try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) {
+        return res.status(400).json({ error: '备份路径无法创建: ' + e.message });
+      }
+    }
+    await savePaths(uploadDir || null, backupDir || null);
+    await audit(req, '更新存储路径', { entity_type: 'system', entity_id: 'paths', detail: '附件=' + (uploadDir||'默认') + ' 备份=' + (backupDir||'默认') });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 /* Logo 上传 */
 router.post('/settings/logo', requirePermission('system.settings'), upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: '未选择文件' });
     const ext = path.extname(req.file.originalname).toLowerCase();
     if (!['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
-      fs.unlinkSync(path.join(UPLOAD_DIR, req.file.filename));
+      fs.unlinkSync(path.join(getUploadDir(), req.file.filename));
       return res.status(400).json({ error: '仅支持 png/jpg/webp' });
     }
-    const logoDir = path.join(UPLOAD_DIR, 'logo');
+    const logoDir = path.join(getUploadDir(), 'logo');
     if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
     const stored = 'logo' + ext;
     const dest = path.join(logoDir, stored);
-    fs.renameSync(path.join(UPLOAD_DIR, req.file.filename), dest);
+    fs.renameSync(path.join(getUploadDir(), req.file.filename), dest);
     await pool.query(
       `INSERT INTO app_settings (key, value) VALUES ('company_logo', $1)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
@@ -1599,33 +1629,27 @@ router.post('/notify-logs/clear', requirePermission('system.settings'), async (r
 /* ---------- 备份与恢复（仅超级管理员） ---------- */
 const {
   runBackup, restoreBackup, listBackups, deleteBackup, pruneOldBackups,
-  readBackupSettings, saveBackupSettings, BACKUP_DIR
+  readBackupSettings, saveBackupSettings
 } = require('../src/backup');
+const { getBackupDir } = require('../src/paths');
 
-function requireSuperAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== 'super_admin') {
-    return res.status(403).json({ error: '仅超级管理员可执行此操作' });
-  }
-  next();
-}
-
-router.get('/backup/list', requireSuperAdmin, async (req, res, next) => {
+router.get('/backup/list', requirePermission('system.backup'), async (req, res, next) => {
   try {
-    res.json({ ok: true, files: listBackups(), dir: BACKUP_DIR });
+    res.json({ ok: true, files: listBackups(), dir: getBackupDir() });
   } catch (e) { next(e); }
 });
 
-router.get('/backup/download/:file', requireSuperAdmin, async (req, res, next) => {
+router.get('/backup/download/:file', requirePermission('system.backup'), async (req, res, next) => {
   try {
     const name = path.basename(String(req.params.file || ''));
     if (!/^backup-\d{8}-\d{6}\.json$/.test(name)) return res.status(400).json({ error: '非法的备份文件名' });
-    const full = path.join(BACKUP_DIR, name);
+    const full = path.join(getBackupDir(), name);
     if (!fs.existsSync(full)) return res.status(404).json({ error: '备份文件不存在' });
     res.download(full, name);
   } catch (e) { next(e); }
 });
 
-router.post('/backup/create', requireSuperAdmin, async (req, res, next) => {
+router.post('/backup/create', requirePermission('system.backup'), async (req, res, next) => {
   try {
     const r = await runBackup();
     await audit(req, '创建备份', { entity_type: 'backup', entity_id: r.file, detail: '备份文件 ' + r.file + '（' + r.size + ' 字节）' });
@@ -1633,7 +1657,7 @@ router.post('/backup/create', requireSuperAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/backup/restore', requireSuperAdmin, async (req, res, next) => {
+router.post('/backup/restore', requirePermission('system.backup'), async (req, res, next) => {
   try {
     const file = String(req.body.file || '').trim();
     if (!file) return res.status(400).json({ error: '未指定备份文件' });
@@ -1643,7 +1667,7 @@ router.post('/backup/restore', requireSuperAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/backup/delete', requireSuperAdmin, async (req, res, next) => {
+router.post('/backup/delete', requirePermission('system.backup'), async (req, res, next) => {
   try {
     const file = String(req.body.file || '').trim();
     if (!file) return res.status(400).json({ error: '未指定备份文件' });
@@ -1653,13 +1677,13 @@ router.post('/backup/delete', requireSuperAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.get('/backup/settings', requireSuperAdmin, async (req, res, next) => {
+router.get('/backup/settings', requirePermission('system.backup'), async (req, res, next) => {
   try {
     res.json({ ok: true, settings: await readBackupSettings() });
   } catch (e) { next(e); }
 });
 
-router.post('/backup/settings', requireSuperAdmin, async (req, res, next) => {
+router.post('/backup/settings', requirePermission('system.backup'), async (req, res, next) => {
   try {
     const s = await saveBackupSettings(req.body);
     await audit(req, '更新备份设置', { entity_type: 'backup', entity_id: 'settings', detail: '备份策略配置变更' });
@@ -1668,7 +1692,7 @@ router.post('/backup/settings', requireSuperAdmin, async (req, res, next) => {
 });
 
 /* ---------- 操作日志清理（仅超级管理员） ---------- */
-router.post('/audit/cleanup', requireSuperAdmin, async (req, res, next) => {
+router.post('/audit/cleanup', requirePermission('system.audit'), async (req, res, next) => {
   try {
     const { pruneAuditLogs } = require('../src/audit');
     const days = Math.min(3650, Math.max(1, parseInt(req.body.days, 10) || 30));
@@ -1988,7 +2012,7 @@ router.post('/contract-templates', requirePermission('contracts.manage'), upload
     }
     const { name, case_type_id, sign_positions, text_fields } = req.body;
     if (!name) return res.status(400).json({ error: '模板名称必填' });
-    const contractsDir = path.join(UPLOAD_DIR, 'contracts');
+    const contractsDir = path.join(getUploadDir(), 'contracts');
     if (!fs.existsSync(contractsDir)) fs.mkdirSync(contractsDir, { recursive: true });
     const base = `tpl_${Date.now()}_${req.file.filename.replace(/\.(docx?|pdf)$/i, '')}`;
     let pdfName = null;
@@ -2021,7 +2045,7 @@ router.post('/contract-templates/:id/delete', requirePermission('contracts.manag
     const id = parseInt(req.params.id, 10);
     const tpl = (await pool.query(`SELECT name, pdf_path FROM contract_templates WHERE id = $1`, [id])).rows[0];
     if (tpl?.pdf_path) {
-      const fp = path.join(UPLOAD_DIR, tpl.pdf_path);
+      const fp = path.join(getUploadDir(), tpl.pdf_path);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
     }
     await pool.query(`UPDATE contract_templates SET active = FALSE WHERE id = $1`, [id]);
@@ -2068,7 +2092,7 @@ router.get('/contract-templates/:id/pdf', requirePermission('contracts.manage'),
     const id = parseInt(req.params.id, 10);
     const tpl = (await pool.query(`SELECT pdf_path FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
     if (!tpl?.pdf_path) return res.status(404).json({ error: '模板不存在' });
-    const fp = path.join(UPLOAD_DIR, tpl.pdf_path);
+    const fp = path.join(getUploadDir(), tpl.pdf_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '模板文件不存在' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
@@ -2189,7 +2213,7 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
     if (textFields.length) {
       try {
         const { PDFDocument } = require('pdf-lib');
-        const tplPath = path.join(UPLOAD_DIR, tpl.pdf_path);
+        const tplPath = path.join(getUploadDir(), tpl.pdf_path);
         if (fs.existsSync(tplPath)) {
           const pdfDoc = await PDFDocument.load(fs.readFileSync(tplPath));
           const cjkFont = await embedCjkFont(pdfDoc);
@@ -2204,7 +2228,7 @@ router.post('/cases/:id/contracts', requirePermission('contracts.manage'), async
               const pdfBytes = await pdfDoc.save();
               const workFile = `work_${contract.id}_${Date.now()}.pdf`;
               const folder = caseFolder(c);
-              const workPath = path.join(UPLOAD_DIR, folder, workFile);
+              const workPath = path.join(getUploadDir(), folder, workFile);
               fs.mkdirSync(path.dirname(workPath), { recursive: true });
               fs.writeFileSync(workPath, pdfBytes);
               await pool.query(`UPDATE contracts SET work_pdf_path = $1 WHERE id = $2`, [`${folder}/${workFile}`, contract.id]);
@@ -2250,8 +2274,8 @@ router.get('/contracts/:id/download', async (req, res, next) => {
     if (!caseRow || !canViewCase(req.session.user, caseRow)) return res.status(403).json({ error: '无权下载' });
     if (!c.pdf_path) return res.status(404).json({ error: '合同尚未完成签署' });
     // 兼容旧路径（contracts/signed/ 前缀）与新路径（案件文件夹）
-    let fp = path.join(UPLOAD_DIR, c.pdf_path);
-    if (!fs.existsSync(fp)) fp = path.join(UPLOAD_DIR, 'contracts', 'signed', c.pdf_path);
+    let fp = path.join(getUploadDir(), c.pdf_path);
+    if (!fs.existsSync(fp)) fp = path.join(getUploadDir(), 'contracts', 'signed', c.pdf_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(c.title + '.pdf')}`);
     res.setHeader('Content-Type', 'application/pdf');
@@ -2387,7 +2411,7 @@ router.put('/library/:lid', requirePermission('cases.edit'), libraryUpload.singl
     let fileSize = existing.file_size;
     if (f) {
       if (existing.file_path) {
-        const old = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), existing.file_path);
+        const old = path.join(getUploadDir(), existing.file_path);
         fs.unlink(old, () => {});
       }
       filePath = 'library/' + f.filename;
@@ -2410,7 +2434,7 @@ router.delete('/library/:lid', requirePermission('cases.edit'), async (req, res,
     const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [lid])).rows[0];
     if (!item) return res.status(404).json({ error: '记录不存在' });
     if (item.file_path) {
-      const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+      const fp = path.join(getUploadDir(), item.file_path);
       fs.unlink(fp, () => {});
     }
     await pool.query(`DELETE FROM library_items WHERE id = $1`, [lid]);
@@ -2423,7 +2447,7 @@ router.get('/library/:lid/file', requireLogin, async (req, res, next) => {
   try {
     const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
     if (!item || !item.file_path) return res.status(404).json({ error: '文件不存在' });
-    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    const fp = path.join(getUploadDir(), item.file_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
     const ct = contentTypeFor(item.file_original_name);
     res.setHeader('Content-Type', ct);
@@ -2436,7 +2460,7 @@ router.get('/library/:lid/preview', requireLogin, async (req, res, next) => {
   try {
     const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
     if (!item || !item.file_path) return res.status(404).render('error', { title: '文件不存在', message: '文件不存在或已被删除。', user: req.session.user });
-    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    const fp = path.join(getUploadDir(), item.file_path);
     if (!fs.existsSync(fp)) return res.status(404).render('error', { title: '文件丢失', message: '文件已被删除。', user: req.session.user });
     const mime = item.file_mime || '';
     const lower = (item.file_original_name || '').toLowerCase();
@@ -2479,7 +2503,7 @@ router.get('/library/:lid/preview-file', requireLogin, async (req, res, next) =>
   try {
     const item = (await pool.query(`SELECT * FROM library_items WHERE id = $1`, [req.params.lid])).rows[0];
     if (!item || !item.file_path) return res.status(404).json({ error: '文件不存在' });
-    const fp = path.join(process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'), item.file_path);
+    const fp = path.join(getUploadDir(), item.file_path);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: '文件不存在' });
     const lower = (item.file_original_name || '').toLowerCase();
     const isOffice = (item.file_mime || '').includes('wordprocessing') || item.file_mime === 'application/msword'

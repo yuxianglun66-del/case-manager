@@ -486,7 +486,8 @@ router.get('/settings/templates/:id/edit', requirePermission('contracts.manage')
     const id = parseInt(req.params.id, 10);
     const tpl = (await pool.query(`SELECT * FROM contract_templates WHERE id = $1 AND active = TRUE`, [id])).rows[0];
     if (!tpl) return res.status(404).render('error', { title: '模板不存在', message: '模板不存在或已停用。', user: req.session.user });
-    const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+    const { getUploadDir } = require('../src/paths');
+    const uploadDir = getUploadDir();
     let pdfB64 = '';
     if (tpl.pdf_path) {
       const fp = path.join(uploadDir, tpl.pdf_path);
@@ -496,16 +497,9 @@ router.get('/settings/templates/:id/edit', requirePermission('contracts.manage')
   } catch (e) { next(e); }
 });
 
-/* ---------- 备份与恢复（仅超级管理员） ---------- */
-router.get('/settings/backup', async (req, res, next) => {
+/* ---------- 备份与恢复 ---------- */
+router.get('/settings/backup', requirePermission('system.backup'), async (req, res, next) => {
   try {
-    if (!req.session.user || req.session.user.role !== 'super_admin') {
-      return res.status(403).render('error', {
-        title: '无权访问',
-        message: '仅超级管理员可访问备份与恢复。',
-        user: req.session.user
-      });
-    }
     const { listBackups, readBackupSettings } = require('../src/backup');
     const files = listBackups();
     const backupSettings = await readBackupSettings();
@@ -513,16 +507,9 @@ router.get('/settings/backup', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ---------- 操作日志（仅超级管理员） ---------- */
-router.get('/settings/audit', async (req, res, next) => {
+/* ---------- 操作日志 ---------- */
+router.get('/settings/audit', requirePermission('system.audit'), async (req, res, next) => {
   try {
-    if (!req.session.user || req.session.user.role !== 'super_admin') {
-      return res.status(403).render('error', {
-        title: '无权访问',
-        message: '仅超级管理员可查看操作日志。',
-        user: req.session.user
-      });
-    }
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(10, parseInt(req.query.limit, 10) || 50));
     const offset = (page - 1) * limit;
@@ -555,16 +542,9 @@ router.get('/settings/audit', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ---------- 运行状态（仅超级管理员） ---------- */
-router.get('/settings/status', async (req, res, next) => {
+/* ---------- 运行状态 ---------- */
+router.get('/settings/status', requirePermission('system.status'), async (req, res, next) => {
   try {
-    if (!req.session.user || req.session.user.role !== 'super_admin') {
-      return res.status(403).render('error', {
-        title: '无权访问',
-        message: '仅超级管理员可查看运行状态。',
-        user: req.session.user
-      });
-    }
     const { execFileSync } = require('child_process');
     const os = require('os');
 

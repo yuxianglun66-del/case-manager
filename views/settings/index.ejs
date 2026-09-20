@@ -27,6 +27,9 @@
   <li class="nav-item">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLibrary" type="button">文库管理</button>
   </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPaths" type="button">存储路径</button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -478,9 +481,30 @@
       </div>
     </div>
   </div>
+  <!-- ============ 存储路径 ============ -->
+  <div class="tab-pane fade" id="tabPaths">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-folder2-open"></i> 文件存储路径</div>
+      <div class="card-body">
+        <div class="alert alert-info small mb-3">
+          修改路径后，已有文件不会自动迁移。如需迁移请手动移动文件后更新此处路径。<br>
+          Docker 部署用户请同步修改 <code>docker-compose.yml</code> 中的 volumes 挂载。
+        </div>
+        <div class="mb-3">
+          <label class="form-label">附件存储路径</label>
+          <input type="text" class="form-control" id="pathUploadDir" placeholder="默认: uploads">
+          <div class="form-text">当前实际路径: <code id="pathUploadActual">-</code></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">备份存储路径</label>
+          <input type="text" class="form-control" id="pathBackupDir" placeholder="默认: uploads/backups">
+          <div class="form-text">当前实际路径: <code id="pathBackupActual">-</code></div>
+        </div>
+        <button class="btn btn-primary" onclick="savePaths()"><i class="bi bi-check-lg"></i> 保存路径</button>
+      </div>
+    </div>
+  </div>
 </div>
-
-<!-- ============ 案件类型弹窗 ============ -->
 <div class="modal fade" id="typeModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1258,5 +1282,38 @@
   if (location.hash) {
     var target = document.querySelector('.nav-link[data-bs-target="' + location.hash + '"]');
     if (target) bootstrap.Tab.getOrCreateInstance(target).show();
+  }
+
+  /* ---- 存储路径 ---- */
+  (async function loadPaths() {
+    try {
+      var r = await fetch('/api/settings/paths');
+      var d = await r.json();
+      if (d.ok) {
+        document.getElementById('pathUploadDir').value = d.uploadDir === d.defaultUploadDir ? '' : d.uploadDir;
+        document.getElementById('pathBackupDir').value = d.backupDir === d.defaultBackupDir ? '' : d.backupDir;
+        document.getElementById('pathUploadActual').textContent = d.uploadDir;
+        document.getElementById('pathBackupActual').textContent = d.backupDir;
+      }
+    } catch (_) {}
+  })();
+
+  async function savePaths() {
+    var uploadDir = document.getElementById('pathUploadDir').value.trim();
+    var backupDir = document.getElementById('pathBackupDir').value.trim();
+    try {
+      var r = await fetch('/api/settings/paths', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadDir: uploadDir, backupDir: backupDir })
+      });
+      var d = await r.json();
+      if (d.ok) {
+        alert('路径已保存');
+        loadPaths();
+      } else {
+        alert(d.error || '保存失败');
+      }
+    } catch (e) { alert('保存失败: ' + e.message); }
   }
 </script>
