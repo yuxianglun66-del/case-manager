@@ -1343,10 +1343,12 @@ router.post('/fields/:id/update', requirePermission('system.settings'), async (r
     const required = req.body.required === '1';
     const placeholder = (req.body.placeholder || '').trim();
     const sort = parseInt(req.body.sort, 10) || 999;
+    const optionsRaw = (req.body.options || '').trim();
     if (!label) return res.status(400).json({ error: '字段名称不能为空' });
-    const old = (await pool.query(`SELECT label, required FROM case_fields WHERE id=$1`, [id])).rows[0];
+    const old = (await pool.query(`SELECT label, required, options FROM case_fields WHERE id=$1`, [id])).rows[0];
     if (!old) return res.status(404).json({ error: '字段不存在' });
-    await pool.query(`UPDATE case_fields SET label=$1, required=$2, placeholder=$3, sort=$4 WHERE id=$5`, [label, required, placeholder || null, sort, id]);
+    const options = optionsRaw ? JSON.stringify(optionsRaw.split(/[,，]/).map((o) => ({ label: o.trim() })).filter((o) => o.label)) : old.options;
+    await pool.query(`UPDATE case_fields SET label=$1, required=$2, placeholder=$3, sort=$4, options=$5 WHERE id=$6`, [label, required, placeholder || null, sort, options, id]);
     await audit(req, '编辑动态字段', { entity_type: 'field', entity_id: id, detail: '字段「' + old.label + '」→「' + label + '」', before: { label: old.label, required: old.required }, after: { label, required } });
     res.json({ ok: true });
   } catch (e) { next(e); }
