@@ -129,5 +129,5 @@ function modalBox(title, html, opts = {}) {
   const modal = new bootstrap.Modal(dom);
   const body = dom.querySelector('.modal-body');
   const okBtn = dom.querySelector('#modalOkBtn');
-  return { modal, body, okBtn, show: () => modal.show(), close: () => modal.hide() };
+  return { modal, body, okBtn, show: () => modal.show(), hide: () => modal.hide(), close: () => modal.hide() };
 }
