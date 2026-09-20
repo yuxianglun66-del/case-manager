@@ -353,10 +353,10 @@ const SEED_TYPES = [
 
 const SEED_TYPE_FIELDS = {
   JT: [
-    ['事故时间', 'date', false, '如 2026-01-01'],
-    ['事故地点', 'text', false, ''],
-    ['责任认定情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
-    ['事发经过', 'textarea', false, '请描述事故发生的经过（时间、经过、影响）'],
+    ['事故时间', 'date', true, '如 2026-01-01'],
+    ['事故地点', 'text', true, ''],
+    ['责任认定情况', 'select', true, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
+    ['事发经过', 'textarea', true, '请描述事故发生的经过（时间、经过、影响）'],
     ['对方当事人/保险公司', 'text', false, ''],
     ['伤情部位', 'text', false, ''],
     ['住院/门诊', 'select', false, '[{"label":"住院"},{"label":"门诊"},{"label":"未就医"}]'],
@@ -365,28 +365,28 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"协商理赔"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
+    ['处理阶段', 'select', true, '[{"label":"协商理赔"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
     ['备注', 'textarea', false, ''],
   ],
   GS: [
     ['工伤发生时间', 'date', true, ''],
-    ['发生地点', 'text', false, ''],
-    ['事发经过', 'textarea', false, '请描述工伤发生的经过（时间、经过、现场情况）'],
+    ['发生地点', 'text', true, ''],
+    ['事发经过', 'textarea', true, '请描述工伤发生的经过（时间、经过、现场情况）'],
     ['用人单位', 'text', true, ''],
     ['是否缴纳社保', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"未知"}]'],
     ['是否已做工伤认定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"办理中"}]'],
     ['认定文号', 'text', false, ''],
     ['伤情/伤残等级', 'text', false, '如：九级'],
     ['工资标准（元/月）', 'number', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"认定阶段"},{"label":"劳动能力鉴定"},{"label":"协商赔偿"},{"label":"仲裁"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"认定阶段"},{"label":"劳动能力鉴定"},{"label":"协商赔偿"},{"label":"仲裁"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   YW: [
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
     ['投保人', 'text', false, ''],
-    ['出险时间', 'date', false, ''],
-    ['出险原因', 'textarea', false, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险原因', 'textarea', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
@@ -394,15 +394,15 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   XP: [
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
     ['学校名称', 'text', true, ''],
-    ['出险时间', 'date', false, ''],
-    ['出险地点', 'text', false, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险地点', 'text', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['班主任/学校联系人', 'text', false, ''],
@@ -410,14 +410,14 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   RS: [
-    ['损害发生时间', 'date', false, ''],
-    ['损害发生地点', 'text', false, ''],
-    ['事发经过', 'textarea', false, '请描述人身损害发生的经过（时间、经过、受伤部位）'],
-    ['侵权责任方', 'text', false, ''],
+    ['损害发生时间', 'date', true, ''],
+    ['损害发生地点', 'text', true, ''],
+    ['事发经过', 'textarea', true, '请描述人身损害发生的经过（时间、经过、受伤部位）'],
+    ['侵权责任方', 'text', true, ''],
     ['责任/过错情况', 'select', false, '[{"label":"全责"},{"label":"主责"},{"label":"同责"},{"label":"次责"},{"label":"无责"},{"label":"待定"}]'],
     ['治疗情况', 'select', false, '[{"label":"门诊"},{"label":"住院"},{"label":"未就医"}]'],
     ['医疗费用（元）', 'number', false, ''],
@@ -425,7 +425,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"协商"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
+    ['处理阶段', 'select', true, '[{"label":"协商"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
     ['备注', 'textarea', false, ''],
   ],
   JC: [
@@ -433,9 +433,9 @@ const SEED_TYPE_FIELDS = {
     ['保险公司', 'text', false, ''],
     ['投保人', 'text', false, ''],
     ['车牌号/车辆信息', 'text', false, ''],
-    ['出险时间', 'date', false, ''],
-    ['出险地点', 'text', false, ''],
-    ['出险原因', 'textarea', false, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险地点', 'text', true, ''],
+    ['出险原因', 'textarea', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
@@ -443,7 +443,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   ZH: [
@@ -451,8 +451,8 @@ const SEED_TYPE_FIELDS = {
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
     ['投保人', 'text', false, ''],
-    ['出险时间', 'date', false, ''],
-    ['出险原因', 'textarea', false, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险原因', 'textarea', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
@@ -460,16 +460,16 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   GZ: [
     ['保单号', 'text', false, ''],
     ['保险公司', 'text', false, ''],
-    ['投保单位', 'text', false, ''],
-    ['出险时间', 'date', false, ''],
-    ['出险地点', 'text', false, ''],
-    ['出险原因', 'textarea', false, ''],
+    ['投保单位', 'text', true, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险地点', 'text', true, ''],
+    ['出险原因', 'textarea', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
@@ -477,7 +477,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
   MS: [
@@ -485,13 +485,13 @@ const SEED_TYPE_FIELDS = {
     ['保险公司', 'text', false, ''],
     ['投保单位', 'text', false, ''],
     ['保障项目', 'select', false, '[{"label":"自然灾害"},{"label":"火灾"},{"label":"意外身故伤残"},{"label":"医疗救助"},{"label":"其他"}]'],
-    ['出险时间', 'date', false, ''],
-    ['出险地点', 'text', false, ''],
-    ['出险原因', 'textarea', false, ''],
+    ['出险时间', 'date', true, ''],
+    ['出险地点', 'text', true, ''],
+    ['出险原因', 'textarea', true, ''],
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
-    ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
 };
@@ -827,6 +827,30 @@ async function initDb() {
         `DELETE FROM case_fields WHERE case_type_id = $1 AND label = ANY($2::text[])`,
         [tRows.rows[0].id, OBSOLETE_REPEAT_FIELDS[code]]
       );
+    }
+
+    // 迁移：按案件类型设置必填字段（幂等：只把 false→true，不反向改）
+    const REQUIRED_FIELDS_BY_TYPE = {
+      JT: ['事故时间', '事故地点', '责任认定情况', '事发经过', '处理阶段'],
+      GS: ['发生地点', '事发经过', '处理阶段'],
+      RS: ['损害发生时间', '损害发生地点', '事发经过', '侵权责任方', '处理阶段'],
+      YW: ['出险时间', '出险原因', '处理阶段'],
+      XP: ['出险时间', '出险地点', '学校名称', '处理阶段'],
+      JC: ['出险时间', '出险地点', '出险原因', '处理阶段'],
+      ZH: ['出险时间', '出险原因', '处理阶段'],
+      GZ: ['出险时间', '出险地点', '出险原因', '投保单位', '处理阶段'],
+      MS: ['出险时间', '出险地点', '出险原因', '处理阶段'],
+    };
+    for (const [code, labels] of Object.entries(REQUIRED_FIELDS_BY_TYPE)) {
+      const { rows: tRows } = await client.query(`SELECT id FROM case_types WHERE code = $1`, [code]);
+      if (tRows.length === 0) continue;
+      const tid = tRows[0].id;
+      for (const label of labels) {
+        await client.query(
+          `UPDATE case_fields SET required = TRUE WHERE case_type_id = $1 AND label = $2 AND required = FALSE`,
+          [tid, label]
+        );
+      }
     }
 
     const { rows: statusRows } = await client.query(`SELECT id FROM statuses LIMIT 1`);
