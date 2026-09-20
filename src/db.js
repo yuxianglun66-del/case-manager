@@ -365,7 +365,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"协商理赔"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
+    ['处理阶段', 'select', true, '[{"label":"协商理赔"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   GS: [
@@ -378,7 +378,7 @@ const SEED_TYPE_FIELDS = {
     ['认定文号', 'text', false, ''],
     ['伤情/伤残等级', 'text', false, '如：九级'],
     ['工资标准（元/月）', 'number', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"认定阶段"},{"label":"劳动能力鉴定"},{"label":"协商赔偿"},{"label":"仲裁"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"认定阶段"},{"label":"劳动能力鉴定"},{"label":"协商赔偿"},{"label":"仲裁"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   YW: [
@@ -394,7 +394,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   XP: [
@@ -410,7 +410,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   RS: [
@@ -425,7 +425,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"协商"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
+    ['处理阶段', 'select', true, '[{"label":"协商"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   JC: [
@@ -443,7 +443,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   ZH: [
@@ -460,7 +460,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   GZ: [
@@ -477,7 +477,7 @@ const SEED_TYPE_FIELDS = {
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
     ['伤残鉴定日期', 'date', false, ''],
     ['报告出具日期', 'date', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
   MS: [
@@ -491,7 +491,7 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
-    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
+    ['处理阶段', 'select', true, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"},{"label":"待定"}]'],
     ['备注', 'textarea', false, ''],
   ],
 };
@@ -852,6 +852,14 @@ async function initDb() {
         );
       }
     }
+
+    // 迁移：给所有「处理阶段」select 字段补「待定」选项（幂等：已含则跳过）
+    await client.query(
+      `UPDATE case_fields
+       SET options = options::jsonb || '[{"label":"待定"}]'::jsonb
+       WHERE label = '处理阶段' AND field_type = 'select'
+         AND NOT (options::jsonb @> '[{"label":"待定"}]'::jsonb)`
+    );
 
     const { rows: statusRows } = await client.query(`SELECT id FROM statuses LIMIT 1`);
     if (statusRows.length === 0) {
