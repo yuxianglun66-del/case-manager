@@ -699,6 +699,16 @@ async function initDb() {
       }
     }
 
+    // 迁移：费用类型重命名（幂等：旧名存在则改，不存在则跳过）同时联动 case_fees 表（必须在 seed 之前执行）
+    const FEE_RENAME_MAP = { '保全费': 'QB', '鉴定费': 'DJ', '一审诉讼费': '1SS', '二审诉讼费': '2SS', '律师费': 'SL', '公证费': 'ZG' };
+    for (const [oldName, newName] of Object.entries(FEE_RENAME_MAP)) {
+      const { rows: ftRows } = await client.query(`SELECT id FROM fee_types WHERE name = $1`, [oldName]);
+      if (ftRows.length > 0) {
+        await client.query(`UPDATE fee_types SET name = $1 WHERE name = $2`, [newName, oldName]);
+        await client.query(`UPDATE case_fees SET fee_type = $1 WHERE fee_type = $2`, [newName, oldName]);
+      }
+    }
+
     // 种子费用类型字典（幂等；用户可在后台新增/停用）
     const SEED_FEE_TYPES = ['QB', 'DJ', '1SS', '2SS', 'SL', '差旅费', '茶水费', 'ZG', '其他'];
     for (let i = 0; i < SEED_FEE_TYPES.length; i++) {
@@ -872,16 +882,6 @@ async function initDb() {
           await client.query(`UPDATE app_settings SET value = $1 WHERE key = 'wecom_push_events'`, [JSON.stringify(ev)]);
         }
       } catch {}
-    }
-
-    // 迁移：费用类型重命名（幂等：旧名存在则改，不存在则跳过）同时联动 case_fees 表
-    const FEE_RENAME_MAP = { '保全费': 'QB', '鉴定费': 'DJ', '一审诉讼费': '1SS', '二审诉讼费': '2SS', '律师费': 'SL', '公证费': 'ZG' };
-    for (const [oldName, newName] of Object.entries(FEE_RENAME_MAP)) {
-      const { rows: ftRows } = await client.query(`SELECT id FROM fee_types WHERE name = $1`, [oldName]);
-      if (ftRows.length > 0) {
-        await client.query(`UPDATE fee_types SET name = $1 WHERE name = $2`, [newName, oldName]);
-        await client.query(`UPDATE case_fees SET fee_type = $1 WHERE fee_type = $2`, [newName, oldName]);
-      }
     }
 
     const { rows: statusRows } = await client.query(`SELECT id FROM statuses LIMIT 1`);
