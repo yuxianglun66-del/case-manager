@@ -1038,6 +1038,15 @@ router.post('/users/:id/reset', requirePermission('system.users'), async (req, r
     if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
       return res.status(403).json({ error: '仅超级管理员可重置管理员账号密码' });
     }
+    // super_admin 操作 super_admin 时需二次确认（输入自己的密码）
+    if (target.role === 'super_admin' && req.session.user.role === 'super_admin' && id !== req.session.user.id) {
+      const confirmPw = req.body.confirm_password || '';
+      if (!confirmPw) return res.status(400).json({ error: '重置超级管理员密码需输入您的登录密码确认', require_confirm: true });
+      const me = (await pool.query(`SELECT password_hash FROM users WHERE id = $1`, [req.session.user.id])).rows[0];
+      if (!me || !(await bcrypt.compare(confirmPw, me.password_hash))) {
+        return res.status(403).json({ error: '确认密码错误' });
+      }
+    }
     const hash = await bcrypt.hash(password, 10);
     await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, id]);
     await audit(req, '重置密码', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' });
@@ -1071,6 +1080,15 @@ router.post('/users/:id/delete', requirePermission('system.users'), async (req, 
     if (!target) return res.status(404).json({ error: '用户不存在' });
     if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
       return res.status(403).json({ error: '仅超级管理员可停用管理员账号' });
+    }
+    // 停用 super_admin 需二次确认
+    if (target.role === 'super_admin' && req.session.user.role === 'super_admin' && id !== req.session.user.id) {
+      const confirmPw = req.body.confirm_password || '';
+      if (!confirmPw) return res.status(400).json({ error: '停用超级管理员需输入您的登录密码确认', require_confirm: true });
+      const me = (await pool.query(`SELECT password_hash FROM users WHERE id = $1`, [req.session.user.id])).rows[0];
+      if (!me || !(await bcrypt.compare(confirmPw, me.password_hash))) {
+        return res.status(403).json({ error: '确认密码错误' });
+      }
     }
     await pool.query(`UPDATE users SET active = FALSE WHERE id = $1`, [id]);
     await audit(req, '停用用户', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' });
@@ -1119,6 +1137,22 @@ router.post('/users/:id/remove', requirePermission('system.users'), async (req, 
   } finally {
     client.release();
   }
+});
+
+/* ---------- 提权：将 admin 提升为 super_admin（仅 super_admin 可操作） ---------- */
+router.post('/users/:id/promote', requirePermission('system.users'), async (req, res, next) => {
+  try {
+    if (req.session.user.role !== 'super_admin') return res.status(403).json({ error: '仅超级管理员可执行此操作' });
+    const id = parseInt(req.params.id, 10);
+    if (id === req.session.user.id) return res.status(400).json({ error: '不能提权自己' });
+    const target = (await pool.query(`SELECT id, role, display_name FROM users WHERE id = $1`, [id])).rows[0];
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+    if (target.role === 'super_admin') return res.status(400).json({ error: '该用户已是超级管理员' });
+    if (target.role !== 'admin') return res.status(400).json({ error: '仅管理员角色可被提权为超级管理员' });
+    await pool.query(`UPDATE users SET role = 'super_admin' WHERE id = $1`, [id]);
+    await audit(req, '提权用户', { entity_type: 'user', entity_id: id, detail: '管理员 ' + target.display_name + ' → 超级管理员' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
 });
 
 /* ---------- 角色权限配置 ---------- */

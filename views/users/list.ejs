@@ -32,10 +32,17 @@
               <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= u.case_count %></span></td>
               <td class="hide-mobile text-muted"><%= fmtDate(u.created_at) %></td>
               <td class="text-end">
+                <% const isTargetSuperAdmin = u.role === 'super_admin'; %>
+                <% const isAdminTarget = u.role === 'admin'; %>
+                <% if (!isTargetSuperAdmin || user.role === 'super_admin') { %>
                 <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>, '<%= (u.wecom_userid || "").replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-pencil-fill"></i></button>
-                <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-key"></i></button>
+                <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', <%= isTargetSuperAdmin %>)"><i class="bi bi-key"></i></button>
                 <button class="btn btn-ico btn-light" title="设置安全问题" onclick="editSecurityQuestion(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-question-circle"></i></button>
-                <button class="btn btn-ico btn-outline-danger" title="停用" onclick="disableUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-person-x"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="停用" onclick="disableUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', <%= isTargetSuperAdmin %>)"><i class="bi bi-person-x"></i></button>
+                <% } %>
+                <% if (isAdminTarget && user.role === 'super_admin' && u.id !== user.id) { %>
+                <button class="btn btn-ico btn-outline-success" title="提权为超级管理员" onclick="promoteUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-shield-fill-check"></i></button>
+                <% } %>
                 <% if (u.role !== 'super_admin') { %>
                 <button class="btn btn-ico btn-outline-danger" title="删除账号" onclick="delUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-trash"></i></button>
                 <% } %>
@@ -204,6 +211,10 @@
       </div>
       <div class="modal-body">
         <div class="text-muted small mb-2" id="resetName"></div>
+        <div id="resetConfirmWrap" style="display:none" class="mb-2">
+          <label class="form-label fw-bold text-danger">请输入您的登录密码确认操作</label>
+          <input type="password" class="form-control" id="resetConfirmPw" placeholder="您的登录密码">
+        </div>
         <input type="password" class="form-control" id="resetPwd" placeholder="新密码（至少 8 位）" minlength="8">
       </div>
       <div class="modal-footer py-2">
@@ -357,17 +368,26 @@
   });
 
   let resetTarget = null;
-  function resetUser(id, name) {
+  let resetIsSuperAdmin = false;
+  function resetUser(id, name, isSuperAdmin) {
     resetTarget = id;
+    resetIsSuperAdmin = isSuperAdmin;
     document.getElementById('resetName').textContent = '为用户「' + name + '」设置新密码';
     document.getElementById('resetPwd').value = '';
+    document.getElementById('resetConfirmPw').value = '';
+    document.getElementById('resetConfirmWrap').style.display = isSuperAdmin ? 'block' : 'none';
     new bootstrap.Modal(document.getElementById('resetModal')).show();
   }
   document.getElementById('resetOk').addEventListener('click', async () => {
     const pwd = document.getElementById('resetPwd').value;
     if (pwd.length < 8) return toast('密码至少 8 位', 'danger');
+    const body = { password: pwd };
+    if (resetIsSuperAdmin) {
+      body.confirm_password = document.getElementById('resetConfirmPw').value;
+      if (!body.confirm_password) return toast('请输入您的登录密码确认', 'danger');
+    }
     try {
-      await postJSON('/api/users/' + resetTarget + '/reset', { password: pwd });
+      await postJSON('/api/users/' + resetTarget + '/reset', body);
       bootstrap.Modal.getInstance(document.getElementById('resetModal')).hide();
       toast('密码已重置', 'success');
     } catch (err) { toast(err.message, 'danger'); }
@@ -392,11 +412,26 @@
     } catch (err) { toast(err.message, 'danger'); }
   });
 
-  async function disableUser(id, name) {
+  async function disableUser(id, name, isSuperAdmin) {
     if (!(await confirmBox('停用用户「' + name + '」？停用后该账号将无法登录，其名下案件不会被删除。', '停用账号'))) return;
+    const body = {};
+    if (isSuperAdmin) {
+      const cpw = prompt('请输入您的登录密码以确认停用超级管理员：');
+      if (!cpw) return;
+      body.confirm_password = cpw;
+    }
     try {
-      await postJSON('/api/users/' + id + '/delete', {});
+      await postJSON('/api/users/' + id + '/delete', body);
       toast('已停用', 'success');
+      setTimeout(() => location.reload(), 300);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  async function promoteUser(id, name) {
+    if (!(await confirmBox('将「' + name + '」提权为超级管理员？提权后该账户将拥有全部系统权限。', '确认提权'))) return;
+    try {
+      await postJSON('/api/users/' + id + '/promote', {});
+      toast('已提权为超级管理员', 'success');
       setTimeout(() => location.reload(), 300);
     } catch (err) { toast(err.message, 'danger'); }
   }
