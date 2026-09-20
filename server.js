@@ -307,6 +307,7 @@ async function start() {
   });
   require('./src/backup').startBackupScheduler();
   require('./src/audit').startAuditCleanupScheduler();
+  require('./src/wecom').startReminderScheduler();
 
   // ====== G2: 优雅停机（Docker stop / Ctrl+C 时先停服务再关连接池） ======
   const shutdown = async (signal) => {

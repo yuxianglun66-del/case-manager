@@ -161,4 +161,80 @@ async function pushEvent(eventKey, userId, content, opts = {}) {
   }
 }
 
-module.exports = { getSettings, getAccessToken, sendText, sendWebhook, pushEvent, isEventEnabled };
+// ====== 定时提醒推送调度器（每 5 分钟扫描到期提醒） ======
+let reminderTimer = null;
+
+async function tickReminders() {
+  try {
+    const { rows: cases } = await pool.query(
+      `SELECT c.id, c.case_no, c.title, c.client_name, c.next_action, c.reminder_at,
+              c.assignee_id, u.username AS assignee_name
+       FROM cases c
+       LEFT JOIN users u ON u.id = c.assignee_id
+       WHERE c.reminder_at IS NOT NULL
+         AND c.next_action IS NOT NULL AND c.next_action <> ''
+         AND c.reminder_ack_at IS NULL
+         AND c.reminder_notified_at IS NULL
+         AND c.deleted_at IS NULL
+         AND c.reminder_at <= now()`
+    );
+    if (cases.length === 0) return;
+
+    const s = await getSettings();
+    if (s.wecom_enabled !== '1') return;
+    if (!isEventEnabled(s.wecom_push_events, 'reminder_notify')) return;
+
+    for (const c of cases) {
+      const dateStr = c.reminder_at ? fmtDateTime(c.reminder_at) : '';
+      const content = '⏰ 案件 ' + c.case_no + '「' + c.title + '」进度提醒已到期\n'
+        + (c.client_name ? '👤 当事人：' + c.client_name + '\n' : '')
+        + '📝 下一步：' + c.next_action + '\n'
+        + '⏰ 提醒时间：' + dateStr + '\n'
+        + (c.assignee_name ? '👤 负责人：' + c.assignee_name : '');
+
+      let delivered = false;
+      try {
+        if (s.wecom_webhook) {
+          const r = await notifyWithRetry(() => sendWebhook(s.wecom_webhook, content));
+          delivered = r.ok;
+          await logNotify('wecom', c.assignee_id, 'reminder_notify', content, r.ok ? 'success' : 'fail', r.error, r.retries);
+        } else if (s.wecom_corpid && s.wecom_secret && c.assignee_id) {
+          const q = await pool.query(`SELECT wecom_userid FROM users WHERE id = $1`, [c.assignee_id]);
+          const wid = q.rows[0]?.wecom_userid?.trim();
+          if (wid) {
+            const r = await notifyWithRetry(() => sendText(wid, content));
+            delivered = r.ok;
+            await logNotify('wecom', c.assignee_id, 'reminder_notify', content, r.ok ? 'success' : 'fail', r.error, r.retries);
+          }
+        }
+      } catch (e) {
+        console.error('[WeCom] reminder push error:', e.message);
+      }
+
+      // 无论推送是否成功都标记已通知，避免反复推送
+      await pool.query(`UPDATE cases SET reminder_notified_at = now() WHERE id = $1`, [c.id]);
+      if (delivered) console.log('[WeCom] 提醒推送成功: ' + c.case_no);
+    }
+  } catch (e) {
+    console.error('[WeCom] tickReminders error:', e.message);
+  }
+}
+
+function fmtDateTime(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.getFullYear() + '年' + (dt.getMonth() + 1) + '月' + dt.getDate() + '日 '
+    + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+}
+
+function startReminderScheduler() {
+  if (reminderTimer) return reminderTimer;
+  const tick = () => tickReminders();
+  tick(); // 启动后立即跑一次
+  reminderTimer = setInterval(tick, 5 * 60 * 1000); // 每 5 分钟
+  if (typeof reminderTimer.unref === 'function') reminderTimer.unref();
+  console.log('[WeCom] 提醒推送调度器已启动（每 5 分钟）');
+  return reminderTimer;
+}
+
+module.exports = { getSettings, getAccessToken, sendText, sendWebhook, pushEvent, isEventEnabled, startReminderScheduler };

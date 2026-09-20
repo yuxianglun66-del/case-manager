@@ -211,6 +211,7 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS fee_agreement TEXT;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS fee_details TEXT;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_at TIMESTAMPTZ;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_by INT REFERENCES users(id);
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_notified_at TIMESTAMPTZ;
 
 -- 案件当事人扩展字段（注意：这些字段不得再写进上方 CREATE TABLE，否则迁移会提前撞 duplicate_column）
 ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS injury_info TEXT;
@@ -861,6 +862,18 @@ async function initDb() {
          AND NOT (options::jsonb @> '[{"label":"待定"}]'::jsonb)`
     );
 
+    // 迁移：存量库 wecom_push_events 补 reminder_notify 事件开关（幂等：已含则跳过）
+    const { rows: wecomRow } = await client.query(`SELECT value FROM app_settings WHERE key = 'wecom_push_events'`);
+    if (wecomRow.length > 0) {
+      try {
+        const ev = JSON.parse(wecomRow[0].value || '{}');
+        if (!ev.reminder_notify) {
+          ev.reminder_notify = '1';
+          await client.query(`UPDATE app_settings SET value = $1 WHERE key = 'wecom_push_events'`, [JSON.stringify(ev)]);
+        }
+      } catch {}
+    }
+
     const { rows: statusRows } = await client.query(`SELECT id FROM statuses LIMIT 1`);
     if (statusRows.length === 0) {
       for (const [name, category, color, sort] of SEED_STATUSES) {
@@ -1061,7 +1074,7 @@ async function initDb() {
       ['wecom_agentid', '', '企业微信自建应用 AgentID'],
       ['wecom_secret', '', '企业微信自建应用 Secret'],
       ['wecom_enabled', '0', '企业微信推送总开关：0/1'],
-      ['wecom_push_events', '{}', '企业微信推送事件开关 JSON（case_assigned/status_changed/reminder_due/new_attachment）'],
+      ['wecom_push_events', '{"reminder_notify":"1"}', '企业微信推送事件开关 JSON（case_assigned/status_changed/reminder_due/reminder_notify/new_attachment）'],
       ['wecom_webhook', '', '企业微信群机器人 Webhook 地址'],
       ['library_categories', JSON.stringify([
         { name: '法律法规', color: '#0d6efd' },
