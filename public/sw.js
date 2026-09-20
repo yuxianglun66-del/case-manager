@@ -1,5 +1,5 @@
 /* 案件管理系统 PWA Service Worker */
-const VERSION = 'v1.0.0';
+const VERSION = 'v2.0.0';
 const STATIC_CACHE = `case-manager-static-${VERSION}`;
 const PAGE_CACHE = `case-manager-pages-${VERSION}`;
 
@@ -96,7 +96,7 @@ self.addEventListener('fetch', (e) => {
 
 /* ---- Web Push 预留：需 HTTPS + VAPID 密钥（服务端订阅推送）后才生效 ---- */
 self.addEventListener('push', (e) => {
-  let data = { title: '案件管理系统', body: '', url: '/dashboard' };
+  let data = { title: '众诚诺泰案件管理平台', body: '', url: '/dashboard' };
   try { if (e.data) Object.assign(data, e.data.json()); } catch (err) {}
   e.waitUntil(
     self.registration.showNotification(data.title, {

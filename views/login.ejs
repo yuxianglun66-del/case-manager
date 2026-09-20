@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-  <title>登录 - <%= settings?.company_name || '案件管理系统' %></title>
+    <title>登录 - <%= settings?.company_name || '众诚诺泰案件管理平台' %></title>
   <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/app.css">
@@ -22,7 +22,7 @@
         <% } else { %>
           <div class="logo-icon"><i class="bi bi-shield-lock-fill"></i></div>
         <% } %>
-        <span><%= settings?.company_name || '案件管理系统' %></span>
+        <span><%= settings?.company_name || '众诚诺泰案件管理平台' %></span>
       </div>
       <% if (error) { %>
         <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-circle"></i> <%= error %></div>

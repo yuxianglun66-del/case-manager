@@ -3,34 +3,156 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>网络连接已断开</title>
+  <meta name="theme-color" content="#0b1120">
+  <title>网络连接已断开 - 众诚诺泰案件管理平台</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
       background: linear-gradient(180deg, #060a14, #0b1120 40%, #0f172a 100%);
-      color: #e6edf7; padding: 24px;
+      color: #e6edf7; padding: 24px; overflow: hidden;
     }
-    .box { text-align: center; max-width: 320px; }
-    img.icon { width: 72px; height: 72px; border-radius: 18px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(13,110,253,.35); }
-    h1 { font-size: 20px; margin-bottom: 8px; }
-    p { font-size: 14px; color: rgba(226,232,240,.72); line-height: 1.6; margin-bottom: 24px; }
-    button {
-      width: 100%; padding: 12px; font-size: 15px; color: #fff;
-      background: #0d6efd; border: none; border-radius: 10px; cursor: pointer;
+    /* 背景网格动画 */
+    body::before {
+      content: ""; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridPulse 4s ease-in-out infinite alternate;
     }
-    button:active { opacity: .85; }
-    a { display: inline-block; margin-top: 14px; font-size: 13px; color: rgba(226,232,240,.6); text-decoration: none; }
+    @keyframes gridPulse { from { opacity: .3; } to { opacity: .7; } }
+    .box { text-align: center; max-width: 320px; position: relative; z-index: 1; }
+    .icon-wrap {
+      width: 88px; height: 88px; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 42px; color: #3b82f6;
+      background: rgba(59,130,246,.1); border-radius: 22px;
+      border: 2px solid rgba(59,130,246,.2);
+      animation: iconFloat 3s ease-in-out infinite alternate, iconGlow 2s ease-in-out infinite alternate;
+      box-shadow: 0 0 30px rgba(59,130,246,.15);
+    }
+    @keyframes iconFloat { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+    @keyframes iconGlow { from { box-shadow: 0 0 20px rgba(59,130,246,.1); } to { box-shadow: 0 0 40px rgba(59,130,246,.25); } }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; animation: fadeUp .5s .2s ease both; }
+    .subtitle { font-size: 14px; color: rgba(226,232,240,.55); margin-bottom: 28px; animation: fadeUp .5s .3s ease both; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .status-bar {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-bottom: 24px; font-size: 13px; color: rgba(226,232,240,.5);
+      animation: fadeUp .5s .4s ease both;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #f59e0b; animation: dotPulse 1.5s ease-in-out infinite;
+    }
+    .status-dot.ok { background: #22c55e; animation: none; }
+    @keyframes dotPulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+    .retry-btn {
+      width: 100%; padding: 13px; font-size: 15px; font-weight: 500; color: #fff;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 4px 16px rgba(59,130,246,.3);
+      animation: fadeUp .5s .5s ease both;
+    }
+    .retry-btn:active { transform: scale(.97); }
+    .retry-btn:hover { box-shadow: 0 6px 24px rgba(59,130,246,.45); }
+    .retry-btn.loading { pointer-events: none; opacity: .7; }
+    .retry-btn.loading::after {
+      content: ""; display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .6s linear infinite; margin-left: 8px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .home-link {
+      display: inline-block; margin-top: 16px; font-size: 13px;
+      color: rgba(226,232,240,.45); text-decoration: none;
+      transition: color .2s;
+    }
+    .home-link:hover { color: rgba(226,232,240,.7); }
+    .brand-footer {
+      position: fixed; bottom: 20px; left: 0; right: 0;
+      text-align: center; font-size: 11px; color: rgba(226,232,240,.2);
+      animation: fadeUp .5s .7s ease both;
+    }
   </style>
 </head>
 <body>
   <div class="box">
-    <img class="icon" src="/icons/icon-192.png" alt="">
-    <h1>网络连接已断开</h1>
-    <p>请检查网络后重试。已缓存的页面仍可离线查看。</p>
-    <button onclick="location.reload()">重新连接</button>
-    <a href="/dashboard">返回案件管理系统</a>
+    <div class="icon-wrap"><i class="bi bi-shield-lock-fill"></i></div>
+    <h1>众诚诺泰案件管理平台</h1>
+    <p class="subtitle">网络连接已断开</p>
+    <div class="status-bar">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">正在检测网络…</span>
+    </div>
+    <button class="retry-btn" id="retryBtn" onclick="doRetry()">重新连接</button>
+    <a class="home-link" href="/dashboard">返回看板</a>
   </div>
+  <div class="brand-footer">众诚诺泰案件管理平台</div>
+  <script>
+    var retryCount = 0;
+    var maxRetries = 3;
+    var statusDot = document.getElementById('statusDot');
+    var statusText = document.getElementById('statusText');
+    var retryBtn = document.getElementById('retryBtn');
+
+    function doRetry() {
+      if (retryBtn.classList.contains('loading')) return;
+      retryBtn.classList.add('loading');
+      retryBtn.textContent = '正在重连';
+      statusText.textContent = '正在尝试第 ' + (++retryCount) + ' 次重连…';
+      statusDot.className = 'status-dot';
+
+      fetch('/', { method: 'HEAD', cache: 'no-store' })
+        .then(function (res) {
+          if (res.ok) {
+            statusDot.className = 'status-dot ok';
+            statusText.textContent = '网络已恢复！';
+            retryBtn.textContent = '返回系统';
+            retryBtn.classList.remove('loading');
+            retryBtn.onclick = function () { location.href = '/dashboard'; };
+          } else { throw new Error(); }
+        })
+        .catch(function () {
+          retryBtn.classList.remove('loading');
+          retryBtn.textContent = '重新连接';
+          if (retryCount >= maxRetries) {
+            statusText.textContent = '网络不可用，请检查后重试';
+          } else {
+            statusText.textContent = '网络暂未恢复，请稍后再试';
+          }
+        });
+    }
+
+    /* 自动检测网络恢复 */
+    var autoCheck = setInterval(function () {
+      fetch('/', { method: 'HEAD', cache: 'no-store' })
+        .then(function (res) {
+          if (res.ok) {
+            clearInterval(autoCheck);
+            statusDot.className = 'status-dot ok';
+            statusText.textContent = '网络已恢复！';
+            retryBtn.textContent = '返回系统';
+            retryBtn.onclick = function () { location.href = '/dashboard'; };
+          }
+        })
+        .catch(function () {});
+    }, 8000);
+
+    /* 初始检测 */
+    setTimeout(function () {
+      statusText.textContent = '正在检测网络状态…';
+      fetch('/', { method: 'HEAD', cache: 'no-store' })
+        .then(function (res) {
+          if (res.ok) { location.href = '/dashboard'; }
+        })
+        .catch(function () {
+          statusText.textContent = '网络暂未恢复，请点击重试';
+        });
+    }, 1500);
+  </script>
 </body>
 </html>

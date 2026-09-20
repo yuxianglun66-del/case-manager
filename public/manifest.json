@@ -1,7 +1,7 @@
 {
-  "name": "案件管理系统",
+  "name": "众诚诺泰案件管理平台",
   "short_name": "案件管理",
-  "description": "法律服务公司案件管理系统：案件、当事人、附件、电子合同一站式管理",
+  "description": "众诚诺泰案件管理平台：案件、当事人、附件、电子合同一站式管理",
   "lang": "zh-CN",
   "start_url": "/dashboard",
   "scope": "/",

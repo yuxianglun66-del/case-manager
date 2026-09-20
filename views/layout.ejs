@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-  <title><%= title %> - <%= settings?.company_name || '案件管理系统' %></title>
+  <title><%= title %> - <%= settings?.company_name || '众诚诺泰案件管理平台' %></title>
   <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.css">
   <link rel="stylesheet" href="/css/app.css">
@@ -207,6 +207,13 @@
     })();
     if (window.applyThemeContrast) window.applyThemeContrast();
   </script>
+  <div id="pwaSplash" class="pwa-splash">
+    <div class="pwa-splash-inner">
+      <div class="pwa-splash-icon"><i class="bi bi-shield-lock-fill"></i></div>
+      <div class="pwa-splash-name">众诚诺泰案件管理平台</div>
+      <div class="pwa-splash-bar"><div class="pwa-splash-bar-fill"></div></div>
+    </div>
+  </div>
   <div class="app-shell">
     <aside class="sidebar d-print-none">
       <div class="sidebar-brand">
@@ -258,7 +265,7 @@
     <main class="main">
       <div class="mobile-topbar">
         <button class="btn btn-sm" id="menuToggle"><i class="bi bi-list fs-5"></i></button>
-        <span class="fw-bold text-truncate brand-text"><i class="bi bi-shield-lock-fill me-1"></i><%= settings?.company_name || '案件管理系统' %></span>
+        <span class="fw-bold text-truncate brand-text"><i class="bi bi-shield-lock-fill me-1"></i><%= settings?.company_name || '众诚诺泰案件管理平台' %></span>
         <div class="d-flex align-items-center gap-2 ms-auto">
           <button class="btn btn-sm btn-grid" id="themeSwitchBtnMobile" title="主题" type="button"><i class="bi bi-palette-fill"></i></button>
           <div class="user-chip-mobile">
@@ -272,6 +279,17 @@
       </div>
     </main>
   </div>
+
+  <div id="pwaInstallBanner" class="pwa-install-banner d-none">
+    <div class="pwa-install-info"><i class="bi bi-shield-lock-fill"></i><span>添加到桌面，更快捷使用</span></div>
+    <button class="btn btn-sm btn-primary" id="pwaInstallBtn">安装</button>
+    <button class="btn btn-sm pwa-install-close" id="pwaInstallClose">&times;</button>
+  </div>
+  <nav class="bottom-nav d-md-none" id="bottomNav">
+    <a href="/dashboard" class="bottom-nav-item" data-page="dashboard"><i class="bi bi-grid-1x2-fill"></i><span>看板</span></a>
+    <a href="/cases" class="bottom-nav-item" data-page="cases"><i class="bi bi-folder-fill"></i><span>案件</span></a>
+    <a href="/settings" class="bottom-nav-item" data-page="settings"><i class="bi bi-gear-fill"></i><span>设置</span></a>
+  </nav>
 
   <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
   <script src="/js/app.js"></script>
@@ -486,6 +504,47 @@
         navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
     }
+  </script>
+  <script>
+    /* PWA Splash Screen — 1.5s 后自动淡出 */
+    (function () {
+      var splash = document.getElementById('pwaSplash');
+      if (!splash) return;
+      setTimeout(function () {
+        splash.classList.add('fade-out');
+        setTimeout(function () { splash.remove(); }, 500);
+      }, 1500);
+    })();
+    /* PWA Install Banner */
+    (function () {
+      var deferredPrompt = null;
+      var banner = document.getElementById('pwaInstallBanner');
+      var installBtn = document.getElementById('pwaInstallBtn');
+      var closeBtn = document.getElementById('pwaInstallClose');
+      if (!banner || !installBtn) return;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.classList.remove('d-none');
+      });
+      installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function () { deferredPrompt = null; banner.classList.add('d-none'); });
+      });
+      if (closeBtn) closeBtn.addEventListener('click', function () { banner.classList.add('d-none'); });
+      window.addEventListener('appinstalled', function () { banner.classList.add('d-none'); deferredPrompt = null; });
+    })();
+    /* Bottom Nav Active State */
+    (function () {
+      var path = location.pathname;
+      document.querySelectorAll('.bottom-nav-item').forEach(function (el) {
+        var page = el.dataset.page;
+        if (page === 'dashboard' && (path === '/' || path === '/dashboard')) el.classList.add('active');
+        else if (page === 'cases' && path.startsWith('/cases')) el.classList.add('active');
+        else if (page === 'settings' && path.startsWith('/settings')) el.classList.add('active');
+      });
+    })();
   </script>
 </body>
 </html>
