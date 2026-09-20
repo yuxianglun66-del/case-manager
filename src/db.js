@@ -363,6 +363,8 @@ const SEED_TYPE_FIELDS = {
     ['医疗费用（元）', 'number', false, ''],
     ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"协商理赔"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -388,6 +390,10 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
+    ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+    ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -400,6 +406,10 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['班主任/学校联系人', 'text', false, ''],
+    ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+    ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -413,6 +423,8 @@ const SEED_TYPE_FIELDS = {
     ['医疗费用（元）', 'number', false, ''],
     ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
     ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"协商"},{"label":"调解"},{"label":"诉讼"},{"label":"执行"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -427,6 +439,10 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
+    ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+    ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -440,6 +456,10 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
+    ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+    ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -453,6 +473,10 @@ const SEED_TYPE_FIELDS = {
     ['是否已报案', 'select', false, '[{"label":"是"},{"label":"否"}]'],
     ['报案号', 'text', false, ''],
     ['理赔金额（元）', 'number', false, ''],
+    ['是否伤残鉴定', 'select', false, '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+    ['鉴定机构/等级', 'text', false, '如：司法鉴定所，十级'],
+    ['伤残鉴定日期', 'date', false, ''],
+    ['报告出具日期', 'date', false, ''],
     ['处理阶段', 'select', false, '[{"label":"资料提交"},{"label":"等待审核"},{"label":"协商"},{"label":"诉讼"}]'],
     ['备注', 'textarea', false, ''],
   ],
@@ -720,6 +744,72 @@ async function initDb() {
          VALUES ($1, $2, $3, NULL, FALSE, $4, $5, TRUE)`,
         [tid, mLabel, mType, mPlaceholder, base]
       );
+    }
+
+    // 迁移：存量库补「伤残鉴定日期/报告出具日期」+ 无鉴定字段类型补「是否伤残鉴定/鉴定机构等级」（幂等）
+    const MIGRATE_DISABILITY_FIELDS = {
+      // JT/RS: 已有 是否伤残鉴定+鉴定机构等级，只补两个日期
+      JT: { anchor: '鉴定机构/等级', fields: [
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      RS: { anchor: '鉴定机构/等级', fields: [
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      // YW/XP/JC/ZH/GZ: 无鉴定字段，在 处理阶段 前补 4 个
+      YW: { anchor: '处理阶段', fields: [
+        ['是否伤残鉴定', 'select', '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+        ['鉴定机构/等级', 'text', '如：司法鉴定所，十级'],
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      XP: { anchor: '处理阶段', fields: [
+        ['是否伤残鉴定', 'select', '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+        ['鉴定机构/等级', 'text', '如：司法鉴定所，十级'],
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      JC: { anchor: '处理阶段', fields: [
+        ['是否伤残鉴定', 'select', '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+        ['鉴定机构/等级', 'text', '如：司法鉴定所，十级'],
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      ZH: { anchor: '处理阶段', fields: [
+        ['是否伤残鉴定', 'select', '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+        ['鉴定机构/等级', 'text', '如：司法鉴定所，十级'],
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+      GZ: { anchor: '处理阶段', fields: [
+        ['是否伤残鉴定', 'select', '[{"label":"是"},{"label":"否"},{"label":"待定"}]'],
+        ['鉴定机构/等级', 'text', '如：司法鉴定所，十级'],
+        ['伤残鉴定日期', 'date', ''], ['报告出具日期', 'date', '']
+      ]},
+    };
+    for (const [code, { anchor, fields }] of Object.entries(MIGRATE_DISABILITY_FIELDS)) {
+      const { rows: tRows } = await client.query(`SELECT id FROM case_types WHERE code = $1`, [code]);
+      if (tRows.length === 0) continue;
+      const tid = tRows[0].id;
+      // 检查是否全部已存在（幂等）
+      const allExist = await Promise.all(fields.map(async ([label]) => {
+        const { rows } = await client.query(`SELECT id FROM case_fields WHERE case_type_id = $1 AND label = $2`, [tid, label]);
+        return rows.length > 0;
+      }));
+      if (allExist.every(Boolean)) continue;
+      // 查锚点 sort
+      const { rows: aRows } = await client.query(`SELECT sort FROM case_fields WHERE case_type_id = $1 AND label = $2`, [tid, anchor]);
+      if (aRows.length === 0) continue;
+      let base = aRows[0].sort + 1;
+      // 顺移冲突 sort
+      const { rows: maxRows } = await client.query(`SELECT COALESCE(MAX(sort), 0) AS m FROM case_fields WHERE case_type_id = $1`, [tid]);
+      if (base <= maxRows[0].m) await client.query(`UPDATE case_fields SET sort = sort + $1 WHERE case_type_id = $2 AND sort >= $3`, [fields.length * 1000, tid, base]);
+      // 逐个插入未存在的字段
+      for (let i = 0; i < fields.length; i++) {
+        const [label, type, options] = fields[i];
+        const { rows: exist } = await client.query(`SELECT id FROM case_fields WHERE case_type_id = $1 AND label = $2`, [tid, label]);
+        if (exist.length > 0) continue;
+        await client.query(
+          `INSERT INTO case_fields (case_type_id, label, field_type, options, required, placeholder, sort, active)
+           VALUES ($1, $2, $3, $4, FALSE, '', $5, TRUE)`,
+          [tid, label, type, options === 'text' || options === 'date' ? null : options, base + i]
+        );
+      }
     }
 
     // 迁移：移除旧类型中与当事人表格重复的人员信息字段（person info now lives in case_parties）
