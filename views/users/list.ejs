@@ -30,7 +30,7 @@
                 <% } %>
               </td>
               <td><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= u.case_count %></span></td>
-              <td class="hide-mobile text-muted"><%= new Date(u.created_at).toLocaleDateString('zh-CN') %></td>
+              <td class="hide-mobile text-muted"><%= fmtDate(u.created_at) %></td>
               <td class="text-end">
                 <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>, '<%= (u.wecom_userid || "").replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-pencil-fill"></i></button>
                 <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-key"></i></button>

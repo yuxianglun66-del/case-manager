@@ -110,6 +110,23 @@ app.locals.safeJson = (data) => {
   return JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 };
 
+// ====== 日期格式化工具（中文风格） ======
+function _pad(n) { return n < 10 ? '0' + n : '' + n; }
+function _fmtDateCN(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+}
+function _fmtDateTimeCN(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + _pad(d.getHours()) + ':' + _pad(d.getMinutes());
+}
+app.locals.fmtDate = _fmtDateCN;
+app.locals.fmtDateTime = _fmtDateTimeCN;
+
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 

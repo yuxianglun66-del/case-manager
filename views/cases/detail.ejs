@@ -56,15 +56,15 @@
           </div>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-calendar-check"></i> 签单日期</div>
-            <div class="info-value"><%= caseData.sign_date ? new Date(caseData.sign_date).toLocaleDateString('zh-CN') : '—' %></div>
+            <div class="info-value"><%= caseData.sign_date ? fmtDate(caseData.sign_date) : '—' %></div>
           </div>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-calendar-plus"></i> 创建时间</div>
-            <div class="info-value"><%= new Date(caseData.created_at).toLocaleString('zh-CN') %></div>
+            <div class="info-value"><%= fmtDateTime(caseData.created_at) %></div>
           </div>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-clock-history"></i> 最近更新</div>
-            <div class="info-value"><%= new Date(caseData.updated_at).toLocaleString('zh-CN') %></div>
+            <div class="info-value"><%= fmtDateTime(caseData.updated_at) %></div>
           </div>
           <div class="info-item">
             <div class="info-label"><i class="bi bi-person-plus"></i> 创建人</div>
@@ -306,11 +306,11 @@
                       <span class="me-1"><%= c.title %></span>
                       <span class="role-badge" style="background:<%= c.status==='signed'?'#198754':c.status==='sent'?'#0d6efd':c.status==='revoked'?'#6c757d':'#ffc107' %>"><%= c.status==='signed'?'已完成':c.status==='sent'?'签署中':c.status==='revoked'?'已撤回':'草稿' %></span>
                     </div>
-                    <div class="text-muted small mt-1"><i class="bi bi-collection me-1"></i>模板：<%= c.template_name || '—' %> · <i class="bi bi-send"></i>发起：<%= c.created_at ? new Date(c.created_at).toLocaleString('zh-CN') : '—' %></div>
+                    <div class="text-muted small mt-1"><i class="bi bi-collection me-1"></i>模板：<%= c.template_name || '—' %> · <i class="bi bi-send"></i>发起：<%= c.created_at ? fmtDateTime(c.created_at) : '—' %></div>
                     <% if (c.signatures && c.signatures.length) { %>
                       <div class="text-muted small mt-1">
                         <% c.signatures.forEach(s => { %>
-                          <span class="me-3"><i class="bi bi-person-check"></i> <%= s.party_name %> (<%= s.party_role %>): <span class="<%= s.status==='signed'?'text-success fw-semibold':'text-warning fw-semibold' %>"><%= s.status==='signed'?'已签署':'待签署' %></span><%= s.signed_at ? ' · ' + new Date(s.signed_at).toLocaleString('zh-CN') : '' %></span>
+                          <span class="me-3"><i class="bi bi-person-check"></i> <%= s.party_name %> (<%= s.party_role %>): <span class="<%= s.status==='signed'?'text-success fw-semibold':'text-warning fw-semibold' %>"><%= s.status==='signed'?'已签署':'待签署' %></span><%= s.signed_at ? ' · ' + fmtDateTime(s.signed_at) : '' %></span>
                         <% }) %>
                       </div>
                     <% } %>
@@ -428,7 +428,7 @@
                   <div class="flex-grow-1 text-truncate">
                     <a href="/api/attachments/<%= a.id %>/preview" target="_blank" class="text-decoration-none fw-semibold"><%= a.original_name %></a>
                     <div class="text-muted small">
-                      <i class="bi bi-database"></i> <%= (a.size / 1024).toFixed(1) %> KB · <i class="bi bi-person"></i> <%= a.uploader_name || '' %> · <i class="bi bi-clock"></i> <%= new Date(a.created_at).toLocaleString('zh-CN') %>
+                      <i class="bi bi-database"></i> <%= (a.size / 1024).toFixed(1) %> KB · <i class="bi bi-person"></i> <%= a.uploader_name || '' %> · <i class="bi bi-clock"></i> <%= fmtDateTime(a.created_at) %>
                     </div>
                   </div>
                   <div class="d-flex gap-1 flex-shrink-0">
@@ -528,7 +528,7 @@
                      const overdue = rd < rStartToday;
                      const today = !overdue && rd < rEndToday;
                 %>
-                  <div class="text-muted small"><i class="bi bi-clock"></i> <%= rd.toLocaleString('zh-CN') %>
+                  <div class="text-muted small"><i class="bi bi-clock"></i> <%= fmtDateTime(rd) %>
                     <% if (overdue) { %><span class="status-badge" style="background:#dc3545">已逾期</span><% } %>
                     <% if (!overdue && today) { %><span class="status-badge" style="background:#f59e0b">今天</span><% } %>
                     <% if (!overdue && !today) { %><span class="status-badge" style="background:#0ea5e9">即将</span><% } %>
@@ -571,7 +571,7 @@
                 <% } %>
               </div>
               <% if (h.note) { %><div class="tl-note"><%= h.note %></div><% } %>
-              <div class="tl-time"><i class="bi bi-person"></i> <%= h.operator_name || '系统' %> · <%= new Date(h.created_at).toLocaleString('zh-CN') %></div>
+              <div class="tl-time"><i class="bi bi-person"></i> <%= h.operator_name || '系统' %> · <%= fmtDateTime(h.created_at) %></div>
             </div>
           <% }) %>
           <% if (history.length === 0) { %>
@@ -696,6 +696,7 @@
 
 <script>
   const getAppUrl = () => window.location.origin;
+  function fmtDT(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; const p = n => n < 10 ? '0' + n : n; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
   let replaceTarget = null;
 
   document.getElementById('uploadForm').addEventListener('submit', async (e) => {
@@ -1203,7 +1204,7 @@
     const c = data.contracts.find(x=>x.id===id);
     if (!c) return;
     let html = '<div class="text-start"><h6>' + c.title + '</h6><table class="table table-sm"><thead><tr><th>当事人</th><th>角色</th><th>状态</th><th>签署时间</th></tr></thead><tbody>';
-    c.signatures.forEach(s=>html+=`<tr><td>${s.party_name}</td><td>${s.party_role}</td><td><span class="badge ${s.status==='signed'?'bg-success':'bg-warning'}">${s.status==='signed'?'已签署':'待签署'}</span></td><td>${s.signed_at?new Date(s.signed_at).toLocaleString('zh-CN'):'—'}</td></tr>`);
+    c.signatures.forEach(s=>html+=`<tr><td>${s.party_name}</td><td>${s.party_role}</td><td><span class="badge ${s.status==='signed'?'bg-success':'bg-warning'}">${s.status==='signed'?'已签署':'待签署'}</span></td><td>${fmtDT(s.signed_at)}</td></tr>`);
     html += '</tbody></table></div>';
     const mb = modalBox('签署进度', html, { okText: '关闭', footer: true });
     mb.show();

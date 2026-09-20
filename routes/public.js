@@ -6,6 +6,10 @@ const { pool } = require('../src/db');
 const { embedCjkFont } = require('../src/pdf-utils');
 const { caseFolder } = require('../src/util');
 
+function _p(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtDate(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日'; }
+function fmtDateTime(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + _p(d.getHours()) + ':' + _p(d.getMinutes()); }
+
 const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 
@@ -183,7 +187,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       const drawHeight = myPos.height || 60;
       const x = myPos.x || 100;
       const y = myPos.y || 100;
-      const dateStr = new Date().toLocaleDateString('zh-CN');
+      const dateStr = fmtDate(new Date());
       // all_pages: 每页都绘制签名
       if (myPos.all_pages) {
         const ppos = myPos.per_page && myPos.page_positions ? myPos.page_positions : null;
@@ -235,7 +239,7 @@ router.post('/sign/:token', signSubmitLimiter, async (req, res, next) => {
       )).rows[0];
       if (cRow) {
         const signedNames = targets.map(t => t.rec.party_name).filter(Boolean).join('、') || '当事人';
-        const content = '✅ 合同签署完成\n\n案号：' + (cRow.case_no || '') + '\n合同：' + first.title + '\n签署人：' + signedNames + '\n时间：' + new Date().toLocaleString('zh-CN', { hour12: false }) + '\n\n请及时跟进并下载存档。';
+        const content = '✅ 合同签署完成\n\n案号：' + (cRow.case_no || '') + '\n合同：' + first.title + '\n签署人：' + signedNames + '\n时间：' + fmtDateTime(new Date()) + '\n\n请及时跟进并下载存档。';
         const targetUid = cRow.assignee_id || cRow.initiator_id || null;
         if (targetUid) await pushEvent('contract_signed', targetUid, content, { link: cRow.case_id ? '/cases/' + cRow.case_id : null, title: '合同签署' });
       }

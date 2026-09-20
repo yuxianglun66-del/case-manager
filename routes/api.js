@@ -8,6 +8,10 @@ const { hasPermission, BUILTIN_ROLES, roleExists, createRole, updateRole, delete
 const { upload, feeUpload, libraryUpload, validateUploadedFiles, contentTypeFor, isInlineSafe, getCaseForPermission, generateCaseNo, caseFolder } = require('../src/util');
 const { convertOfficeToPdf, convertOfficeToPdfCached } = require('../src/convert');
 const { embedCjkFont, stampTextFields } = require('../src/pdf-utils');
+
+function _p(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtDate(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日'; }
+function fmtDateTime(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + _p(d.getHours()) + ':' + _p(d.getMinutes()); }
 const archiver = require('archiver');
 const { audit } = require('../src/audit');
 const { pushEvent } = require('../src/wecom');
@@ -160,7 +164,7 @@ router.post('/cases/create', requirePermission('cases.create'), async (req, res,
     await addHistory(client, caseId, 'created', user.id, { statusId, note: '创建案件' });
     await client.query('COMMIT');
     await audit(req, '创建案件', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + caseNo + '「' + title + '」', after: { case_no: caseNo, title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate } });
-    pushEvent('case_assigned', assigneeId, '📋 您有新案件：' + caseNo + ' ' + title + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + caseId });
+    pushEvent('case_assigned', assigneeId, '📋 您有新案件：' + caseNo + ' ' + title + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + caseId });
     res.json({ ok: true, id: caseId, case_no: caseNo });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
   finally { client.release(); }
@@ -263,7 +267,7 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
     await client.query('COMMIT');
     await audit(req, '更新案件', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + title + '」', before: { title: req.caseRow.title, client_name: req.caseRow.client_name, assignee_id: req.caseRow.assignee_id, status_id: req.caseRow.status_id, sign_staff_id: req.caseRow.sign_staff_id, sign_date: req.caseRow.sign_date, next_action: req.caseRow.next_action, fee_agreement: req.caseRow.fee_agreement, fee_details: req.caseRow.fee_details }, after: { title, client_name: clientName || null, assignee_id: assigneeId, status_id: statusId, sign_staff_id: signStaffId, sign_date: signDate, next_action: nextAction, fee_agreement: feeAgreement, fee_details: feeDetails } });
     if (assigneeId && assigneeId !== req.caseRow.assignee_id) {
-      pushEvent('case_assigned', assigneeId, '📋 案件 ' + req.caseRow.case_no + '「' + title + '」已分配给您' + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      pushEvent('case_assigned', assigneeId, '📋 案件 ' + req.caseRow.case_no + '「' + title + '」已分配给您' + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true, id });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -293,7 +297,7 @@ router.post('/cases/:id/status', requirePermission('cases.edit'), needCase, asyn
     await client.query('COMMIT');
     await audit(req, '变更状态', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + ' 状态变更为「' + st.name + '」' + (note ? '（' + note + '）' : ''), before: { status_id: req.caseRow.status_id }, after: { status_id: statusId } });
     if (req.caseRow.assignee_id) {
-      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      pushEvent('status_changed', req.caseRow.assignee_id, '📌 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」状态变更为「' + st.name + '」' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -310,7 +314,7 @@ router.post('/cases/:id/delete', requirePermission('cases.delete'), needCase, as
       [id, req.session.user.id]
       );
       if (req.caseRow.assignee_id) {
-        pushEvent('status_changed', req.caseRow.assignee_id, '🗑️ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases' });
+        pushEvent('status_changed', req.caseRow.assignee_id, '🗑️ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' + (req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '') + (req.caseRow.next_action ? '\n📝 进度内容：' + req.caseRow.next_action : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases' });
       }
       await audit(req, '移入回收站', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」已移入回收站' });
     res.json({ ok: true });
@@ -447,7 +451,7 @@ router.post('/cases/batch/status', requirePermission('cases.edit'), async (req, 
 
   await audit(req, '批量变更状态', { entity_type: 'case', detail: `批量将 ${rows.length} 个案件状态变更为「${st.name}」` });
   for (const row of rows) {
-    if (row.assignee_id) pushEvent('status_changed', row.assignee_id, '📌 案件 ' + row.case_no + ' 状态变更为「' + st.name + '」（批量）\n\n👤 操作人：' + user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + row.id });
+    if (row.assignee_id) pushEvent('status_changed', row.assignee_id, '📌 案件 ' + row.case_no + ' 状态变更为「' + st.name + '」（批量）\n\n👤 操作人：' + user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + row.id });
   }
   res.json({ ok: true, updated: rows.length });
 });
@@ -490,7 +494,7 @@ router.post('/cases/batch/assignee', requirePermission('cases.assign'), requireP
 
   await audit(req, '批量分配负责人', { entity_type: 'case', detail: `批量将 ${rows.length} 个案件分配给「${target.display_name}」` });
   for (const row of rows) {
-    pushEvent('case_assigned', assigneeId, '📋 案件 ' + row.case_no + ' 已分配给您（批量）\n\n👤 操作人：' + user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + row.id });
+    pushEvent('case_assigned', assigneeId, '📋 案件 ' + row.case_no + ' 已分配给您（批量）\n\n👤 操作人：' + user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + row.id });
   }
   res.json({ ok: true, updated: rows.length });
 });
@@ -508,10 +512,10 @@ router.post('/cases/:id/next-action', requirePermission('cases.remind'), needCas
     );
     await audit(req, '更新下一步流程', { entity_type: 'case', entity_id: id, detail: '案号 ' + req.caseRow.case_no + ' 下一步：' + (nextAction || '（空）'), before: { next_action: req.caseRow.next_action, reminder_at: req.caseRow.reminder_at }, after: { next_action: nextAction, reminder_at: reminderAt } });
     if (req.caseRow.assignee_id) {
-      const dateHint = reminderAt ? '\n⏰ 提醒时间：' + new Date(reminderAt).toLocaleString('zh-CN', { hour12: false }) : '';
+      const dateHint = reminderAt ? '\n⏰ 提醒时间：' + fmtDateTime(reminderAt) : '';
       const typeHint = req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '';
       const statusHint = req.caseRow.status_name ? '\n📈 当前进度：' + req.caseRow.status_name : '';
-      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」设置了进度提醒' + typeHint + statusHint + dateHint + '\n📝 进度内容：' + (nextAction || '（未填写）') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」设置了进度提醒' + typeHint + statusHint + dateHint + '\n📝 进度内容：' + (nextAction || '（未填写）') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true });
   } catch (e) { next(e); }
@@ -602,7 +606,7 @@ router.post('/cases/:id/fees', requirePermission('cases.fee'), needCase, feeUplo
        note || null, req.session.user.id]
     );
     await audit(req, '新增费用', { entity_type: 'case_fee', entity_id: rows[0].id, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${fee_type} ¥${amount}` });
-    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用新增\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + fee_type + '\n💰 金额：¥' + amount + (dir === 'income' ? '（收入）' : '（支出）') + '\n👥 付款方：' + (pb === 'staff' ? '员工/公司垫付' : '当事人/家属支付') + (payer ? '（' + payer + '）' : '') + '\n📌 状态：' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免') + (note ? '\n📝 备注：' + note : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用新增\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + fee_type + '\n💰 金额：¥' + amount + (dir === 'income' ? '（收入）' : '（支出）') + '\n👥 付款方：' + (pb === 'staff' ? '员工/公司垫付' : '当事人/家属支付') + (payer ? '（' + payer + '）' : '') + '\n📌 状态：' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免') + (note ? '\n📝 备注：' + note : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true, id: rows[0].id });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -645,7 +649,7 @@ router.put('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, fee
     if (old.payer !== newPayer) changes.push('付款方 ' + (old.payer || '（空）') + ' → ' + (newPayer || '（空）'));
     if ((old.paid_by || 'client') !== pb) changes.push('垫付方 ' + ((old.paid_by || 'client') === 'staff' ? '员工/公司垫付' : '当事人/家属支付') + ' → ' + (pb === 'staff' ? '员工/公司垫付' : '当事人/家属支付'));
     if (old.status !== st) changes.push('状态 ' + (old.status === 'paid' ? '已收取' : old.status === 'pending' ? '待收取' : old.status === 'advanced' ? '垫付' : '减免') + ' → ' + (st === 'paid' ? '已收取' : st === 'pending' ? '待收取' : st === 'advanced' ? '垫付' : '减免'));
-    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用修改\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n✏️ 变更内容：' + (changes.length ? changes.join('；') : '（无实质字段变化）') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '💳 费用修改\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n✏️ 变更内容：' + (changes.length ? changes.join('；') : '（无实质字段变化）') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -660,7 +664,7 @@ router.delete('/cases/:id/fees/:fid', requirePermission('cases.fee'), needCase, 
     const old = rows[0];
     if (old.file_path) { const abs = path.join(UPLOAD_DIR, old.file_path); if (fs.existsSync(abs)) try { fs.unlinkSync(abs); } catch {} }
     await audit(req, '删除费用', { entity_type: 'case_fee', entity_id: fid, detail: `案号 ${req.caseRow.case_no}「${req.caseRow.title}」${old.fee_type} ¥${old.amount}`, before: { fee_type: old.fee_type, amount: old.amount, direction: old.direction } });
-    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '🗑️ 费用删除\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + old.fee_type + '\n💰 金额：¥' + old.amount + (old.direction === 'expense' ? '（支出）' : '（收入）') + (old.payer ? '\n👤 付款方：' + old.payer : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+    pushEvent('fee_changed', (req.caseRow.assignee_id || req.caseRow.initiator_id), '🗑️ 费用删除\n\n📋 案号：' + req.caseRow.case_no + '「' + req.caseRow.title + '」\n🧾 费用类型：' + old.fee_type + '\n💰 金额：¥' + old.amount + (old.direction === 'expense' ? '（支出）' : '（收入）') + (old.payer ? '\n👤 付款方：' + old.payer : '') + '\n\n✍️ 操作人：' + req.session.user.username + '\n🕐 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
   finally { client.release(); }
@@ -735,7 +739,7 @@ router.post('/cases/:id/attachments', requirePermission('attachments.manage'), n
     }
     await audit(req, '上传附件', { entity_type: 'case', entity_id: req.caseRow.id, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传 ' + files.length + ' 个附件' + (remark ? '（备注：' + remark + '）' : '') });
     if (req.caseRow.assignee_id) {
-      pushEvent('new_attachment', req.caseRow.assignee_id, '📎 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传了 ' + files.length + ' 个附件' + (remark ? '（' + remark + '）' : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + new Date().toLocaleString('zh-CN', { hour12: false }), { link: '/cases/' + req.caseRow.id });
+      pushEvent('new_attachment', req.caseRow.assignee_id, '📎 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」上传了 ' + files.length + ' 个附件' + (remark ? '（' + remark + '）' : '') + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + req.caseRow.id });
     }
     res.json({ ok: true, files: list });
   } catch (e) { await client.query('ROLLBACK'); next(e); }
@@ -1528,7 +1532,7 @@ router.post('/wecom/test', requirePermission('system.settings'), async (req, res
     const s = (await pool.query(`SELECT key, value FROM app_settings WHERE key LIKE 'wecom_%'`)).rows.reduce((o, r) => { o[r.key] = r.value; return o; }, {});
     const webhook = req.body.webhook_url || s.wecom_webhook;
     if (webhook) {
-      const result = await sendWebhook(webhook, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
+      const result = await sendWebhook(webhook, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + fmtDateTime(new Date()));
       if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
       await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: 'Webhook 推送测试' });
       return res.json({ ok: true });
@@ -1537,7 +1541,7 @@ router.post('/wecom/test', requirePermission('system.settings'), async (req, res
     if (wid) {
       const token = await getAccessToken();
       if (!token) return res.status(400).json({ error: '未配置企业微信 CorpID/Secret 或 token 获取失败' });
-      const result = await sendText(wid, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + new Date().toLocaleString('zh-CN'));
+      const result = await sendText(wid, '✅ 企业微信推送测试成功！\n系统：案件管理系统\n时间：' + fmtDateTime(new Date()));
       if (!result.ok) return res.status(400).json({ error: result.error || '发送失败' });
       await audit(req, '企业微信推送测试', { entity_type: 'system', entity_id: 'wecom', detail: '推送给 ' + wid });
       return res.json({ ok: true });
@@ -1781,8 +1785,8 @@ router.get('/cases/export/csv', requirePermission('cases.import_export'), async 
     const rows = cases.map(c => [
       c.case_no, c.title, c.client_name || '', c.parties_str || '', c.type_name || '', c.status_name || '',
       c.assignee_name || '', c.target_amount != null ? Number(c.target_amount) : '', c.received_amount != null ? Number(c.received_amount) : '',
-      c.fee_cnt || 0, new Date(c.created_at).toLocaleString('zh-CN'),
-      new Date(c.updated_at).toLocaleString('zh-CN')
+      c.fee_cnt || 0, fmtDateTime(c.created_at),
+      fmtDateTime(c.updated_at)
     ]);
 
     const csv = [headers.join(',')].concat(rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))).join('\n');
@@ -1864,8 +1868,8 @@ router.get('/cases/export/xlsx', requirePermission('cases.import_export'), async
         target_amount: c.target_amount != null ? Number(c.target_amount) : '',
         received_amount: c.received_amount != null ? Number(c.received_amount) : '',
         fee_cnt: c.fee_cnt || 0,
-        created_at: new Date(c.created_at).toLocaleString('zh-CN'),
-        updated_at: new Date(c.updated_at).toLocaleString('zh-CN'),
+        created_at: fmtDateTime(c.created_at),
+        updated_at: fmtDateTime(c.updated_at),
       });
     }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -260,7 +260,7 @@
               <% const _stColor = ({ pending: '#f59e0b', paid: '#198754', advanced: '#0ea5e9', waived: '#6c757d' })[f.status] || '#6c757d'; %>
               <span class="badge" style="background:<%= _stColor %>"><%= _stLabel %></span>
             </td>
-            <td class="hide-mobile text-muted"><%= f.paid_at || (f.created_at ? new Date(f.created_at).toLocaleDateString('zh-CN') : '') %></td>
+            <td class="hide-mobile text-muted"><%= f.paid_at || (f.created_at ? fmtDate(f.created_at) : '') %></td>
           </tr>
           <% }) %>
           <% if (!feeRows.length) { %><tr><td colspan="8" class="empty-tip"><i class="bi bi-inbox"></i>没有符合条件的费用记录</td></tr><% } %>

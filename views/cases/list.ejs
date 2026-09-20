@@ -164,10 +164,10 @@
               <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_category ? ({signed:'已签约',processing:'理赔中',litigation:'诉讼中',closed:'已结案'}[c.status_category] || c.status_category) : '' %><%= c.status_name ? (' · ' + c.status_name) : '' %></span></td>
               <td class="hide-mobile"><i class="bi bi-briefcase text-muted me-1"></i><%= c.assignee_name || '—' %></td>
               <td class="hide-mobile"><i class="bi bi-person-check text-muted me-1"></i><%= c.sign_staff_name || '—' %></td>
-              <td class="hide-mobile"><i class="bi bi-calendar-check text-muted me-1"></i><%= c.sign_date ? new Date(c.sign_date).toLocaleDateString('zh-CN') : '—' %></td>
+              <td class="hide-mobile"><i class="bi bi-calendar-check text-muted me-1"></i><%= c.sign_date ? fmtDate(c.sign_date) : '—' %></td>
               <td class="text-center"><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><i class="bi bi-paperclip"></i> <%= c.file_count %></span></td>
               <td class="hide-mobile" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= c.next_action || '' %>"><%= c.next_action || '—' %></td>
-              <td class="hide-mobile text-muted"><%= c.updated_at ? new Date(c.updated_at).toLocaleString('zh-CN') : '' %></td>
+              <td class="hide-mobile text-muted"><%= c.updated_at ? fmtDateTime(c.updated_at) : '' %></td>
               <% if (can('cases.delete')) { %>
               <td class="text-end" style="width:50px"><button class="btn btn-ico btn-outline-danger" title="删除案件" onclick="event.stopPropagation(); delCase(<%= c.id %>, '<%= c.case_no.replace(/[\\'\"<>]/g,'') %>')"><i class="bi bi-trash"></i></button></td>
               <% } %>

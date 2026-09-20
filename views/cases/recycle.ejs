@@ -52,7 +52,7 @@
               <td><span class="status-badge" style="background:<%= c.status_color || '#6c757d' %>"><%= c.status_name || '未设置' %></span></td>
               <td class="hide-mobile"><i class="bi bi-person text-muted me-1"></i><%= c.client_name || '—' %></td>
               <td class="hide-mobile"><i class="bi bi-person-x text-muted me-1"></i><%= c.deleted_by_name || '—' %></td>
-              <td class="hide-mobile text-muted"><%= c.deleted_at ? new Date(c.deleted_at).toLocaleString('zh-CN') : '' %></td>
+              <td class="hide-mobile text-muted"><%= c.deleted_at ? fmtDateTime(c.deleted_at) : '' %></td>
               <td class="text-end" style="white-space:nowrap">
                 <button class="btn btn-ico btn-outline-success" title="恢复案件" onclick="restoreCase(<%= c.id %>, '<%= c.case_no.replace(/[\\'\"<>]/g,'') %>')"><i class="bi bi-arrow-counterclockwise"></i></button>
                 <button class="btn btn-ico btn-outline-danger" title="彻底删除" onclick="purgeCase(<%= c.id %>, '<%= c.case_no.replace(/[\\'\"<>]/g,'') %>')"><i class="bi bi-trash3"></i></button>

@@ -593,6 +593,18 @@ body[data-theme="dark"] .hover-bg:hover, body.dark .hover-bg:hover { background:
   background: #0f172a;
 }
 .form-control::placeholder { color: var(--content-faint); }
+/* 日期时间选择器图标放大 */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) brightness(1.2);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
 .form-label { font-weight: 600; font-size: 13px; color: var(--content-muted); margin-bottom: 6px; }
 .form-text { font-size: 12px; color: var(--content-faint); }
 .form-section-title {

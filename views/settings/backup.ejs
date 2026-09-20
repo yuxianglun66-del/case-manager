@@ -44,7 +44,7 @@
         </div>
         <hr>
         <div class="small text-muted">
-          上次自动备份：<span id="bkLastRun"><%= backupSettings.backup_last_run ? new Date(backupSettings.backup_last_run).toLocaleString('zh-CN') : '从未' %></span><br>
+          上次自动备份：<span id="bkLastRun"><%= backupSettings.backup_last_run ? fmtDateTime(backupSettings.backup_last_run) : '从未' %></span><br>
           上次结果：<span id="bkLastResult" class="<%= backupSettings.backup_last_result === 'ok' ? 'text-success' : 'text-danger' %>"><%= backupSettings.backup_last_result === 'ok' ? '成功' : (backupSettings.backup_last_result || '—') %></span>
         </div>
       </div>
@@ -69,7 +69,7 @@
                   <tr>
                     <td class="text-break"><i class="bi bi-file-earmark-zip me-1"></i><%= f.name %></td>
                     <td><%= (f.size / 1024).toFixed(1) %> KB</td>
-                    <td><%= f.created_at ? new Date(f.created_at).toLocaleString('zh-CN') : '—' %></td>
+                    <td><%= f.created_at ? fmtDateTime(f.created_at) : '—' %></td>
                     <td class="text-end">
                       <button class="btn btn-ico btn-light" title="下载" onclick="dlBackup('<%= f.name %>')"><i class="bi bi-download"></i></button>
                       <button class="btn btn-ico btn-outline-warning" title="恢复" onclick="restoreBackup('<%= f.name %>')"><i class="bi bi-arrow-counterclockwise"></i></button>

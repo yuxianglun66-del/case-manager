@@ -25,7 +25,7 @@
         <div class="form-text mb-0">
           超过保留时间的日志由系统每天自动清除。
           <% if (auditCfg.audit_retention_days > 0) { %>当前设置：<strong><%= auditCfg.audit_retention_days %> 天</strong><% } else { %>当前设置：<strong>不自动清理</strong><% } %>
-          <% if (auditCfg.audit_last_cleanup) { %>（上次清理：<%= new Date(auditCfg.audit_last_cleanup).toLocaleString('zh-CN') %>）<% } %>
+          <% if (auditCfg.audit_last_cleanup) { %>（上次清理：<%= fmtDateTime(auditCfg.audit_last_cleanup) %>）<% } %>
           <button class="btn btn-link btn-sm p-0 ms-2" id="btnCleanupNow"><i class="bi bi-trash"></i> 立即清理 30 天前日志</button>
         </div>
       </div>
@@ -90,7 +90,7 @@
           <% if (logs && logs.length) { %>
             <% logs.forEach(l => { %>
               <tr>
-                <td class="text-nowrap small text-muted"><%= new Date(l.created_at).toLocaleString('zh-CN') %></td>
+                <td class="text-nowrap small text-muted"><%= fmtDateTime(l.created_at) %></td>
                 <td class="text-nowrap"><%= l.display_name || '<span class="text-muted">外部/未知</span>' %></td>
                 <td class="text-nowrap"><span class="badge text-bg-light border"><%= l.action %></span></td>
                 <td class="text-nowrap small">

@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { rgb } = require('pdf-lib');
 
+function _p(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtDate(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d.getTime())) return ''; return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日'; }
+
 // 在 pdfDoc 中加载中文字体（找不到可用字体时返回 null，调用方跳过中文绘制）
 async function embedCjkFont(pdfDoc) {
   try {
@@ -35,7 +38,7 @@ async function embedCjkFont(pdfDoc) {
 
 // 文本占位符替换：{title}/{case_no}/{client_name}/{date} 案件级，{name}/{id_card}... 当事人级（无数据留空）
 function fillTemplateText(text, data = {}, party = null) {
-  const dateStr = new Date().toLocaleDateString('zh-CN');
+  const dateStr = fmtDate(new Date());
   const m = { '{title}': data.title || '', '{case_no}': data.case_no || '', '{client_name}': data.client_name || '', '{date}': dateStr };
   let out = String(text == null ? '' : text).replace(/\{(title|case_no|client_name|date)\}/g, (k) => m[k] || '');
   if (!out.includes('{')) return out;
