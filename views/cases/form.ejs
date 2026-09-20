@@ -91,17 +91,9 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">进度提醒</label>
-          <textarea name="next_action" class="form-control" rows="2" placeholder="描述下一步要做什么"><%= caseData ? (caseData.next_action || '') : '' %></textarea>
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">提醒时间</label>
-          <input type="datetime-local" name="reminder_at" class="form-control" value="<%= caseData && caseData.reminder_at ? new Date(caseData.reminder_at).toISOString().slice(0,16) : '' %>">
-        </div>
         <div class="col-12">
           <label class="form-label">服务费约定方式</label>
-          <textarea name="fee_agreement" class="form-control" rows="2" placeholder="如：按标的额5%收取，或按件计费500元/件"><%= caseData ? (caseData.fee_agreement || '') : '' %></textarea>
+          <input type="text" name="fee_agreement" class="form-control" placeholder="如：按标的额5%收取，或按件计费500元/件" value="<%= caseData ? (caseData.fee_agreement || '') : '' %>">
         </div>
       </div>
 

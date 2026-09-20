@@ -417,7 +417,7 @@ router.get('/cases/:id', async (req, res, next) => {
     const statuses = (await pool.query(`SELECT id, name, color, category FROM statuses WHERE active = TRUE ORDER BY category, sort`)).rows;
 
     res.render('cases/detail', {
-      title: c.case_no,
+      title: (c.client_name || c.title) + ' - ' + c.type_name,
       caseData: c, fields, values, history, attachments, statuses, parties, contracts,
     });
   } catch (e) { next(e); }

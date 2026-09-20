@@ -76,10 +76,17 @@
         <div class="form-section-title mt-4"><i class="bi bi-file-earmark-text"></i> 详细信息</div>
         <div class="info-grid">
           <% fields.forEach(f => { %>
-            <div class="info-item<%= f.field_type === 'textarea' ? ' info-item-full' : '' %>"<%= f.field_type === 'textarea' ? ' style="grid-column:1/-1;min-height:56px"' : '' %>>
-              <div class="info-label"><%= f.label %></div>
-              <div class="info-value"<%= f.field_type === 'textarea' ? ' style="white-space:pre-line"' : '' %>><%= values[f.id] || '—' %></div>
+            <% if (f.field_type === 'textarea') { %>
+            <div class="info-item" style="grid-column:1/-1;background:rgba(59,130,246,.04);border-left:3px solid rgba(59,130,246,.3);min-height:80px">
+              <div class="info-label"><i class="bi bi-text-paragraph"></i> <%= f.label %></div>
+              <div class="info-value" style="white-space:pre-line;line-height:1.6;font-weight:400"><%= values[f.id] || '—' %></div>
             </div>
+            <% } else { %>
+            <div class="info-item">
+              <div class="info-label"><%= f.label %></div>
+              <div class="info-value"><%= values[f.id] || '—' %></div>
+            </div>
+            <% } %>
           <% }) %>
         </div>
         <% } %>
