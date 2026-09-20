@@ -156,6 +156,7 @@ router.get('/cases', async (req, res, next) => {
     const dateFrom = (req.query.date_from || '').trim();
     const dateTo = (req.query.date_to || '').trim();
     const cat = (req.query.cat || '').trim();
+    const mine = req.query.mine === '1';
 
     const where = ['c.deleted_at IS NULL'];
     const params = [];
@@ -163,6 +164,7 @@ router.get('/cases', async (req, res, next) => {
     if (typeId) { params.push(typeId); where.push(`c.case_type_id = $${params.length}`); }
     if (statusId) { params.push(statusId); where.push(`c.status_id = $${params.length}`); }
     if (assigneeId && canViewAll(user)) { params.push(assigneeId); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
+    if (mine) { params.push(user.id); where.push(`(c.assignee_id = $${params.length} OR c.sign_staff_id = $${params.length})`); }
     if (dateFrom) { params.push(dateFrom); where.push(`c.sign_date >= $${params.length}`); }
     if (dateTo) { params.push(dateTo); where.push(`c.sign_date <= $${params.length}`); }
     const catSql = {
@@ -209,7 +211,7 @@ router.get('/cases', async (req, res, next) => {
     res.render('cases/list', {
       title: '案件管理',
       cases, types, statuses, staff,
-      filters: { kw, type: typeId, status: statusId, assignee: assigneeId, date_from: dateFrom, date_to: dateTo, cat },
+      filters: { kw, type: typeId, status: statusId, assignee: assigneeId, date_from: dateFrom, date_to: dateTo, cat, mine },
       page: cur, totalPages, total: count.rows[0].n,
     });
   } catch (e) { next(e); }
