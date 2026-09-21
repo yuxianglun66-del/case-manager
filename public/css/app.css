@@ -1094,44 +1094,6 @@ body:not(.theme-dark) .preset-card:not(.is-light) {
   color: #e2e8f0;
 }
 
-/* ============ PWA Splash Screen ============ */
-.pwa-splash {
-  position: fixed; inset: 0; z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(180deg, #060a14, #0b1120 40%, #0f172a 100%);
-  transition: opacity .5s ease, visibility .5s ease;
-}
-.pwa-splash.fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
-.pwa-splash-inner { text-align: center; animation: splashIn .8s ease both; }
-.pwa-splash-icon {
-  width: 80px; height: 80px; margin: 0 auto 16px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 40px; color: #3b82f6;
-  background: rgba(59,130,246,.12); border-radius: 20px;
-  border: 2px solid rgba(59,130,246,.25);
-  animation: splashIconPulse 1.5s ease-in-out infinite alternate;
-}
-.pwa-splash-name {
-  font-size: 18px; font-weight: 600; color: #e2e8f0;
-  letter-spacing: 1px; margin-bottom: 24px;
-  animation: splashFadeUp .6s .3s ease both;
-}
-.pwa-splash-bar {
-  width: 160px; height: 3px; margin: 0 auto;
-  background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden;
-}
-.pwa-splash-bar-fill {
-  height: 100%; width: 0; background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  border-radius: 2px; animation: splashBar 1.4s .2s ease forwards;
-}
-@keyframes splashIn { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
-@keyframes splashIconPulse { from { box-shadow: 0 0 0 0 rgba(59,130,246,.3); } to { box-shadow: 0 0 20px 4px rgba(59,130,246,.15); } }
-@keyframes splashFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes splashBar { to { width: 100%; } }
-
-/* ============ Page Transition ============ */
-/* 页面内容无动画，直接显示 */
-
 /* ============ Mobile Bottom Nav ============ */
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 1040;

@@ -207,13 +207,6 @@
     })();
     if (window.applyThemeContrast) window.applyThemeContrast();
   </script>
-  <div id="pwaSplash" class="pwa-splash">
-    <div class="pwa-splash-inner">
-      <div class="pwa-splash-icon"><i class="bi bi-shield-lock-fill"></i></div>
-      <div class="pwa-splash-name">众诚诺泰案件管理平台</div>
-      <div class="pwa-splash-bar"><div class="pwa-splash-bar-fill"></div></div>
-    </div>
-  </div>
   <div class="app-shell">
     <aside class="sidebar d-print-none">
       <div class="sidebar-brand">
@@ -506,15 +499,6 @@
     }
   </script>
   <script>
-    /* PWA Splash Screen — 1.5s 后自动淡出 */
-    (function () {
-      var splash = document.getElementById('pwaSplash');
-      if (!splash) return;
-      setTimeout(function () {
-        splash.classList.add('fade-out');
-        setTimeout(function () { splash.remove(); }, 500);
-      }, 1500);
-    })();
     /* PWA Install Banner */
     (function () {
       var deferredPrompt = null;
