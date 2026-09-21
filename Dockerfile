@@ -4,14 +4,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \
     TZ=Asia/Shanghai
 
-# 系统依赖：中文字体（PDF 生成必需）+ LibreOffice（Word/Excel 转 PDF）
-# apt 走阿里云镜像
-RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
+# apt 加超时重试，国内镜像慢时不会无限卡死
+RUN echo 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nAcquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99timeout \
+    && sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
       curl ca-certificates gnupg tzdata xz-utils \
       fonts-wqy-microhei fonts-noto-cjk fonts-droid-fallback \
-      libreoffice-writer libreoffice-calc libreoffice-core \
-    && rm -rf /var/lib/apt/lists/*
+      libreoffice-core libreoffice-calc libreoffice-common libreoffice-writer \
+    && apt-get purge -y --auto-remove libreoffice-help* libreoffice-l10n* 2>/dev/null \
+    && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man /usr/share/locale
 
 # Node.js 20 从 npmmirror CDN 下载二进制包（绕过被墙的 deb.nodesource.com）
 RUN ARCH=$(uname -m) && \
