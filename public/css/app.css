@@ -1130,8 +1130,8 @@ body:not(.theme-dark) .preset-card:not(.is-light) {
 @keyframes splashBar { to { width: 100%; } }
 
 /* ============ Page Transition ============ */
-.page-content { animation: pageFadeIn .4s ease both; }
-@keyframes pageFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.page-content { animation: pageFadeIn .15s ease both; }
+@keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ============ Mobile Bottom Nav ============ */
 .bottom-nav {
