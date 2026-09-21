@@ -1130,8 +1130,7 @@ body:not(.theme-dark) .preset-card:not(.is-light) {
 @keyframes splashBar { to { width: 100%; } }
 
 /* ============ Page Transition ============ */
-.page-content { animation: pageFadeIn .15s ease both; }
-@keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* 页面内容无动画，直接显示 */
 
 /* ============ Mobile Bottom Nav ============ */
 .bottom-nav {
