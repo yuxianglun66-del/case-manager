@@ -213,8 +213,8 @@
     cats: <%- safeJson(byStatus.map(s => s.category)) %>,
   };
 
-  Chart.defaults.color = '#64748b';
-  Chart.defaults.borderColor = 'rgba(59,130,246,.06)';
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--content-muted').trim() || '#64748b';
+  Chart.defaults.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--content-border').trim() || 'rgba(59,130,246,.06)';
 
   new Chart(document.getElementById('chartType'), {
     type: 'bar',
@@ -243,7 +243,7 @@
     type: 'doughnut',
     data: {
       labels: visIdxs.map(i => statusData.labels[i]),
-      datasets: [{ data: visIdxs.map(i => statusData.counts[i]), backgroundColor: visIdxs.map(i => statusData.colors[i]), borderWidth: 2, borderColor: '#0f172a' }],
+      datasets: [{ data: visIdxs.map(i => statusData.counts[i]), backgroundColor: visIdxs.map(i => statusData.colors[i]), borderWidth: 2, borderColor: getComputedStyle(document.documentElement).getPropertyValue('--surface-solid').trim() || '#0f172a' }],
     },
     options: { plugins: { legend: { display: false } }, cutout: '62%' },
   });
@@ -256,13 +256,13 @@
   legend.innerHTML = CAT_ORDER.filter(c => groups[c] && groups[c].length)
     .map(c => `
       <div class="mb-3">
-        <div class="small fw-bold text-uppercase" style="letter-spacing:.6px;color:#8b9bb4;margin-bottom:6px">${CAT_LABELS[c] || c}</div>
+        <div class="small fw-bold text-uppercase" style="letter-spacing:.6px;color:var(--content-muted,#8b9bb4);margin-bottom:6px">${CAT_LABELS[c] || c}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px">
           ${groups[c].map(i => `
             <div class="d-flex align-items-center small" title="${statusData.labels[i]}">
               <span style="width:12px;height:12px;border-radius:3px;background:${statusData.colors[i]};display:inline-block;margin-right:6px;box-shadow:0 0 6px ${statusData.colors[i]}40;flex:none"></span>
-              <span class="text-truncate" style="flex:1;color:#94a3b8">${statusData.labels[i]}</span>
-              <b style="color:#e2e8f0">${statusData.counts[i]}</b>
+              <span class="text-truncate" style="flex:1;color:var(--content-muted,#94a3b8)">${statusData.labels[i]}</span>
+              <b style="color:var(--content-fg,#e2e8f0)">${statusData.counts[i]}</b>
             </div>`).join('')}
         </div>
       </div>`).join('') || '<div class="text-muted small">暂无案件数据</div>';
