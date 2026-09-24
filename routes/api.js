@@ -43,21 +43,26 @@ function parseParties(v) {
   if (!Array.isArray(arr)) return [];
   return arr
     .filter((p) => p && (p.name || '').trim())
-    .map((p, i) => ({
-      id: p.id ? parseInt(p.id, 10) : null,
-      name: (p.name || '').trim(),
-      role: (p.role || '').trim() || '其他',
-      gender: (p.gender || '').trim() || null,
-      age: p.age || null,
-      id_card: (p.id_card || '').trim() || null,
-      phone: (p.phone || '').trim() || null,
-      address: (p.address || '').trim() || null,
-      contact_person: (p.contact_person || '').trim() || null,
-      contact_phone: (p.contact_phone || '').trim() || null,
-      injury_info: (p.injury_info || '').trim() || null,
-      hospital_dept: (p.hospital_dept || '').trim() || null,
-      remark: (p.remark || '').trim() || null,
-    }));
+    .map((p) => {
+      const out = {
+        id: p.id ? parseInt(p.id, 10) : null,
+        name: (p.name || '').trim(),
+        role: (p.role || '').trim() || '其他',
+      };
+      // 扩展字段：调用方未携带 → 保持 undefined（update 端跳过该列，不清空已有数据）；
+      // 携带但为空 → null（允许显式清空）。编辑案件表单只提交 4 个基础字段，不能再覆盖扩展字段。
+      if ('gender' in p) out.gender = (p.gender || '').trim() || null;
+      if ('age' in p) out.age = p.age ? parseInt(p.age, 10) : null;
+      if ('id_card' in p) out.id_card = (p.id_card || '').trim() || null;
+      if ('phone' in p) out.phone = (p.phone || '').trim() || null;
+      if ('address' in p) out.address = (p.address || '').trim() || null;
+      if ('contact_person' in p) out.contact_person = (p.contact_person || '').trim() || null;
+      if ('contact_phone' in p) out.contact_phone = (p.contact_phone || '').trim() || null;
+      if ('injury_info' in p) out.injury_info = (p.injury_info || '').trim() || null;
+      if ('hospital_dept' in p) out.hospital_dept = (p.hospital_dept || '').trim() || null;
+      if ('remark' in p) out.remark = (p.remark || '').trim() || null;
+      return out;
+    });
 }
 
 // 全文搜索：案号/标题/客户 + 自定义字段（备注/地点等）+ 当事人 + 历史备注
@@ -243,10 +248,31 @@ router.post('/cases/:id/update', requirePermission('cases.edit'), needCase, asyn
       const p = parties[i];
       if (p.id) {
         keptIds.add(parseInt(p.id, 10));
+        // 只更新本次 payload 实际携带的扩展字段：编辑案件表单只提交 4 个基础字段，
+        // 不能把详情页当事人弹窗填写的 性别/年龄/地址/联系人/伤情/科室/备注 覆盖为 null
+        const sets = ['name=$1', 'role=$2', 'sort=$3'];
+        const vals = [p.name, p.role, i];
+        let n = 4;
+        const ext = (key, cast) => {
+          if (p[key] === undefined) return;
+          sets.push(`${key}=$${n}`);
+          vals.push(cast ? cast(p[key]) : (p[key] || null));
+          n += 1;
+        };
+        ext('gender');
+        ext('age', (v) => (v ? parseInt(v, 10) : null));
+        ext('id_card');
+        ext('phone');
+        ext('address');
+        ext('contact_person');
+        ext('contact_phone');
+        ext('injury_info');
+        ext('hospital_dept');
+        ext('remark');
+        vals.push(parseInt(p.id, 10), id);
         await client.query(
-          `UPDATE case_parties SET name=$1, role=$2, gender=$3, age=$4, id_card=$5, phone=$6, address=$7, contact_person=$8, contact_phone=$9, injury_info=$10, hospital_dept=$11, remark=$12, sort=$13
-           WHERE id=$14 AND case_id=$15`,
-          [p.name, p.role, p.gender || null, p.age ? parseInt(p.age) : null, p.id_card || null, p.phone || null, p.address || null, p.contact_person || null, p.contact_phone || null, p.injury_info || null, p.hospital_dept || null, p.remark || null, i, parseInt(p.id, 10), id]
+          `UPDATE case_parties SET ${sets.join(', ')} WHERE id=$${n} AND case_id=$${n + 1}`,
+          vals
         );
       } else {
         const ins = await client.query(

@@ -146,7 +146,17 @@
         phone: tr.querySelector('.p-party-phone').value.trim(),
         id_card: tr.querySelector('.p-party-id').value.trim(),
       };
-      if (tr.dataset.id) item.id = parseInt(tr.dataset.id, 10);
+      if (tr.dataset.id) {
+        item.id = parseInt(tr.dataset.id, 10);
+        // 本表单只编辑 4 个基础字段；把详情页弹窗维护的扩展字段原样带回，
+        // 防止 /api/cases/:id/update 的全字段 UPDATE 把它们覆盖为 null
+        const orig = PARTIES.find(x => x.id === item.id);
+        if (orig) {
+          ['gender', 'age', 'address', 'contact_person', 'contact_phone', 'injury_info', 'hospital_dept', 'remark'].forEach(k => {
+            if (orig[k] !== undefined && orig[k] !== null && orig[k] !== '') item[k] = orig[k];
+          });
+        }
+      }
       list.push(item);
     });
     return list;
