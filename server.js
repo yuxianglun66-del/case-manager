@@ -16,6 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
+// 不暴露框架指纹
+app.disable('x-powered-by');
+
 // ====== C2+C3: 生产环境强制要求环境变量 ======
 if (isProd) {
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('changeme123')) {
@@ -32,8 +35,22 @@ if (isProd) {
 // 必须放在限流/会话之前，否则所有请求都来自代理 IP，导致限流误伤与 secure cookie 失效
 if (isProd) app.set('trust proxy', 1);
 
-// ====== G1: 健康检查（无需登录，供 Docker/K8s 探活） ======
+// ====== G1: 健康检查（无需登录，供 Docker/K8s 探活）======
+// 仅限内网/回环访问：容器 healthcheck 走 localhost；公网请求（经反代，req.ip=真实客户端 IP）一律 404，避免泄露版本信息
+function isPrivateIp(ip) {
+  if (!ip) return false;
+  const v = String(ip).replace(/^::ffff:/i, '');
+  if (v === '::1' || v === 'localhost') return true;
+  if (/^127\./.test(v)) return true;
+  if (/^10\./.test(v)) return true;
+  if (/^192\.168\./.test(v)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(v)) return true;
+  if (/^f[cd][0-9a-f]*:/i.test(v)) return true; // IPv6 ULA fc00::/7
+  if (/^fe[89ab][0-9a-f]*:/i.test(v)) return true; // IPv6 link-local
+  return false;
+}
 app.get('/healthz', async (req, res) => {
+  if (!isPrivateIp(req.ip)) return res.status(404).json({ error: 'Not Found' });
   try {
     const dbVer = (await pool.query('SELECT version() AS v')).rows[0].v;
     const lo = await new Promise((resolve) => {
@@ -251,11 +268,18 @@ app.get('/sw.js', (req, res, next) => {
   next();
 });
 
-// 上传文件静态访问（logo 等）
+// 上传文件静态访问：默认需登录（案件附件不可被外部直链读取）；/uploads/logo/* 公开（登录页、导航栏 Logo）
 const _uploadDir = getUploadDir();
 app.use('/uploads', (req, res, next) => {
   const fp = path.join(_uploadDir, req.path);
   if (!fp.startsWith(path.resolve(_uploadDir))) return res.status(403).end();
+  const p = req.path.replace(/\\/g, '/');
+  const isLogo = p === '/logo' || p.startsWith('/logo/');
+  const isDemo = process.env.DEMO === '1' && !isProd;
+  if (!isLogo && !isDemo && !(req.session && req.session.userId)) {
+    // 不暴露文件是否存在
+    return res.status(404).json({ error: 'Not Found' });
+  }
   express.static(_uploadDir)(req, res, next);
 });
 
