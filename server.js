@@ -280,6 +280,10 @@ app.use('/uploads', (req, res, next) => {
     // 不暴露文件是否存在
     return res.status(404).json({ error: 'Not Found' });
   }
+  // 文件不存在时直接 404，避免 static next() 落入后续路由被 requireLogin 302（泄露路由结构）
+  let _stat = null;
+  try { _stat = fs.statSync(fp); } catch (_) { /* not found */ }
+  if (!_stat || !_stat.isFile()) return res.status(404).json({ error: 'Not Found' });
   express.static(_uploadDir)(req, res, next);
 });
 
