@@ -1002,8 +1002,6 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     if (role === 'super_admin') return res.status(400).json({ error: '不能创建超级管理员账号' });
     if (role === 'admin' && !isSuperAdmin) return res.status(403).json({ error: '仅超级管理员可创建管理员账号' });
     if (!roleExists(role)) return res.status(400).json({ error: '角色不存在' });
-    const securityQuestion = (req.body.security_question || '').trim();
-    const securityAnswer = (req.body.security_answer || '').trim();
     const wecomUserid = (req.body.wecom_userid || '').trim() || null;
     const pwErr = validatePasswordStrength(password);
     if (!username || !displayName || pwErr) {
@@ -1013,8 +1011,8 @@ router.post('/users/create', requirePermission('system.users'), async (req, res,
     if (dup.length) return res.status(400).json({ error: '用户名已存在' });
     const hash = await bcrypt.hash(password, 10);
     const ins = await pool.query(
-      `INSERT INTO users (username, password_hash, display_name, role, security_question, security_answer, wecom_userid) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [username, hash, displayName, role, securityQuestion || null, securityAnswer || null, wecomUserid]
+      `INSERT INTO users (username, password_hash, display_name, role, wecom_userid) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [username, hash, displayName, role, wecomUserid]
     );
     await audit(req, '新增用户', { entity_type: 'user', entity_id: ins.rows[0].id, detail: '用户名 ' + username + '（' + displayName + '，' + getRoleLabel(role) + '）', after: { username, display_name: displayName, role } });
     res.json({ ok: true });
@@ -1074,26 +1072,12 @@ router.post('/users/:id/reset', requirePermission('system.users'), async (req, r
       }
     }
     const hash = await bcrypt.hash(password, 10);
-    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, id]);
+    await pool.query(`UPDATE users SET password_hash = $1, must_change_password = TRUE WHERE id = $2`, [hash, id]);
+    // 重置后使该用户已登录的会话失效
+    try {
+      await pool.query(`DELETE FROM user_sessions WHERE sess_data::text LIKE '%"userId":${id}%'`).catch(() => {});
+    } catch (e) { /* 忽略会话清理失败 */ }
     await audit(req, '重置密码', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + '（' + target.role + '）' });
-    res.json({ ok: true });
-  } catch (e) { next(e); }
-});
-
-router.post('/users/:id/security-question', requirePermission('system.users'), async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    const question = (req.body.security_question || '').trim();
-    const answer = (req.body.security_answer || '').trim();
-    if (!question || !answer) return res.status(400).json({ error: '安全问题和答案都不能为空' });
-    const target = (await pool.query(`SELECT role, display_name FROM users WHERE id = $1`, [id])).rows[0];
-    if (!target) return res.status(404).json({ error: '用户不存在' });
-    if ((target.role === 'super_admin' || target.role === 'admin') && req.session.user.role !== 'super_admin') {
-      return res.status(403).json({ error: '仅超级管理员可修改管理员账号的安全问题' });
-    }
-    const answerHash = await bcrypt.hash(answer, 10);
-    await pool.query(`UPDATE users SET security_question = $1, security_answer = $2 WHERE id = $3`, [question, answerHash, id]);
-    await audit(req, '修改安全问题', { entity_type: 'user', entity_id: id, detail: '用户 ' + target.display_name + ' 问题：' + question });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

@@ -37,7 +37,6 @@
                 <% if (!isTargetSuperAdmin || user.role === 'super_admin') { %>
                 <button class="btn btn-ico btn-light" title="编辑" onclick="editUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', '<%= u.role %>', <%= u.active ? 'true' : 'false' %>, '<%= (u.wecom_userid || "").replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-pencil-fill"></i></button>
                 <button class="btn btn-ico btn-light" title="重置密码" onclick="resetUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', <%= isTargetSuperAdmin %>)"><i class="bi bi-key"></i></button>
-                <button class="btn btn-ico btn-light" title="设置安全问题" onclick="editSecurityQuestion(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-question-circle"></i></button>
                 <button class="btn btn-ico btn-outline-danger" title="停用" onclick="disableUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>', <%= isTargetSuperAdmin %>)"><i class="bi bi-person-x"></i></button>
                 <% } %>
                 <% if (isAdminTarget && user.role === 'super_admin' && u.id !== user.id) { %>
@@ -165,14 +164,6 @@
             <input type="password" name="password" id="uPassword" class="form-control" autocomplete="new-password" minlength="8">
             <div class="form-text">至少 8 位</div>
           </div>
-          <div class="mb-3" id="sqWrap">
-            <label class="form-label">安全问题（用于忘记密码）</label>
-            <input type="text" name="security_question" id="uSecurityQuestion" class="form-control" placeholder="例如：我的生日是哪一天？">
-          </div>
-          <div class="mb-3" id="saWrap">
-            <label class="form-label">安全答案</label>
-            <input type="text" name="security_answer" id="uSecurityAnswer" class="form-control" placeholder="例如：0101">
-          </div>
           <div class="mb-3">
             <label class="form-label">角色</label>
             <select name="role" id="uRole" class="form-select">
@@ -220,33 +211,6 @@
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
         <button type="button" class="btn btn-primary" id="resetOk">确认重置</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 设置安全问题 -->
-<div class="modal fade" id="sqModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title">设置安全问题</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="text-muted small mb-2" id="sqName"></div>
-        <div class="mb-3">
-          <label class="form-label">安全问题</label>
-          <input type="text" class="form-control" id="sqQuestion" placeholder="例如：我的生日是哪一天？">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">安全答案</label>
-          <input type="text" class="form-control" id="sqAnswer" placeholder="例如：0101">
-        </div>
-      </div>
-      <div class="modal-footer py-2">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
-        <button type="button" class="btn btn-primary" id="sqOk">保存</button>
       </div>
     </div>
   </div>
@@ -300,8 +264,6 @@
     document.getElementById('uName').value = name;
     document.getElementById('uWecomUserid').value = wecomUserid || '';
     document.getElementById('passwordWrap').style.display = 'none';
-    document.getElementById('sqWrap').style.display = 'none';
-    document.getElementById('saWrap').style.display = 'none';
     const roleSel = document.getElementById('uRole');
     if (role === 'super_admin') {
       roleSel.value = 'admin';
@@ -329,8 +291,6 @@
     document.getElementById('uUsername').disabled = false;
     document.getElementById('uUsernameHint').textContent = '仅创建时设置，之后不可修改';
     document.getElementById('passwordWrap').style.display = '';
-    document.getElementById('sqWrap').style.display = '';
-    document.getElementById('saWrap').style.display = '';
     document.getElementById('activeWrap').style.display = 'none';
     const roleSel = document.getElementById('uRole');
     roleSel.value = 'staff';
@@ -357,8 +317,6 @@
           display_name: document.getElementById('uName').value,
           password: document.getElementById('uPassword').value,
           role: document.getElementById('uRole').value,
-          security_question: document.getElementById('uSecurityQuestion').value,
-          security_answer: document.getElementById('uSecurityAnswer').value,
           wecom_userid: document.getElementById('uWecomUserid').value.trim(),
         });
         toast('已创建', 'success');
@@ -390,25 +348,6 @@
       await postJSON('/api/users/' + resetTarget + '/reset', body);
       bootstrap.Modal.getInstance(document.getElementById('resetModal')).hide();
       toast('密码已重置', 'success');
-    } catch (err) { toast(err.message, 'danger'); }
-  });
-
-  let sqTarget = null;
-  function editSecurityQuestion(id, name) {
-    sqTarget = id;
-    document.getElementById('sqName').textContent = '为用户「' + name + '」设置安全问题';
-    document.getElementById('sqQuestion').value = '';
-    document.getElementById('sqAnswer').value = '';
-    new bootstrap.Modal(document.getElementById('sqModal')).show();
-  }
-  document.getElementById('sqOk').addEventListener('click', async () => {
-    const q = document.getElementById('sqQuestion').value.trim();
-    const a = document.getElementById('sqAnswer').value.trim();
-    if (!q || !a) return toast('请填写安全问题和答案', 'danger');
-    try {
-      await postJSON('/api/users/' + sqTarget + '/security-question', { security_question: q, security_answer: a });
-      bootstrap.Modal.getInstance(document.getElementById('sqModal')).hide();
-      toast('安全问题已保存', 'success');
     } catch (err) { toast(err.message, 'danger'); }
   });
 

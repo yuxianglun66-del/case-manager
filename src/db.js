@@ -643,31 +643,20 @@ async function initDb() {
       // 首次创建：密码可用 ADMIN_PASSWORD 环境变量覆盖；首次登录强制改密
       const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
       const hash = await bcrypt.hash(adminPassword, 10);
-      const secHash = await bcrypt.hash('0101', 10);
       await client.query(
-        `INSERT INTO users (username, password_hash, display_name, role, must_change_password, security_question, security_answer) VALUES ('admin', $1, '超级管理员', 'super_admin', TRUE, $2, $3)`,
-        [hash, '我的生日是哪一天？', secHash]
+        `INSERT INTO users (username, password_hash, display_name, role, must_change_password) VALUES ('admin', $1, '超级管理员', 'super_admin', TRUE)`,
+        [hash]
       );
     } else {
       // 仅首次创建时强制改密；后续重启保持密码稳定
-      // 设置默认安全问题（如果还没有，答案以 bcrypt 哈希存储）
-      const existing = (await client.query(`SELECT security_answer, security_question FROM users WHERE username = 'admin'`)).rows[0];
-      if (existing && !existing.security_question) {
-        const secHash = await bcrypt.hash('0101', 10);
-        await client.query(`UPDATE users SET security_question = '我的生日是哪一天？', security_answer = $1 WHERE username = 'admin'`, [secHash]).catch(() => {});
-      }
       // 权限模型升级：admin 账号升级为超级管理员
       await client.query(`UPDATE users SET role = 'super_admin' WHERE username = 'admin' AND role = 'admin'`).catch(() => {});
     }
 
-    // S2: 迁移已存在用户的明文安全答案 → bcrypt 哈希（幂等）
-    const { rows: plainRows } = await client.query(
-      `SELECT id, security_answer FROM users WHERE security_answer IS NOT NULL AND security_answer <> '' AND security_answer NOT LIKE '$2%'`
-    );
-    for (const r of plainRows) {
-      const secHash = await bcrypt.hash(r.security_answer, 10);
-      await client.query(`UPDATE users SET security_answer = $1 WHERE id = $2`, [secHash, r.id]).catch(() => {});
-    }
+    // 安全答案（忘记密码自助重置）功能已下线：清空存量安全问题/答案，消除弱口令后门
+    await client.query(
+      `UPDATE users SET security_question = NULL, security_answer = NULL WHERE security_question IS NOT NULL OR security_answer IS NOT NULL`
+    ).catch(() => {});
 
     // 默认角色权限（超管始终拥有全部权限，此处仅记录 管理员/员工 默认值）
     const DEFAULT_ROLE_PERMS = {

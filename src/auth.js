@@ -1,6 +1,5 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const rateLimit = require('express-rate-limit');
 const { pool } = require('../src/db');
 const { hasPermission, ROLES } = require('./permissions');
 const { audit } = require('./audit');
@@ -12,16 +11,6 @@ function validatePasswordStrength(pw) {
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return '密码必须同时包含字母和数字';
   return null;
 }
-
-// 忘记密码接口限流（5次/15分钟/IP）
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: '操作次数过多，请15分钟后再试',
-  skipSuccessfulRequests: true,
-});
 
 // 登录失败锁定策略：连续 5 次失败锁定 15 分钟
 const LOGIN_MAX_FAILS = 5;
@@ -176,86 +165,8 @@ function createAuthRouter(loginLimiter) {
     }
   });
 
-  // ====== 忘记密码（公开页面） ======
-  router.get('/forgot-password', (req, res) => {
-    res.render('forgot-password', { title: '忘记密码', step: 'username', error: null, success: null, username: '', csrfToken: req.session?.csrfToken || '', layout: false });
-  });
-
-  router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
-    const csrfToken = req.session?.csrfToken || '';
-    const step = req.body.step || 'verify';
-
-    if (step === 'verify') {
-      // 验证用户名和安全答案
-      const username = (req.body.username || '').trim();
-      const answer = (req.body.security_answer || '').trim();
-      if (!username || !answer) {
-        return res.render('forgot-password', { title: '忘记密码', step: 'username', error: '请输入用户名和安全答案', success: null, username, csrfToken, layout: false });
-      }
-      try {
-        const { rows } = await pool.query(`SELECT id, username, security_question, security_answer FROM users WHERE username = $1 AND active = TRUE`, [username]);
-        if (rows.length === 0) {
-          return res.render('forgot-password', { title: '忘记密码', step: 'username', error: '用户名不存在或账号已停用', success: null, username, csrfToken, layout: false });
-        }
-        const user = rows[0];
-        if (!user.security_question || !user.security_answer) {
-          return res.render('forgot-password', { title: '忘记密码', step: 'username', error: '该用户未设置安全问题，请联系管理员', success: null, username, csrfToken, layout: false });
-        }
-        // S2: 安全答案以 bcrypt 哈希存储并比对
-        let answerOk = false;
-        if (String(user.security_answer).startsWith('$2')) {
-          answerOk = await bcrypt.compare(answer, user.security_answer);
-        } else {
-          // 兼容历史明文（迁移由 initDb 完成，此处防御性兜底）
-          answerOk = answer === user.security_answer;
-        }
-        if (!answerOk) {
-          return res.render('forgot-password', { title: '忘记密码', step: 'username', error: '安全答案错误', success: null, username, csrfToken, layout: false });
-        }
-        // 答案正确，进入第二步
-        return res.render('forgot-password', {
-          title: '忘记密码', step: 'reset', error: null, success: null,
-          username, securityQuestion: user.security_question, userId: user.id,
-          csrfToken, layout: false,
-        });
-      } catch (e) {
-        console.error('[auth] forgot-password verify error:', e.message);
-        return res.render('forgot-password', { title: '忘记密码', step: 'username', error: '系统错误，请稍后再试', success: null, username, csrfToken, layout: false });
-      }
-    }
-
-    if (step === 'reset') {
-      // 设置新密码
-      const userId = parseInt(req.body.userId, 10);
-      const new_password = req.body.new_password || '';
-      const confirm_password = req.body.confirm_password || '';
-      const username = req.body.username || '';
-      if (!userId || !new_password) {
-        return res.render('forgot-password', { title: '忘记密码', step: 'reset', error: '请输入新密码', success: null, username, csrfToken, layout: false });
-      }
-      const pwErr = validatePasswordStrength(new_password);
-      if (pwErr) {
-        return res.render('forgot-password', { title: '忘记密码', step: 'reset', error: pwErr, success: null, username, csrfToken, layout: false });
-      }
-      if (new_password !== confirm_password) {
-        return res.render('forgot-password', { title: '忘记密码', step: 'reset', error: '两次输入的密码不一致', success: null, username, csrfToken, layout: false });
-      }
-      try {
-        const hash = await bcrypt.hash(new_password, 10);
-        await pool.query(`UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2`, [hash, userId]);
-        // 重置密码后使当前会话失效（若该用户已登录）
-        try {
-          await pool.query(`DELETE FROM user_sessions WHERE sess_data::text LIKE '%"userId":${userId}%'`).catch(() => {});
-        } catch (e) { /* 忽略会话清理失败 */ }
-        return res.render('forgot-password', { title: '忘记密码', step: 'done', error: null, success: '密码已重置成功，请使用新密码登录', username, csrfToken, layout: false });
-      } catch (e) {
-        console.error('[auth] forgot-password reset error:', e.message);
-        return res.render('forgot-password', { title: '忘记密码', step: 'reset', error: '系统错误，请稍后再试', success: null, username, csrfToken, layout: false });
-      }
-    }
-
-    res.render('forgot-password', { title: '忘记密码', step: 'username', error: null, success: null, username: '', csrfToken, layout: false });
-  });
+  // 忘记密码：自助安全答案重置已下线（安全答案存在弱口令后门风险），
+  // 统一改为管理员在「系统管理 → 用户管理」中人工重置密码（POST /api/users/:id/reset）。
 
   return router;
 }
