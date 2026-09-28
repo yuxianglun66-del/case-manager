@@ -398,19 +398,31 @@
       if (startKey && window.uiTheme) window.uiTheme.applyNow(window.uiTheme.find(startKey));
     })();
   </script>
-  <!-- ============ 站内通知（红点） ============ -->
+  <!-- ============ 站内通知（数字角标） ============ -->
   <style>
-    .notify-wrap { position: fixed; top: 16px; right: 16px; z-index: 1060; }
+    /* z-index 1040：低于 Bootstrap modal(1055)/backdrop(1050)，高于 sidebar(1030)/topbar(1020) */
+    .notify-wrap { position: fixed; top: 16px; right: 16px; z-index: 1040; }
     @media (max-width: 767.98px) { .notify-wrap { top: 60px; } }
+    /* B2 安全区：让出右上角，避免 page-head 操作按钮被悬浮铃铛遮挡 */
+    .page-head { padding-right: 48px; }
+    @media (max-width: 767.98px) { .page-head { padding-right: 44px; } }
     .notify-bell { position: relative; width: 40px; height: 40px; border-radius: 12px;
       display: inline-flex; align-items: center; justify-content: center;
       background: var(--surface-elevated); border: 1px solid var(--content-border);
       color: var(--content-fg); font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
-    .notify-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px;
-      border-radius: 50%; background: #ef4444; border: 1.5px solid var(--surface-solid); }
     .notify-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px;
       padding: 0 4px; border-radius: 9px; background: #ef4444; color: #fff;
       font-size: 11px; line-height: 18px; text-align: center; font-weight: 600; }
+    @keyframes notify-ring {
+      0% { transform: rotate(0); }
+      15% { transform: rotate(16deg); }
+      30% { transform: rotate(-14deg); }
+      45% { transform: rotate(10deg); }
+      60% { transform: rotate(-8deg); }
+      75% { transform: rotate(4deg); }
+      100% { transform: rotate(0); }
+    }
+    .notify-bell.ring i { display: inline-block; animation: notify-ring .6s ease; transform-origin: 50% 15%; }
     .notify-panel { position: absolute; top: 48px; right: 0; width: 340px; max-width: calc(100vw - 24px);
       max-height: 440px; display: flex; flex-direction: column; border-radius: 14px;
       background: var(--surface-elevated); border: 1px solid var(--content-border);
@@ -434,12 +446,12 @@
       border-radius: 50%; background: #3b82f6; vertical-align: 1px; margin-right: 6px; }
   </style>
   <div class="notify-wrap d-print-none">
-    <button class="btn notify-bell" id="notifyBell" type="button" title="通知" aria-label="通知">
+    <button class="btn notify-bell" id="notifyBell" type="button" title="通知" aria-label="通知"
+            aria-haspopup="true" aria-expanded="false" aria-controls="notifyPanel">
       <i class="bi bi-bell"></i>
-      <span class="notify-dot" id="notifyDot" hidden></span>
       <span class="notify-count" id="notifyCount" hidden></span>
     </button>
-    <div class="notify-panel" id="notifyPanel" hidden>
+    <div class="notify-panel" id="notifyPanel" role="dialog" aria-label="通知列表" hidden>
       <div class="notify-head">
         <span><i class="bi bi-bell-fill me-1"></i> 通知</span>
         <button type="button" class="btn btn-sm p-0" id="notifyReadAll" style="color:var(--primary-text)">全部已读</button>
@@ -451,10 +463,26 @@
     (function () {
       const bell = document.getElementById('notifyBell');
       const panel = document.getElementById('notifyPanel');
-      const dot = document.getElementById('notifyDot');
       const cnt = document.getElementById('notifyCount');
       const body = document.getElementById('notifyBody');
+      const BASE_TITLE = document.title;
+      let prevUnread = -1;
+      let timer = null;
       function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+      function openPanel(open) {
+        panel.hidden = !open;
+        bell.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) refresh();
+      }
+      function setTitle(n) {
+        document.title = n > 0 ? '(' + (n > 99 ? '99+' : n) + ') ' + BASE_TITLE : BASE_TITLE;
+      }
+      function ring() {
+        bell.classList.remove('ring');
+        void bell.offsetWidth;
+        bell.classList.add('ring');
+        setTimeout(() => bell.classList.remove('ring'), 700);
+      }
       function render(rows) {
         if (!rows || !rows.length) { body.innerHTML = '<div class="notify-empty">暂无通知</div>'; return; }
         body.innerHTML = rows.map(n => `
@@ -476,24 +504,41 @@
             const n = d.unread || 0;
             cnt.textContent = n > 99 ? '99+' : n;
             cnt.hidden = n === 0;
-            dot.hidden = n === 0;
+            setTitle(n);
+            if (prevUnread >= 0 && n > prevUnread) ring();
+            prevUnread = n;
             render(d.recent || []);
           })
           .catch(() => {});
       }
+      function startPolling() {
+        if (timer) return;
+        timer = setInterval(refresh, 60000);
+      }
+      function stopPolling() {
+        if (!timer) return;
+        clearInterval(timer);
+        timer = null;
+      }
       bell.addEventListener('click', (e) => {
         e.stopPropagation();
-        panel.hidden = !panel.hidden;
-        if (!panel.hidden) refresh();
+        openPanel(panel.hidden);
       });
       document.addEventListener('click', (e) => {
-        if (!e.target.closest('#notifyPanel') && !e.target.closest('#notifyBell')) panel.hidden = true;
+        if (!e.target.closest('#notifyPanel') && !e.target.closest('#notifyBell')) openPanel(false);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !panel.hidden) { openPanel(false); bell.focus(); }
       });
       document.getElementById('notifyReadAll').addEventListener('click', () => {
         postJSON('/api/notifications/read', {}).then(refresh).catch(() => {});
       });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { stopPolling(); }
+        else { refresh(); startPolling(); }
+      });
       refresh();
-      setInterval(refresh, 60000);
+      startPolling();
     })();
   </script>
   <script>
