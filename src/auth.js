@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { hasPermission, ROLES } = require('./permissions');
 const { audit } = require('./audit');
+const { sendSecurityAlert } = require('./wecom');
 const isProd = process.env.NODE_ENV === 'production';
 
 // 密码复杂度：至少 8 位，且必须同时包含字母和数字
@@ -16,10 +17,13 @@ function validatePasswordStrength(pw) {
 const LOGIN_MAX_FAILS = 5;
 const LOGIN_LOCK_MINUTES = 15;
 
+// 用户不存在时对比的假哈希：与真实 bcrypt.compare 耗时对齐，消除「用户是否存在」的时序侧信道
+const DUMMY_PASSWORD_HASH = '$2a$10$Bt17JhxGIjJIOzk06u7Toe9NPBhC2sMNV8OANpZpr0.o0StLFVig2';
+
 // 记录一次登录失败；达到阈值则写入锁定时间（锁定到期后自动归零重新计数）
 async function recordLoginFailure(username) {
   try {
-    await pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO login_attempts (username, fail_count)
        VALUES ($1, 1)
        ON CONFLICT (username) DO UPDATE SET
@@ -33,11 +37,14 @@ async function recordLoginFailure(username) {
              ELSE login_attempts.fail_count + 1 END) >= $2
            THEN now() + ($3 || ' minutes')::interval
            ELSE NULL END,
-         updated_at = now()`,
+         updated_at = now()
+       RETURNING fail_count, locked_until`,
       [username, LOGIN_MAX_FAILS, LOGIN_LOCK_MINUTES]
     );
+    return rows[0] || null;
   } catch (e) {
     console.error('[auth] recordLoginFailure error:', e.message);
+    return null;
   }
 }
 
@@ -67,14 +74,22 @@ function createAuthRouter(loginLimiter) {
 
       const { rows } = await pool.query(`SELECT * FROM users WHERE username = $1`, [uname]);
       const user = rows[0];
-      if (!user) return res.render('login', { title: '登录', error: '用户名或密码错误。', layout: false });
-      if (!user.active) return res.render('login', { title: '登录', error: '账号已被禁用，请联系管理员。', layout: false });
-      const ok = await bcrypt.compare(password, user.password_hash);
+      // 用户不存在也走一次等价 bcrypt（对比假哈希），保证两条分支耗时一致
+      const ok = await bcrypt.compare(password, user ? user.password_hash : DUMMY_PASSWORD_HASH);
       if (!ok) {
-        await recordLoginFailure(uname);
+        const after = await recordLoginFailure(uname);
         console.log(`[auth] login failed, username=${uname}`);
+        // 刚触发账号锁定 → 异步推送安全告警，不阻塞登录响应
+        if (after && after.locked_until && new Date(after.locked_until) > new Date()) {
+          const when = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+          sendSecurityAlert(
+            `【安全告警】账号被锁定\n账号: ${uname}\n来源IP: ${req.ip}\n时间: ${when}\n策略: 连续登录失败 ${LOGIN_MAX_FAILS} 次，锁定 ${LOGIN_LOCK_MINUTES} 分钟`
+          ).catch(() => {});
+        }
         return res.render('login', { title: '登录', error: '用户名或密码错误。', layout: false });
       }
+      // 密码正确后再校验启用状态：避免用错误密码探测「账号存在且被禁用」
+      if (!user.active) return res.render('login', { title: '登录', error: '账号已被禁用，请联系管理员。', layout: false });
 
       // 登录成功，清除失败计数
       await pool.query(`DELETE FROM login_attempts WHERE username = $1`, [uname]);

@@ -161,6 +161,35 @@ async function pushEvent(eventKey, userId, content, opts = {}) {
   }
 }
 
+// 安全告警（登录锁定等）：不依赖推送事件开关；Webhook 优先，否则逐个发给活跃超级管理员
+async function sendSecurityAlert(content) {
+  try {
+    const s = await getSettings();
+    if (s.wecom_enabled !== '1') return { ok: false, error: '企微未启用' };
+    if (s.wecom_webhook) {
+      const d = await notifyWithRetry(() => sendWebhook(s.wecom_webhook, content));
+      await logNotify('wecom', null, 'security_alert', content, d.ok ? 'success' : 'fail', d.error, d.retries);
+      return d;
+    }
+    if (!(s.wecom_corpid && s.wecom_secret)) return { ok: false, error: '未配置 Webhook 或企业微信应用' };
+    const { rows } = await pool.query(
+      `SELECT id, wecom_userid FROM users
+       WHERE role = 'super_admin' AND active = TRUE
+         AND wecom_userid IS NOT NULL AND trim(wecom_userid) <> ''`
+    );
+    let anyOk = false;
+    for (const r of rows) {
+      const d = await notifyWithRetry(() => sendText(r.wecom_userid.trim(), content));
+      await logNotify('wecom', r.id, 'security_alert', content, d.ok ? 'success' : 'fail', d.error, d.retries);
+      if (d.ok) anyOk = true;
+    }
+    return { ok: anyOk };
+  } catch (e) {
+    console.error('[WeCom] sendSecurityAlert error:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
 // ====== 定时提醒推送调度器（每 5 分钟扫描到期提醒） ======
 let reminderTimer = null;
 
@@ -237,4 +266,4 @@ function startReminderScheduler() {
   return reminderTimer;
 }
 
-module.exports = { getSettings, getAccessToken, sendText, sendWebhook, pushEvent, isEventEnabled, startReminderScheduler };
+module.exports = { getSettings, getAccessToken, sendText, sendWebhook, pushEvent, sendSecurityAlert, isEventEnabled, startReminderScheduler };
