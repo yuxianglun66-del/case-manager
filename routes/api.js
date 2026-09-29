@@ -562,6 +562,119 @@ router.post('/cases/:id/reminder/ack', needCase, async (req, res, next) => {
   finally { client.release(); }
 });
 
+/* ---------- 多进度提醒：一案多条（不同日期、不同内容） ---------- */
+async function loadReminders(caseId) {
+  const { rows } = await pool.query(
+    `SELECT id, remind_at, content, notified_at, ack_at
+     FROM case_reminders WHERE case_id = $1 ORDER BY remind_at ASC, id ASC`,
+    [caseId]
+  );
+  return rows;
+}
+
+// 把 cases.next_action/reminder_at 同步为最近一条未签收提醒（列表页"下一步"列展示用）
+async function syncPrimaryReminder(client, caseId) {
+  await client.query(
+    `UPDATE cases SET
+       next_action = (SELECT content FROM case_reminders WHERE case_id = $1 AND ack_at IS NULL ORDER BY remind_at ASC, id ASC LIMIT 1),
+       reminder_at = (SELECT remind_at FROM case_reminders WHERE case_id = $1 AND ack_at IS NULL ORDER BY remind_at ASC, id ASC LIMIT 1),
+       reminder_notified_at = NULL, reminder_ack_at = NULL, reminder_ack_by = NULL,
+       updated_at = now()
+     WHERE id = $1`,
+    [caseId]
+  );
+}
+
+router.post('/cases/:id/reminders', requirePermission('cases.remind'), needCase, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const caseId = req.caseRow.id;
+    const content = (req.body.content || '').trim();
+    const remindAt = req.body.remind_at ? new Date(req.body.remind_at) : null;
+    if (!content) return res.status(400).json({ error: '提醒内容不能为空' });
+    if (!remindAt || isNaN(remindAt.getTime())) return res.status(400).json({ error: '提醒时间无效' });
+    const { rows } = await client.query(
+      `INSERT INTO case_reminders (case_id, remind_at, content) VALUES ($1, $2, $3)
+       RETURNING id, remind_at, content, notified_at, ack_at`,
+      [caseId, remindAt, content]
+    );
+    await syncPrimaryReminder(client, caseId);
+    await audit(req, '新增进度提醒', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + req.caseRow.case_no + ' 新增提醒：' + content + '（' + fmtDateTime(remindAt) + '）' });
+    if (req.caseRow.assignee_id) {
+      const typeHint = req.caseRow.type_name ? '\n📂 案件类型：' + req.caseRow.type_name : '';
+      const statusHint = req.caseRow.status_name ? '\n📈 当前进度：' + req.caseRow.status_name : '';
+      pushEvent('reminder_due', req.caseRow.assignee_id, '⏰ 案件 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」新增进度提醒' + typeHint + statusHint + '\n⏰ 提醒时间：' + fmtDateTime(remindAt) + '\n📝 提醒内容：' + content + '\n\n👤 操作人：' + req.session.user.username + '\n⏰ 时间：' + fmtDateTime(new Date()), { link: '/cases/' + caseId });
+    }
+    res.json({ ok: true, reminder: rows[0], reminders: await loadReminders(caseId) });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.post('/cases/:id/reminders/:rid/update', requirePermission('cases.remind'), needCase, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const caseId = req.caseRow.id;
+    const rid = parseInt(req.params.rid, 10);
+    const content = (req.body.content || '').trim();
+    const remindAt = req.body.remind_at ? new Date(req.body.remind_at) : null;
+    if (!rid) return res.status(400).json({ error: '参数无效' });
+    if (!content) return res.status(400).json({ error: '提醒内容不能为空' });
+    if (!remindAt || isNaN(remindAt.getTime())) return res.status(400).json({ error: '提醒时间无效' });
+    // 修改日期时重新武装推送（notified_at 清空），只改内容则不重推
+    const { rows } = await client.query(
+      `UPDATE case_reminders SET
+         content = $1,
+         remind_at = $2,
+         notified_at = CASE WHEN remind_at IS DISTINCT FROM $2 THEN NULL ELSE notified_at END
+       WHERE id = $3 AND case_id = $4
+       RETURNING id, remind_at, content, notified_at, ack_at`,
+      [content, remindAt, rid, caseId]
+    );
+    if (!rows.length) return res.status(404).json({ error: '提醒不存在' });
+    await syncPrimaryReminder(client, caseId);
+    await audit(req, '修改进度提醒', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + req.caseRow.case_no + ' 修改提醒：' + content + '（' + fmtDateTime(remindAt) + '）' });
+    res.json({ ok: true, reminder: rows[0], reminders: await loadReminders(caseId) });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.post('/cases/:id/reminders/:rid/delete', requirePermission('cases.remind'), needCase, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const caseId = req.caseRow.id;
+    const rid = parseInt(req.params.rid, 10);
+    if (!rid) return res.status(400).json({ error: '参数无效' });
+    const { rows } = await client.query(
+      `DELETE FROM case_reminders WHERE id = $1 AND case_id = $2 RETURNING content`,
+      [rid, caseId]
+    );
+    if (!rows.length) return res.status(404).json({ error: '提醒不存在' });
+    await syncPrimaryReminder(client, caseId);
+    await audit(req, '删除进度提醒', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + req.caseRow.case_no + ' 删除提醒：' + rows[0].content });
+    res.json({ ok: true, reminders: await loadReminders(caseId) });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
+router.post('/cases/:id/reminders/:rid/ack', needCase, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const caseId = req.caseRow.id;
+    const rid = parseInt(req.params.rid, 10);
+    if (!rid) return res.status(400).json({ error: '参数无效' });
+    const { rows } = await client.query(
+      `UPDATE case_reminders SET ack_at = COALESCE(ack_at, now()), ack_by = COALESCE(ack_by, $1)
+       WHERE id = $2 AND case_id = $3 RETURNING id`,
+      [req.session.user.id, rid, caseId]
+    );
+    if (!rows.length) return res.status(404).json({ error: '提醒不存在' });
+    await syncPrimaryReminder(client, caseId);
+    await audit(req, '确认提醒', { entity_type: 'case', entity_id: caseId, detail: '案号 ' + req.caseRow.case_no + '「' + req.caseRow.title + '」签收一条进度提醒' });
+    res.json({ ok: true, reminders: await loadReminders(caseId) });
+  } catch (e) { next(e); }
+  finally { client.release(); }
+});
+
 router.post('/cases/:id/fee', requirePermission('cases.fee'), needCase, async (req, res, next) => {
   const client = await pool.connect();
   try {

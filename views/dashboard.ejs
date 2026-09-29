@@ -90,8 +90,8 @@
           <% reminders.forEach(r => { %>
             <% const cls = r.level === 'overdue' ? 'bg-danger-subtle' : r.level === 'today' ? 'bg-warning-subtle' : ''; %>
             <tr class="<%= cls %>">
-              <td class="fw-semibold"><a class="row-link" href="/cases/<%= r.id %>"><%= r.case_no %></a></td>
-              <td class="text-truncate" style="max-width:200px"><a class="row-link" href="/cases/<%= r.id %>"><%= r.title %></a></td>
+              <td class="fw-semibold"><a class="row-link" href="/cases/<%= r.case_id %>"><%= r.case_no %></a></td>
+              <td class="text-truncate" style="max-width:200px"><a class="row-link" href="/cases/<%= r.case_id %>"><%= r.title %></a></td>
               <td class="text-truncate" style="max-width:240px"><i class="bi bi-arrow-repeat text-muted me-1"></i><%= r.next_action %></td>
               <td class="text-nowrap">
                 <% if (r.level === 'overdue') { %><span class="status-badge" style="background:#dc3545">已逾期</span><% } %>
@@ -104,7 +104,7 @@
               </td>
               <td class="hide-mobile"><span class="status-badge" style="background:<%= r.status_color || '#6c757d' %>"><%= r.status_name || '未设置' %></span></td>
               <td class="text-nowrap">
-                <button class="btn btn-sm btn-outline-success" onclick="ackReminder(<%= r.id %>, this)"><i class="bi bi-check2-circle me-1"></i>签收</button>
+                <button class="btn btn-sm btn-outline-success" onclick="ackReminder(<%= r.case_id %>, <%= r.rid %>, this)"><i class="bi bi-check2-circle me-1"></i>签收</button>
               </td>
             </tr>
           <% }) %>
@@ -267,12 +267,12 @@
         </div>
       </div>`).join('') || '<div class="text-muted small">暂无案件数据</div>';
 
-  async function ackReminder(caseId, btn) {
+  async function ackReminder(caseId, rid, btn) {
     if (!(await confirmBox('确认已处理该提醒？签收后此提醒将从待办列表中移除。', '签收提醒'))) return;
     const csrf = getCsrfToken();
     btn.disabled = true;
     try {
-      const res = await fetch('/api/cases/' + caseId + '/reminder/ack', {method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'x-csrf-token':csrf}:{}),}});
+      const res = await fetch('/api/cases/' + caseId + '/reminders/' + rid + '/ack', {method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'x-csrf-token':csrf}:{}),}});
       if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '签收失败'); }
       toast('已签收', 'success');
       setTimeout(()=>location.reload(), 400);

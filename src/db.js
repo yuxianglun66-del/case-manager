@@ -213,6 +213,20 @@ ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_at TIMESTAMPTZ;
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_ack_by INT REFERENCES users(id);
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS reminder_notified_at TIMESTAMPTZ;
 
+-- 多进度提醒：一案多条，不同日期不同内容
+CREATE TABLE IF NOT EXISTS case_reminders (
+  id SERIAL PRIMARY KEY,
+  case_id INT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  remind_at TIMESTAMPTZ NOT NULL,
+  content TEXT NOT NULL,
+  notified_at TIMESTAMPTZ,
+  ack_at TIMESTAMPTZ,
+  ack_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_case_reminders_case ON case_reminders(case_id);
+CREATE INDEX IF NOT EXISTS idx_case_reminders_due ON case_reminders(remind_at) WHERE notified_at IS NULL AND ack_at IS NULL;
+
 -- 案件当事人扩展字段（注意：这些字段不得再写进上方 CREATE TABLE，否则迁移会提前撞 duplicate_column）
 ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS injury_info TEXT;
 ALTER TABLE case_parties ADD COLUMN IF NOT EXISTS hospital_dept VARCHAR(100);
@@ -657,6 +671,23 @@ async function initDb() {
     await client.query(
       `UPDATE users SET security_question = NULL, security_answer = NULL WHERE security_question IS NOT NULL OR security_answer IS NOT NULL`
     ).catch(() => {});
+
+    // 多进度提醒：存量单条 next_action/reminder_at 迁移进 case_reminders（一次性，flag 防重）
+    const migFlag = await client.query(`SELECT value FROM app_settings WHERE key = 'case_reminders_migrated'`);
+    if (!migFlag.rows.length || migFlag.rows[0].value !== '1') {
+      await client.query(
+        `INSERT INTO case_reminders (case_id, remind_at, content, notified_at, ack_at, ack_by)
+         SELECT c.id, c.reminder_at, c.next_action, c.reminder_notified_at, c.reminder_ack_at, c.reminder_ack_by
+         FROM cases c
+         WHERE c.reminder_at IS NOT NULL
+           AND c.next_action IS NOT NULL AND c.next_action <> ''
+           AND c.deleted_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM case_reminders cr WHERE cr.case_id = c.id)`
+      );
+      await client.query(
+        `INSERT INTO app_settings (key, value) VALUES ('case_reminders_migrated', '1') ON CONFLICT DO NOTHING`
+      );
+    }
 
     // 默认角色权限（超管始终拥有全部权限，此处仅记录 管理员/员工 默认值）
     const DEFAULT_ROLE_PERMS = {

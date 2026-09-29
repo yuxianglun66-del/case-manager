@@ -195,29 +195,30 @@ let reminderTimer = null;
 
 async function tickReminders() {
   try {
-    const { rows: cases } = await pool.query(
-      `SELECT c.id, c.case_no, c.title, c.client_name, c.next_action, c.reminder_at,
+    const { rows: rems } = await pool.query(
+      `SELECT cr.id AS rid, cr.content, cr.remind_at,
+              c.id, c.case_no, c.title, c.client_name,
               c.assignee_id, u.username AS assignee_name
-       FROM cases c
+       FROM case_reminders cr
+       JOIN cases c ON c.id = cr.case_id
        LEFT JOIN users u ON u.id = c.assignee_id
-       WHERE c.reminder_at IS NOT NULL
-         AND c.next_action IS NOT NULL AND c.next_action <> ''
-         AND c.reminder_ack_at IS NULL
-         AND c.reminder_notified_at IS NULL
-         AND c.deleted_at IS NULL
-         AND c.reminder_at <= now()`
+       WHERE cr.remind_at <= now()
+         AND cr.notified_at IS NULL
+         AND cr.ack_at IS NULL
+         AND cr.content IS NOT NULL AND cr.content <> ''
+         AND c.deleted_at IS NULL`
     );
-    if (cases.length === 0) return;
+    if (rems.length === 0) return;
 
     const s = await getSettings();
     if (s.wecom_enabled !== '1') return;
     if (!isEventEnabled(s.wecom_push_events, 'reminder_notify')) return;
 
-    for (const c of cases) {
-      const dateStr = c.reminder_at ? fmtDateTime(c.reminder_at) : '';
+    for (const c of rems) {
+      const dateStr = c.remind_at ? fmtDateTime(c.remind_at) : '';
       const content = '⏰ 案件 ' + c.case_no + '「' + c.title + '」进度提醒已到期\n'
         + (c.client_name ? '👤 当事人：' + c.client_name + '\n' : '')
-        + '📝 下一步：' + c.next_action + '\n'
+        + '📝 提醒内容：' + c.content + '\n'
         + '⏰ 提醒时间：' + dateStr + '\n'
         + (c.assignee_name ? '👤 负责人：' + c.assignee_name : '');
 
@@ -241,8 +242,8 @@ async function tickReminders() {
       }
 
       // 无论推送是否成功都标记已通知，避免反复推送
-      await pool.query(`UPDATE cases SET reminder_notified_at = now() WHERE id = $1`, [c.id]);
-      if (delivered) console.log('[WeCom] 提醒推送成功: ' + c.case_no);
+      await pool.query(`UPDATE case_reminders SET notified_at = now() WHERE id = $1`, [c.rid]);
+      if (delivered) console.log('[WeCom] 提醒推送成功: ' + c.case_no + ' / ' + c.content.slice(0, 20));
     }
   } catch (e) {
     console.error('[WeCom] tickReminders error:', e.message);

@@ -505,52 +505,30 @@
       </div>
     </div>
 
-    <!-- ============ 进度提醒（紧凑·内联编辑） ============ -->
+    <!-- ============ 进度提醒（支持多条：不同日期、不同内容） ============ -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-bell"></i> 进度提醒</span>
-          <% if (can('cases.remind')) { %>
-          <button class="btn btn-sm btn-outline-primary" id="naEditBtn" onclick="toggleNextActionEdit()"><i class="bi bi-sliders"></i> 设置</button>
+        <span><i class="bi bi-bell"></i> 进度提醒
+          <% if (reminders && reminders.length) { %><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa"><%= reminders.length %></span><% } %>
+        </span>
+        <% if (can('cases.remind')) { %>
+        <button class="btn btn-sm btn-outline-primary" id="remAddBtn" onclick="toggleReminderForm()"><i class="bi bi-plus-lg"></i> 添加</button>
         <% } %>
       </div>
       <div class="card-body py-2">
-        <div id="naDisplay">
-          <% if (caseData.next_action) { %>
-            <div class="d-flex align-items-start gap-2">
-              <i class="bi bi-check-circle-fill text-success mt-1"></i>
-              <div class="min-w-0">
-                <div class="small fw-semibold"><%= caseData.next_action %></div>
-                <% if (caseData.reminder_at) {
-                     const rd = new Date(caseData.reminder_at);
-                     const rnow = new Date();
-                     const rStartToday = new Date(rnow.getFullYear(), rnow.getMonth(), rnow.getDate());
-                     const rEndToday = new Date(rnow.getFullYear(), rnow.getMonth(), rnow.getDate() + 1);
-                     const overdue = rd < rStartToday;
-                     const today = !overdue && rd < rEndToday;
-                %>
-                  <div class="text-muted small"><i class="bi bi-clock"></i> <%= fmtDateTime(rd) %>
-                    <% if (overdue) { %><span class="status-badge" style="background:#dc3545">已逾期</span><% } %>
-                    <% if (!overdue && today) { %><span class="status-badge" style="background:#f59e0b">今天</span><% } %>
-                    <% if (!overdue && !today) { %><span class="status-badge" style="background:#0ea5e9">即将</span><% } %>
-                  </div>
-                <% } %>
-              </div>
-            </div>
-          <% } else { %>
-            <div class="text-muted small">暂无进度提醒，点击「设置」添加</div>
-          <% } %>
-        </div>
-        <div id="naEdit" style="display:none">
+        <div id="remList"><div class="text-muted small">加载中…</div></div>
+        <div id="remForm" style="display:none">
+          <input type="hidden" id="remId" value="">
           <div class="mb-2">
-            <textarea name="next_action" id="naNextAction" class="form-control form-control-sm" rows="2" placeholder="描述需要提醒什么"><%= caseData.next_action || '' %></textarea>
+            <textarea id="remContent" class="form-control form-control-sm" rows="2" placeholder="提醒什么内容？"></textarea>
           </div>
           <div class="mb-2">
-            <label class="form-label small">提醒时间</label>
-            <input type="datetime-local" id="naReminderAt" class="form-control form-control-sm" value="<%= caseData.reminder_at ? new Date(caseData.reminder_at).toISOString().slice(0,16) : '' %>">
+            <label class="form-label small mb-1">提醒时间</label>
+            <input type="datetime-local" id="remAt" class="form-control form-control-sm">
           </div>
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-primary" onclick="saveNextAction()"><i class="bi bi-check-lg"></i> 保存</button>
-            <button class="btn btn-sm btn-light" onclick="toggleNextActionEdit()"><i class="bi bi-x-lg"></i> 取消</button>
+            <button class="btn btn-sm btn-primary" onclick="saveReminder()"><i class="bi bi-check-lg"></i> 保存</button>
+            <button class="btn btn-sm btn-light" onclick="closeReminderForm()"><i class="bi bi-x-lg"></i> 取消</button>
           </div>
         </div>
       </div>
@@ -819,32 +797,136 @@
     }
   });
 
-  /* ============ 进度提醒（内联编辑） ============ */
-  function toggleNextActionEdit() {
-    const display = document.getElementById('naDisplay');
-    const edit = document.getElementById('naEdit');
-    if (!display || !edit) return;
-    const isEditing = edit.style.display !== 'none';
-    if (isEditing) {
-      edit.style.display = 'none';
-      display.style.display = '';
+  /* ============ 进度提醒（多条：不同日期不同内容） ============ */
+  var REMINDERS = <%- safeJson(reminders || []) %>;
+  var REMIND_CAN = <%= can('cases.remind') ? 'true' : 'false' %>;
+
+  function escRemText(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function remTimeLabel(iso) {
+    var d = new Date(iso);
+    var now = new Date();
+    var startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var endToday = new Date(startToday.getTime() + 86400000);
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var ts = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (d < startToday) return { ts: ts, badge: '<span class="status-badge" style="background:#dc3545">已逾期</span>' };
+    if (d < endToday) return { ts: ts, badge: '<span class="status-badge" style="background:#f59e0b">今天</span>' };
+    return { ts: ts, badge: '<span class="status-badge" style="background:#0ea5e9">即将</span>' };
+  }
+  function toLocalInput(d) {
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function renderReminders() {
+    var el = document.getElementById('remList');
+    if (!el) return;
+    if (!REMINDERS.length) {
+      el.innerHTML = '<div class="text-muted small">暂无进度提醒' + (REMIND_CAN ? '，点击「添加」新增' : '') + '</div>';
+      return;
+    }
+    el.innerHTML = REMINDERS.map(function (r) {
+      var t = remTimeLabel(r.remind_at);
+      var badges, icon;
+      if (r.ack_at) {
+        badges = '<span class="status-badge" style="background:#198754">已签收</span>';
+        icon = 'bi-check-circle-fill text-success';
+      } else {
+        badges = t.badge;
+        if (r.notified_at) badges += ' <span class="status-badge" style="background:#6f42c1">已推送</span>';
+        icon = 'bi-bell-fill text-primary';
+      }
+      var btns = '';
+      if (REMIND_CAN) {
+        if (!r.ack_at) btns += '<button class="btn btn-sm btn-outline-success" onclick="ackReminder(' + r.id + ')" title="签收"><i class="bi bi-check2-circle"></i></button> ';
+        btns += '<button class="btn btn-sm btn-outline-secondary" onclick="editReminder(' + r.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ';
+        btns += '<button class="btn btn-sm btn-outline-danger" onclick="deleteReminder(' + r.id + ')" title="删除"><i class="bi bi-trash"></i></button>';
+      }
+      return '<div class="d-flex align-items-start gap-2 py-1 border-bottom">'
+        + '<i class="bi ' + icon + ' mt-1"></i>'
+        + '<div class="min-w-0 flex-grow-1">'
+        + '<div class="small fw-semibold" style="white-space:pre-wrap">' + escRemText(r.content) + '</div>'
+        + '<div class="text-muted small"><i class="bi bi-clock"></i> ' + t.ts + ' ' + badges + '</div>'
+        + '</div>'
+        + '<div class="text-nowrap">' + btns + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  function resetReminderForm() {
+    document.getElementById('remId').value = '';
+    document.getElementById('remContent').value = '';
+    document.getElementById('remAt').value = '';
+    var btn = document.getElementById('remAddBtn');
+    if (btn) btn.innerHTML = '<i class="bi bi-plus-lg"></i> 添加';
+  }
+  function closeReminderForm() {
+    var form = document.getElementById('remForm');
+    if (form) form.style.display = 'none';
+    resetReminderForm();
+  }
+  function toggleReminderForm() {
+    var form = document.getElementById('remForm');
+    if (!form) return;
+    if (form.style.display === 'none') {
+      resetReminderForm();
+      form.style.display = '';
+      document.getElementById('remContent').focus();
     } else {
-      edit.style.display = '';
-      display.style.display = 'none';
+      closeReminderForm();
     }
   }
-  async function saveNextAction() {
-    const nextAction = document.getElementById('naNextAction').value.trim();
-    const reminderAt = document.getElementById('naReminderAt').value || null;
-    if (!nextAction) return toast('请填写进度提醒','warning');
+  function editReminder(id) {
+    var r = null, i;
+    for (i = 0; i < REMINDERS.length; i++) if (REMINDERS[i].id === id) r = REMINDERS[i];
+    if (!r) return;
+    document.getElementById('remId').value = r.id;
+    document.getElementById('remContent').value = r.content;
+    document.getElementById('remAt').value = toLocalInput(new Date(r.remind_at));
+    document.getElementById('remForm').style.display = '';
+    var btn = document.getElementById('remAddBtn');
+    if (btn) btn.innerHTML = '<i class="bi bi-pencil"></i> 编辑中';
+    document.getElementById('remContent').focus();
+  }
+  async function saveReminder() {
+    var rid = document.getElementById('remId').value;
+    var content = document.getElementById('remContent').value.trim();
+    var at = document.getElementById('remAt').value;
+    if (!content) return toast('请填写提醒内容', 'warning');
+    if (!at) return toast('请选择提醒时间', 'warning');
     try {
-      const res = await postJSON('/api/cases/<%= caseData.id %>/next-action', { next_action: nextAction, reminder_at: reminderAt });
-      if (!res.ok) throw new Error((await res.json()).error || '更新失败');
-      toggleNextActionEdit();
-      toast('进度提醒已更新','success');
-      setTimeout(() => location.reload(), 400);
+      var url = rid
+        ? '/api/cases/<%= caseData.id %>/reminders/' + rid + '/update'
+        : '/api/cases/<%= caseData.id %>/reminders';
+      var res = await postJSON(url, { content: content, remind_at: at });
+      REMINDERS = res.reminders || [];
+      renderReminders();
+      closeReminderForm();
+      toast(rid ? '提醒已更新' : '提醒已添加', 'success');
     } catch (err) { toast(err.message, 'danger'); }
   }
+  async function ackReminder(rid) {
+    if (!(await confirmBox('确认已处理该提醒？签收后此提醒将不再提示。', '签收提醒'))) return;
+    try {
+      var res = await postJSON('/api/cases/<%= caseData.id %>/reminders/' + rid + '/ack', {});
+      REMINDERS = res.reminders || [];
+      renderReminders();
+      toast('已签收', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+  async function deleteReminder(rid) {
+    if (!(await confirmBox('确认删除该提醒？', '删除提醒'))) return;
+    try {
+      var res = await postJSON('/api/cases/<%= caseData.id %>/reminders/' + rid + '/delete', {});
+      REMINDERS = res.reminders || [];
+      renderReminders();
+      closeReminderForm();
+      toast('提醒已删除', 'success');
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+  renderReminders();
 
   /* ============ 费用模块 ============ */
   const CAN_FEE = <%= can('cases.fee') ? 'true' : 'false' %>;

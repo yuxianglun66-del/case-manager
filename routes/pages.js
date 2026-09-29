@@ -96,20 +96,21 @@ router.get('/dashboard', async (req, res, next) => {
       ? { where: '', params: [] }
       : { where: ' AND c.assignee_id = $2', params: [req.session.user.id] };
     const remindersSql =
-      `SELECT c.id, c.case_no, c.title, c.client_name, c.next_action, c.reminder_at,
-              c.assignee_id, c.reminder_ack_at, c.reminder_ack_by,
+      `SELECT c.id AS case_id, c.case_no, c.title, c.client_name,
+              cr.id AS rid, cr.content AS next_action, cr.remind_at AS reminder_at,
+              cr.notified_at, cr.ack_at,
+              c.assignee_id,
               u.display_name AS assignee_name,
               s.name AS status_name, s.color AS status_color
-       FROM cases c
+       FROM case_reminders cr
+       JOIN cases c ON c.id = cr.case_id
        LEFT JOIN users u ON u.id = c.assignee_id
        LEFT JOIN statuses s ON s.id = c.status_id
-       WHERE c.reminder_at IS NOT NULL
-         AND c.deleted_at IS NULL
-         AND c.next_action IS NOT NULL AND c.next_action <> ''
-         AND c.reminder_ack_at IS NULL
-         AND c.reminder_at <= now() + ($1 * interval '1 day')
+       WHERE c.deleted_at IS NULL
+         AND cr.ack_at IS NULL
+         AND cr.remind_at <= now() + ($1 * interval '1 day')
          ${reminderScope.where}
-       ORDER BY c.reminder_at ASC`;
+       ORDER BY cr.remind_at ASC`;
     const remParams = [advanceDays].concat(reminderScope.params);
     const { rows: reminders } = await pool.query(remindersSql, remParams);
     const now = new Date();
@@ -407,6 +408,11 @@ router.get('/cases/:id', async (req, res, next) => {
       `SELECT * FROM case_parties WHERE case_id = $1 ORDER BY sort, id`, [id]
     )).rows;
 
+    const reminders = (await pool.query(
+      `SELECT id, remind_at, content, notified_at, ack_at
+       FROM case_reminders WHERE case_id = $1 ORDER BY remind_at ASC, id ASC`, [id]
+    )).rows;
+
     const contracts = (await pool.query(
       `SELECT c.*, ct.name AS template_name,
               (SELECT json_agg(json_build_object('id', cs.id, 'party_name', cs.party_name, 'party_role', cs.party_role, 'status', cs.status, 'signed_at', cs.signed_at, 'sign_token', cs.sign_token))
@@ -420,7 +426,7 @@ router.get('/cases/:id', async (req, res, next) => {
 
     res.render('cases/detail', {
       title: (c.client_name || c.title) + ' - ' + c.type_name,
-      caseData: c, fields, values, history, attachments, statuses, parties, contracts,
+      caseData: c, fields, values, history, attachments, statuses, parties, contracts, reminders,
     });
   } catch (e) { next(e); }
 });
