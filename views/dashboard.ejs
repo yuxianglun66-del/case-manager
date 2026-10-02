@@ -134,7 +134,7 @@
             <div id="chartStatusEmpty" class="text-center text-muted small d-none" style="padding:60px 0">暂无案件数据</div>
           </div>
           <div class="col-6">
-            <div id="statusLegend" style="max-height:260px;overflow-y:auto;padding-right:2px"></div>
+            <div id="statusLegend" style="max-height:260px;overflow-y:auto;overflow-x:hidden;padding-right:2px"></div>
           </div>
         </div>
       </div>
@@ -181,7 +181,7 @@
       <div class="card-header"><i class="bi bi-people-fill"></i> 员工办案量</div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table mb-0">
+          <table class="table mb-0" style="min-width:0;width:auto">
             <thead><tr><th>员工</th><th>案件数</th></tr></thead>
             <tbody>
               <% workload.forEach(w => { %>
@@ -259,10 +259,10 @@
         <div class="small fw-bold text-uppercase" style="letter-spacing:.6px;color:var(--content-muted,#8b9bb4);margin-bottom:6px">${CAT_LABELS[c] || c}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px">
           ${groups[c].map(i => `
-            <div class="d-flex align-items-center small" title="${statusData.labels[i]}">
+            <div class="d-flex align-items-center small" title="${statusData.labels[i]}" style="min-width:0;overflow:hidden">
               <span style="width:12px;height:12px;border-radius:3px;background:${statusData.colors[i]};display:inline-block;margin-right:6px;box-shadow:0 0 6px ${statusData.colors[i]}40;flex:none"></span>
-              <span class="text-truncate" style="flex:1;color:var(--content-muted,#94a3b8)">${statusData.labels[i]}</span>
-              <b style="color:var(--content-fg,#e2e8f0)">${statusData.counts[i]}</b>
+              <span class="text-truncate" style="flex:0 1 auto;min-width:0;color:var(--content-muted,#94a3b8)">${statusData.labels[i]}</span>
+              <b style="flex:none;margin-left:6px;color:var(--content-fg,#e2e8f0)">${statusData.counts[i]}</b>
             </div>`).join('')}
         </div>
       </div>`).join('') || '<div class="text-muted small">暂无案件数据</div>';
