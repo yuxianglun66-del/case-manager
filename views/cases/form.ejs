@@ -101,7 +101,7 @@
       <div class="row gx-4" id="dynamicFields"></div>
 
       <div class="mt-4 d-flex gap-2">
-        <button type="submit" class="btn btn-primary px-4"><%= mode === 'new' ? '保存案件' : '保存修改' %></button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> <%= mode === 'new' ? '保存案件' : '保存修改' %></button>
         <a href="<%= mode === 'edit' ? '/cases/' + caseData.id : '/cases' %>" class="btn btn-light">取消</a>
       </div>
     </form>

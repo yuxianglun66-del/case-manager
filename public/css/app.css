@@ -644,6 +644,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
   border-radius: var(--radius-sm);
 }
 .btn-ico .bi { font-size: 1.08em; line-height: 1; }
+/* 表格/列表行内的紧凑图标按钮（统一 28px，替代 inline 26px / py-0 等零散写法） */
+.btn-ico.btn-ico-sm { width: 28px; height: 28px; }
+.btn-ico.btn-ico-sm .bi { font-size: 1em; }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--bs-primary), var(--primary-edge));
@@ -660,11 +663,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
 .btn-light:hover { background: linear-gradient(180deg, #e9edf4, #d3dae5); border-color: #b4c1d4; color: #1e293b; }
 
 .btn-outline-primary {
-  background-color: rgba(59,130,246,.14);
+  background-color: rgba(var(--bs-primary-rgb), .14);
   background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));
-  border: 1px solid rgba(59, 130, 246, .48); color: var(--primary-text);
+  border: 1px solid rgba(var(--bs-primary-rgb), .48); color: var(--primary-text);
 }
-.btn-outline-primary:hover { background-color: rgba(59, 130, 246, .24); border-color: var(--accent); color: var(--accent); }
+.btn-outline-primary:hover { background-color: rgba(var(--bs-primary-rgb), .24); border-color: var(--accent); color: var(--accent); }
 .btn-outline-success {
   background-color: rgba(16,185,129,.15);
   background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(0,0,0,.05));

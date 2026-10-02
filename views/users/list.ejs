@@ -77,8 +77,8 @@
               <% if (rp.locked) { %><span class="text-muted small ms-1">全部权限</span><% } %>
               <span class="ms-auto"></span>
               <% if (roles[rkey] && !roles[rkey].builtin) { %>
-                <button class="btn btn-ico btn-sm btn-light" title="编辑角色" onclick="editRole('<%= rkey %>')"><i class="bi bi-pencil-fill"></i></button>
-                <button class="btn btn-ico btn-sm btn-outline-danger" title="删除角色" onclick="delRole('<%= rkey %>', '<%= roles[rkey].label %>')"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-ico btn-light" title="编辑角色" onclick="editRole('<%= rkey %>')"><i class="bi bi-pencil-fill"></i></button>
+                <button class="btn btn-ico btn-outline-danger" title="删除角色" onclick="delRole('<%= rkey %>', '<%= roles[rkey].label %>')"><i class="bi bi-trash"></i></button>
               <% } %>
             </div>
             <div class="card-body p-2" style="max-height:360px;overflow:auto">
@@ -132,7 +132,7 @@
         </div>
         <div class="modal-footer py-2">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 保存</button>
         </div>
       </form>
     </div>
@@ -185,7 +185,7 @@
         </div>
         <div class="modal-footer py-2">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 保存</button>
         </div>
       </form>
     </div>

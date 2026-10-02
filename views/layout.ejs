@@ -145,7 +145,8 @@
           '.user-meta strong{color:' + sFg + '!important;}' +
           '.user-meta small{color:' + sMuted + '!important;}' +
 '.btn-primary{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;}' +
-'.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;background:' + (bodyDark ? 'rgba(59,130,246,.16)' : 'rgba(59,130,246,.09)') + '!important;background-image:' + (bodyDark ? 'linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.04))' : 'linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.04))') + '!important;}' +
+'.btn-outline-primary{color:' + primText + '!important;border-color:' + primRGBA + '!important;background:' + (bodyDark ? rgba(p, .16) : rgba(p, .09)) + '!important;background-image:' + (bodyDark ? 'linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.04))' : 'linear-gradient(180deg,rgba(255,255,255,.18),rgba(0,0,0,.04))') + '!important;}' +
+          '.btn-outline-primary:hover{color:' + accent + '!important;border-color:' + accent + '!important;background:' + (bodyDark ? rgba(p, .26) : rgba(p, .16)) + '!important;}' +
           '.pagination .page-link{color:' + primText + '!important;border-color:' + cBorder + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.5)' : 'rgba(255,255,255,.8)') + '!important;}' +
           '.pagination .page-item.active .page-link{background:linear-gradient(135deg,' + primary + ',' + primEdge + ')!important;color:' + primContrast + '!important;border-color:' + primary + '!important;}' +
           '.pagination .page-item.disabled .page-link{color:' + cFaint + '!important;background:' + (bodyDark ? 'rgba(15,23,42,.3)' : 'rgba(241,245,249,.6)') + '!important;}' +

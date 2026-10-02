@@ -43,7 +43,7 @@
         <a href="/cases?cat=litigation" class="btn btn-sm <%= filters.cat === 'litigation' ? 'btn-primary' : 'btn-outline-secondary' %>">诉讼中</a>
         <a href="/cases?cat=closed" class="btn btn-sm <%= filters.cat === 'closed' ? 'btn-primary' : 'btn-outline-secondary' %>">已结案</a>
       </div>
-      <a href="/cases?mine=1" class="btn btn-sm <%= filters.mine ? 'btn-primary' : 'btn-outline-success' %>"><i class="bi bi-person-fill"></i> 我的案件</a>
+        <a href="/cases?mine=1" class="btn btn-sm <%= filters.mine ? 'btn-primary' : 'btn-outline-secondary' %>"><i class="bi bi-person-fill"></i> 我的案件</a>
       <form method="GET" action="/cases" class="d-flex align-items-center gap-1 ms-1">
         <div class="input-group input-group-sm" style="width:240px">
           <input type="text" name="kw" class="form-control" placeholder="搜索案号/名称/客户" value="<%= filters.kw || '' %>" aria-label="搜索案件">

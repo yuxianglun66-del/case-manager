@@ -172,7 +172,7 @@
           </div>
           <div class="ms-auto">
             <% if (can('cases.fee')) { %>
-            <button class="btn btn-sm btn-outline-primary" onclick="saveAgreement()"><i class="bi bi-check-lg"></i> 保存</button>
+            <button class="btn btn-sm btn-primary" onclick="saveAgreement()"><i class="bi bi-check-lg"></i> 保存</button>
             <% } %>
           </div>
         </div>
@@ -269,7 +269,7 @@
               <div class="col-12">
                 <label class="form-label small">截图/发票</label>
                 <div class="d-flex align-items-center gap-2">
-                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('feeFileInput').click()"><i class="bi bi-paperclip"></i> 选择文件</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('feeFileInput').click()"><i class="bi bi-paperclip"></i> 选择文件</button>
                   <input type="file" id="feeFileInput" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf" style="display:none">
                   <span id="feeFileName" class="text-muted small text-truncate" style="max-width:200px"></span>
                 </div>
@@ -277,10 +277,10 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer py-2">
-            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary btn-sm" id="feeSaveBtn" onclick="saveFee()"><i class="bi bi-check-lg"></i> 保存</button>
-          </div>
+  <div class="modal-footer py-2">
+  <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+  <button type="button" class="btn btn-primary" id="feeSaveBtn" onclick="saveFee()"><i class="bi bi-check-lg"></i> 保存</button>
+  </div>
         </div>
       </div>
     </div>
@@ -545,7 +545,7 @@
                   <%= h.action === 'created' ? '创建案件' : h.action === 'status' ? (h.status_name || '状态变更') : h.action === 'attachment' ? '附件操作' : h.action === 'attachment-del' ? '删除附件' : '更新信息' %>
                 </span>
                 <% if (typeof user !== 'undefined' && user && user.role === 'super_admin') { %>
-                <button class="btn btn-ico btn-outline-danger" style="width:26px;height:26px;padding:0" title="删除此条进度记录" onclick="deleteHistory(<%= h.id %>)"><i class="bi bi-trash" style="font-size:12px"></i></button>
+                <button class="btn btn-ico btn-ico-sm btn-outline-danger" title="删除此条进度记录" onclick="deleteHistory(<%= h.id %>)"><i class="bi bi-trash"></i></button>
                 <% } %>
               </div>
               <% if (h.note) { %><div class="tl-note"><%= h.note %></div><% } %>
@@ -665,9 +665,9 @@
         </div>
         <div class="modal-footer py-2">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
-        </div>
-      </form>
+  <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> 保存</button>
+  </div>
+  </form>
     </div>
   </div>
 </div>
@@ -841,9 +841,9 @@
       }
       var btns = '';
       if (REMIND_CAN) {
-        if (!r.ack_at) btns += '<button class="btn btn-sm btn-outline-success" onclick="ackReminder(' + r.id + ')" title="签收"><i class="bi bi-check2-circle"></i></button> ';
-        btns += '<button class="btn btn-sm btn-outline-secondary" onclick="editReminder(' + r.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ';
-        btns += '<button class="btn btn-sm btn-outline-danger" onclick="deleteReminder(' + r.id + ')" title="删除"><i class="bi bi-trash"></i></button>';
+    if (!r.ack_at) btns += '<button class="btn btn-ico btn-ico-sm btn-outline-success" onclick="ackReminder(' + r.id + ')" title="签收"><i class="bi bi-check2-circle"></i></button> ';
+    btns += '<button class="btn btn-ico btn-ico-sm btn-light" onclick="editReminder(' + r.id + ')" title="编辑"><i class="bi bi-pencil"></i></button> ';
+    btns += '<button class="btn btn-ico btn-ico-sm btn-outline-danger" onclick="deleteReminder(' + r.id + ')" title="删除"><i class="bi bi-trash"></i></button>';
       }
       return '<div class="d-flex align-items-start gap-2 py-1 border-bottom">'
         + '<i class="bi ' + icon + ' mt-1"></i>'
@@ -1018,9 +1018,9 @@
           '<td class="d-none d-sm-table-cell"><span class="badge bg-' + STATUS_COLORS[f.status] + '">' + feeStatusLabel(f.status, f.paid_by) + '</span></td>' +
           '<td class="d-none d-md-table-cell">' + (f.paid_at || '-') + '</td>' +
           '<td class="text-end text-nowrap">' +
-            (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-sm btn-outline-info py-0" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
-            (CAN_FEE ? '<button class="btn btn-sm btn-outline-primary py-0" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil-fill"></i></button> ' : '') +
-            (CAN_DELETE_FEE ? '<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
+    (f.file_path ? '<a href="/api/cases/' + CASE_ID + '/fees/' + f.id + '/file" target="_blank" class="btn btn-ico btn-ico-sm btn-light" title="查看附件"><i class="bi bi-eye"></i></a> ' : '') +
+    (CAN_FEE ? '<button class="btn btn-ico btn-ico-sm btn-light" onclick="editFee(' + f.id + ')" title="编辑"><i class="bi bi-pencil-fill"></i></button> ' : '') +
+    (CAN_DELETE_FEE ? '<button class="btn btn-ico btn-ico-sm btn-outline-danger" onclick="deleteFee(' + f.id + ')" title="删除"><i class="bi bi-trash"></i></button>' : '') +
             '</td></tr>').join('');
     } catch (e) { document.getElementById('feeTbody').innerHTML = '<tr><td colspan="6" class="text-center text-muted small py-3"><i class="bi bi-exclamation-triangle me-1"></i>加载失败</td></tr>'; }
   }
