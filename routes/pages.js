@@ -50,48 +50,52 @@ router.get('/dashboard', async (req, res, next) => {
   try {
     const sc = scopeClause(req.session.user);
 
-    const total = await pool.query(`SELECT COUNT(*)::int AS n FROM cases c WHERE c.deleted_at IS NULL${sc.where}`, sc.params);
-    const byType = await pool.query(
-      `SELECT t.id, t.name, t.color, COUNT(c.id)::int AS n
-       FROM case_types t
-       LEFT JOIN cases c ON c.case_type_id = t.id AND c.deleted_at IS NULL
-       WHERE t.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
-       GROUP BY t.id ORDER BY t.sort`,
-      sc.params
-    );
-    const byStatus = await pool.query(
-      `SELECT s.id, s.name, s.color, s.category, COUNT(c.id)::int AS n
-       FROM statuses s
-       LEFT JOIN cases c ON c.status_id = s.id AND c.deleted_at IS NULL
-       WHERE s.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
-       GROUP BY s.id ORDER BY s.sort`,
-      sc.params
-    );
-    const recent = await pool.query(
-      `SELECT c.id, c.case_no, c.title, c.client_name, c.updated_at,
-              t.name AS type_name, t.color AS type_color,
-              s.name AS status_name, s.color AS status_color,
-              u.display_name AS assignee_name
-       FROM cases c
-       LEFT JOIN case_types t ON t.id = c.case_type_id
-       LEFT JOIN statuses s ON s.id = c.status_id
-       LEFT JOIN users u ON u.id = c.assignee_id
-       WHERE c.deleted_at IS NULL${sc.where}
-       ORDER BY c.updated_at DESC LIMIT 8`,
-      sc.params
-    );
+    // 第一轮：独立查询并行执行（原先 6 个串行 await）
+    const [total, byType, byStatus, recent, workloadRes, advDaysRow] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM cases c WHERE c.deleted_at IS NULL${sc.where}`, sc.params),
+      pool.query(
+        `SELECT t.id, t.name, t.color, COUNT(c.id)::int AS n
+         FROM case_types t
+         LEFT JOIN cases c ON c.case_type_id = t.id AND c.deleted_at IS NULL
+         WHERE t.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
+         GROUP BY t.id ORDER BY t.sort`,
+        sc.params
+      ),
+      pool.query(
+        `SELECT s.id, s.name, s.color, s.category, COUNT(c.id)::int AS n
+         FROM statuses s
+         LEFT JOIN cases c ON c.status_id = s.id AND c.deleted_at IS NULL
+         WHERE s.active = TRUE${sc.where.replace(/c\.assignee_id/g, 'c.assignee_id')}
+         GROUP BY s.id ORDER BY s.sort`,
+        sc.params
+      ),
+      pool.query(
+        `SELECT c.id, c.case_no, c.title, c.client_name, c.updated_at,
+                t.name AS type_name, t.color AS type_color,
+                s.name AS status_name, s.color AS status_color,
+                u.display_name AS assignee_name
+         FROM cases c
+         LEFT JOIN case_types t ON t.id = c.case_type_id
+         LEFT JOIN statuses s ON s.id = c.status_id
+         LEFT JOIN users u ON u.id = c.assignee_id
+         WHERE c.deleted_at IS NULL${sc.where}
+         ORDER BY c.updated_at DESC LIMIT 8`,
+        sc.params
+      ),
+      canViewAll(req.session.user)
+        ? pool.query(
+            `SELECT u.id, u.display_name, COUNT(c.id)::int AS n
+             FROM users u LEFT JOIN cases c ON c.assignee_id = u.id AND c.deleted_at IS NULL
+             WHERE u.active = TRUE GROUP BY u.id, u.display_name ORDER BY n DESC`
+          )
+        : Promise.resolve({ rows: [] }),
+      pool.query(`SELECT value FROM app_settings WHERE key = 'reminder_advance_days'`),
+    ]);
+    const workload = workloadRes.rows;
 
-    const workload = canViewAll(req.session.user)
-      ? (await pool.query(
-          `SELECT u.id, u.display_name, COUNT(c.id)::int AS n
-           FROM users u LEFT JOIN cases c ON c.assignee_id = u.id AND c.deleted_at IS NULL
-           WHERE u.active = TRUE GROUP BY u.id, u.display_name ORDER BY n DESC`
-        )).rows
-      : [];
-
-    /* ---------- 待办提醒：已逾期 + 今天 + 未来 advanceDays 天内 ---------- */
-    const advDaysRow = (await pool.query(`SELECT value FROM app_settings WHERE key = 'reminder_advance_days'`)).rows[0];
-    const advanceDays = Math.max(parseInt(advDaysRow && advDaysRow.value, 10) || 3, 0);
+    /* ---------- 待办提醒：已逾期 + 今天 + 未来 advanceDays 天内（依赖 advanceDays，第二轮） ---------- */
+    const advDays = advDaysRow.rows[0];
+    const advanceDays = Math.max(parseInt(advDays && advDays.value, 10) || 3, 0);
     const reminderScope = canViewAll(req.session.user)
       ? { where: '', params: [] }
       : { where: ' AND c.assignee_id = $2', params: [req.session.user.id] };

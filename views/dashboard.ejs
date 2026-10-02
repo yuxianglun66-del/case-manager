@@ -78,7 +78,7 @@
 <div class="card mb-4" id="reminderPanel">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-bell"></i> 待办提醒 <small class="text-muted">已逾期 · 今天 · 未来 <%= advanceDays %> 天内</small></span>
-    <% if (upcomingCount > 0) { %><span class="badge rounded-pill" style="background:rgba(59,130,246,.15);color:#60a5fa">另有 <%= upcomingCount %> 条即将到期</span><% } %>
+    <% if (upcomingCount > 0) { %><span class="badge rounded-pill" id="remUpcomingBadge" style="background:rgba(59,130,246,.15);color:#60a5fa">另有 <%= upcomingCount %> 条即将到期</span><% } %>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -267,6 +267,34 @@
         </div>
       </div>`).join('') || '<div class="text-muted small">暂无案件数据</div>';
 
+  // 签收后原地更新，不整页刷新（保留滚动位置）
+  var REM_OVERDUE = <%= overdueCount %>;
+  var REM_TODAY = <%= todayCount %>;
+  var REM_UPCOMING = <%= upcomingCount %>;
+
+  function renderRemBanner() {
+    var banner = document.querySelector('.reminder-banner');
+    if (!banner) return;
+    if (REM_OVERDUE + REM_TODAY <= 0) { banner.style.display = 'none'; return; }
+    var html = '<strong>提醒：</strong>';
+    if (REM_TODAY > 0) html += '今天有 <b class="text-danger">' + REM_TODAY + '</b> 条流程提醒待处理';
+    if (REM_TODAY > 0 && REM_OVERDUE > 0) html += '，';
+    if (REM_OVERDUE > 0) html += '<b class="text-danger">' + REM_OVERDUE + '</b> 条已逾期，请尽快处理';
+    html += ' <a href="#reminderPanel" class="ms-2 fw-semibold">查看 →</a>';
+    banner.querySelector('.flex-grow-1').innerHTML = html;
+  }
+
+  function renderUpcomingBadge() {
+    var badge = document.getElementById('remUpcomingBadge');
+    if (!badge) return;
+    if (REM_UPCOMING > 0) {
+      badge.style.display = '';
+      badge.textContent = '另有 ' + REM_UPCOMING + ' 条即将到期';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
   async function ackReminder(caseId, rid, btn) {
     if (!(await confirmBox('确认已处理该提醒？签收后此提醒将从待办列表中移除。', '签收提醒'))) return;
     const csrf = getCsrfToken();
@@ -274,8 +302,22 @@
     try {
       const res = await fetch('/api/cases/' + caseId + '/reminders/' + rid + '/ack', {method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'x-csrf-token':csrf}:{}),}});
       if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || '签收失败'); }
+      const row = btn.closest('tr');
+      const cls = row ? (row.className || '') : '';
+      if (cls.indexOf('bg-danger-subtle') >= 0) REM_OVERDUE = Math.max(0, REM_OVERDUE - 1);
+      else if (cls.indexOf('bg-warning-subtle') >= 0) REM_TODAY = Math.max(0, REM_TODAY - 1);
+      else REM_UPCOMING = Math.max(0, REM_UPCOMING - 1);
+      if (row) row.remove();
+      renderRemBanner();
+      renderUpcomingBadge();
+      const tbody = document.querySelector('#reminderPanel tbody');
+      if (tbody && tbody.querySelectorAll('tr').length === 0) {
+        const panel = document.getElementById('reminderPanel');
+        if (panel) panel.style.display = 'none';
+        const banner = document.querySelector('.reminder-banner');
+        if (banner) banner.style.display = 'none';
+      }
       toast('已签收', 'success');
-      setTimeout(()=>location.reload(), 400);
     } catch (err) {
       btn.disabled = false;
       toast(err.message, 'danger');
