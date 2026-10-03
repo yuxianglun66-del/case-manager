@@ -1,4 +1,4 @@
-/* UI 主题预设 - 6 套精选（4 暗 + 2 亮），不求数量、只求特色：
+/* UI 主题预设 - 6 套精选（3 暗 + 3 亮），不求数量、只求特色：
  * 每套背景由「主色光晕 + 同色系渐变」两层构成，暗色有重点光效不死黑，亮色通透不刺白。
  * 运行时支持：管理员用它做全局切换（POST /api/settings 落库），员工仅本地 localStorage。
  * 这里仅管预设和"即时换肤"，保存动作由调用方决定。
@@ -21,34 +21,19 @@
       surfaceElevated: 'rgba(16,27,54,.94)',
     },
     {
-      key: 'matrix-green',
-      name: '苔原绿',
-      desc: '灰绿过渡底色（介于明暗之间）+ 深绿字「苔原」气质',
-      mode: 'light',
-      primary: '#15803d',
-      sidebar: '#22362a',
-      bg: 'radial-gradient(1000px 480px at 50% 0%, rgba(21,128,61,.18), transparent 60%), linear-gradient(180deg, #7d998a, #96af9f 55%, #adc4b5 100%)',
-      fg: '#0e2116',
-      muted: '#3d5849',
-      accent: '#22c55e',
-      surface: 'rgba(243,250,245,.86)',
-      surfaceSolid: '#f3faf5',
-      surfaceElevated: 'rgba(255,255,255,.94)',
-    },
-    {
-      key: 'sunset-amber',
-      name: '暖沙棕',
-      desc: '暖棕过渡底色（介于明暗之间）+ 深棕字「暖沙」气质',
-      mode: 'light',
-      primary: '#c2410c',
-      sidebar: '#3b2a1a',
-      bg: 'radial-gradient(1000px 500px at 80% -6%, rgba(194,65,12,.18), transparent 58%), linear-gradient(180deg, #a0836a, #b9a087 55%, #d0b9a1 100%)',
-      fg: '#24150a',
-      muted: '#6d4f36',
-      accent: '#f59e0b',
-      surface: 'rgba(253,245,238,.88)',
-      surfaceSolid: '#fdf5ee',
-      surfaceElevated: 'rgba(255,255,255,.95)',
+      key: 'cyber-cyan',
+      name: '赛博青',
+      desc: '深青黑底 + 青色光晕「赛博」气质',
+      mode: 'dark',
+      primary: '#22d3ee',
+      sidebar: '#041216',
+      bg: 'radial-gradient(1100px 520px at 20% -8%, rgba(34,211,238,.20), transparent 60%), radial-gradient(900px 500px at 85% 108%, rgba(6,182,212,.10), transparent 55%), linear-gradient(180deg, #02060c, #06222c 78%, #0a3d4d 100%)',
+      fg: '#e6f7fb',
+      muted: '#8fb8c4',
+      accent: '#00e5ff',
+      surface: 'rgba(8,24,32,.72)',
+      surfaceSolid: '#081820',
+      surfaceElevated: 'rgba(12,32,42,.94)',
     },
     {
       key: 'plasma-purple',
@@ -79,6 +64,21 @@
       surface: 'rgba(247,250,255,.88)',
       surfaceSolid: '#f7faff',
       surfaceElevated: 'rgba(255,255,255,.96)',
+    },
+    {
+      key: 'matrix-green',
+      name: '苔原绿',
+      desc: '浅鼠尾草绿渐变 + 绿色光晕，清新不浑浊',
+      mode: 'light',
+      primary: '#15803d',
+      sidebar: '#22362a',
+      bg: 'radial-gradient(1000px 480px at 50% 0%, rgba(21,128,61,.14), transparent 60%), linear-gradient(180deg, #eef6f0, #e6f1ea 55%, #dcebe1 100%)',
+      fg: '#0e2116',
+      muted: '#3d5849',
+      accent: '#22c55e',
+      surface: 'rgba(247,252,249,.88)',
+      surfaceSolid: '#f7fcf9',
+      surfaceElevated: 'rgba(255,255,255,.95)',
     },
     {
       key: 'paper-amber',
@@ -152,18 +152,6 @@
     set('inpThemeSidebar', theme.sidebar);
     set('inpThemeMode', theme.mode);
     set('inpBgGradient', theme.bg);
-  }
-
-  /* 返回当前激活的 theme key（读取 localStorage，回退至匹配 DB 默认值的项） */
-  function currentKey() {
-    const saved = localStorage.getItem('uiTheme');
-    if (saved) return saved;
-    const root = getComputedStyle(document.documentElement);
-    const p = (root.getPropertyValue('--bs-primary') || '').trim();
-    const s = (root.getPropertyValue('--sidebar-bg') || '').trim();
-    const m = document.body.classList.contains('theme-dark') ? 'dark' : 'light';
-    const exact = window.UI_THEMES.find(t => t.primary.toLowerCase() === (p||'').toLowerCase() && t.sidebar.toLowerCase() === (s||'').toLowerCase());
-    return exact ? exact.key : (m === 'dark' ? 'circuit-blue' : 'clean-light');
   }
 
   /* 快速切换：非管理员只本地换肤（localStorage）；管理员可选 save=true 落库。返回 Promise。 */

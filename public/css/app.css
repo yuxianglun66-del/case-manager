@@ -984,6 +984,7 @@ body.theme-dark .sidebar { border-right-color: var(--sidebar-border); }
   padding: 8px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0; /* flex 子项默认 min-height:auto 不会收缩，主题多时列表被 overflow:hidden 裁掉且不出滚动条 */
 }
 .ts-item {
   display: flex;

@@ -344,13 +344,17 @@
         panel.classList.add('show');
         if (originBtn) {
           const r = originBtn.getBoundingClientRect();
-          const pr = panel.getBoundingClientRect();
-          let left = r.left - 260 + r.width;
+          const pw = panel.offsetWidth || 280;
+          let left = r.left - pw + r.width;
           if (left < 8) left = 8;
-          if (left + 260 > window.innerWidth - 8) left = window.innerWidth - 268;
+          if (left + pw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pw - 8);
           panel.style.left = left + 'px';
+          const ph = panel.offsetHeight;
           let top = r.bottom + 8;
-          if (top + 320 > window.innerHeight) top = Math.max(8, r.top - 320);
+          if (top + ph > window.innerHeight - 8) {
+            top = r.top - 8 - ph;
+            if (top < 8) top = Math.max(8, window.innerHeight - ph - 8);
+          }
           panel.style.top = top + 'px';
         }
       }
