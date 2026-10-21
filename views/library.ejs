@@ -27,6 +27,22 @@
   #libContentModal .modal-body blockquote { border-left:3px solid var(--bs-primary); padding-left:.6rem; margin:.4rem 0; color:#555; background:#f8f9fa; padding:.3rem .6rem; border-radius:0 4px 4px 0; }
   #libContentModal .modal-body pre { background:#f1f3f5; padding:.5rem; border-radius:4px; overflow:auto; }
   #libContentModal .modal-body code { background:#f1f3f5; padding:1px 4px; border-radius:3px; font-size:.85em; }
+
+  /* ============ 分类胶囊 + 分组区块 ============ */
+  .lib-pill { display:inline-flex; align-items:center; gap:6px; padding:.2rem .7rem; font-size:.8rem; line-height:1.6; border:1px solid var(--content-border, #ced4da); border-radius:999px; background:transparent; color:inherit; cursor:pointer; transition:border-color .12s, box-shadow .12s; }
+  .lib-pill:hover { border-color: var(--bs-primary); }
+  .lib-pill .p-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .lib-pill .p-cnt { font-size:.7rem; font-weight:600; padding:0 .5em; border-radius:999px; background:rgba(148,163,184,.22); }
+  .lib-pill.active { box-shadow: 0 0 0 1px rgba(59,130,246,.15); }
+  .lib-section { margin-bottom:1rem; }
+  .lib-sec-head { position:sticky; top:0; z-index:1010; cursor:pointer; user-select:none; transition:none; }
+  .lib-sec-head.card:hover { transform:none; }
+  .lib-sec-head .card-body { padding:.55rem .75rem; }
+  .lib-sec-chevron { font-size:.85rem; color:var(--content-muted, #94a3b8); transition:transform .15s; }
+  .lib-section.collapsed .lib-sec-chevron { transform:rotate(-90deg); }
+  .lib-sec-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 2px rgba(148,163,184,.2); }
+  .lib-sec-cnt { font-size:.72rem; font-weight:600; padding:.05em .55em; border-radius:999px; background:rgba(148,163,184,.22); color:inherit; }
+  @media (max-width: 991.98px) { .lib-sec-head { top:50px; } } /* 让开移动端吸顶 topbar */
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -38,12 +54,12 @@
 
 <div class="card mb-3">
   <div class="card-body py-2">
-    <div class="d-flex gap-2 flex-wrap">
-      <select class="form-select form-select-sm" id="libFilterCat" style="max-width:180px">
-        <option value="">全部分类</option>
-      </select>
-      <input type="text" class="form-control form-control-sm" id="libFilterKey" placeholder="搜索标题/内容..." style="max-width:260px">
-      <button class="btn btn-outline-primary btn-sm" onclick="loadLibrary()"><i class="bi bi-search"></i></button>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <div class="d-flex gap-1 flex-wrap align-items-center" id="libPills" role="group" aria-label="分类筛选"></div>
+      <div class="d-flex gap-2 ms-auto">
+        <input type="text" class="form-control form-control-sm" id="libFilterKey" placeholder="搜索标题/内容..." style="max-width:240px">
+        <button class="btn btn-outline-primary btn-sm" onclick="loadLibrary()" title="搜索"><i class="bi bi-search"></i></button>
+      </div>
     </div>
   </div>
 </div>
@@ -96,6 +112,9 @@ var libCats = libCatsData.map(function(c) { return c.name; });
 var libCatColors = {};
 libCatsData.forEach(function(c) { libCatColors[c.name] = c.color; });
 var canEditLib = <%= canEdit %>;
+var libFilterCat = '';   /* 当前选中的分类胶囊（''=全部） */
+var libCollapsed = {};   /* 分组折叠状态，按分类名记忆 */
+try { libCollapsed = JSON.parse(localStorage.getItem('libCollapsed') || '{}') || {}; } catch (e) { libCollapsed = {}; }
 var quillInstance = null;
 
 function renderContent(text) {
@@ -128,59 +147,155 @@ function initQuill() {
   });
 }
 
+function escLib(s) {
+  /* 用拼接写实体，防止源码里的 & 等被转义链吞掉 */
+  var t = String(s == null ? '' : s);
+  return t.split('&').join('&' + 'amp;')
+          .split('<').join('&' + 'lt;')
+          .split('>').join('&' + 'gt;')
+          .split('"').join('&' + 'quot;');
+}
+
+function libLuminanceFg(hex) {
+  try {
+    var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return ((0.299*r + 0.587*g + 0.114*b) / 255) > 0.5 ? '#000' : '#fff';
+  } catch (e) { return '#fff'; }
+}
+
 (function() {
-  var sel = document.getElementById('libFilterCat');
-  libCats.forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
   var catSel = document.getElementById('libCategory');
   if (catSel) libCats.forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); });
+  document.getElementById('libPills').addEventListener('click', function(e) {
+    var b = e.target.closest('.lib-pill'); if (!b) return;
+    libFilterCat = b.dataset.cat;
+    loadLibrary();
+  });
+  var fk = document.getElementById('libFilterKey');
+  fk.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadLibrary(); });
   loadLibrary();
 })();
 
+function renderLibPills(sf) {
+  var counts = {}, total = sf.length;
+  libCats.forEach(function(c) { counts[c] = 0; });
+  var orphans = {};
+  sf.forEach(function(it) {
+    var c = it.category || '未分类';
+    if (counts.hasOwnProperty(c)) counts[c]++;
+    else orphans[c] = (orphans[c] || 0) + 1;
+  });
+  function pill(cat, label, cnt, color) {
+    var active = libFilterCat === cat;
+    var bg = color || 'var(--bs-primary)';
+    var st = active ? ' style="background:' + bg + ';border-color:' + bg + ';color:' + (color ? libLuminanceFg(color) : '#fff') + '"' : '';
+    var dot = color ? '<span class="p-dot" style="background:' + color + '"></span>' : '';
+    var cntSt = active ? ' style="background:rgba(255,255,255,.25)"' : '';
+    return '<button type="button" class="lib-pill' + (active ? ' active' : '') + '" data-cat="' + escLib(cat) + '"' + st + '>' + dot + escLib(label) + '<span class="p-cnt"' + cntSt + '>' + cnt + '</span></button>';
+  }
+  var html = pill('', '全部', total, null);
+  libCats.forEach(function(c) { html += pill(c, c, counts[c], libCatColors[c] || '#6c757d'); });
+  Object.keys(orphans).forEach(function(c) { if (!counts.hasOwnProperty(c)) html += pill(c, c, orphans[c], libCatColors[c] || '#6c757d'); });
+  document.getElementById('libPills').innerHTML = html;
+}
+
+function libItemCard(it) {
+  var hasFile = it.file_path;
+  var dateStr = String(it.created_at).slice(0, 10);
+  var h = '<div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body py-2 px-3">';
+  h += '<div class="d-flex justify-content-between align-items-start gap-2">';
+  h += '<div class="fw-semibold" style="min-width:0"><span style="word-break:break-all">' + escLib(it.title || '') + '</span>' + (hasFile ? ' <i class="bi bi-paperclip text-muted" title="附件"></i>' : '') + '</div>';
+  if (canEditLib) {
+    h += '<div class="d-flex gap-1 flex-shrink-0">'
+      + '<button class="btn btn-ico btn-ico-sm btn-light" title="编辑" onclick="editLibItem(' + it.id + ')"><i class="bi bi-pencil-fill"></i></button>'
+      + '<button class="btn btn-ico btn-ico-sm btn-outline-danger" title="删除" onclick="deleteLibItem(' + it.id + ')"><i class="bi bi-trash"></i></button>'
+      + '</div>';
+  }
+  h += '</div>';
+  if (hasFile) {
+    h += '<div class="mt-2 d-flex align-items-center gap-2 flex-wrap">'
+      + '<a href="/api/library/' + it.id + '/preview" target="_blank" class="btn btn-sm btn-primary"><i class="bi bi-eye"></i> 预览</a>'
+      + '<span class="text-muted" style="font-size:.75rem;word-break:break-all">' + escLib(it.file_original_name || '') + '</span></div>';
+  }
+  if (it.content) {
+    h += '<div class="text-primary mt-2" style="font-size:.8rem;cursor:pointer" onclick="showLibContent(' + it.id + ')"><i class="bi bi-file-text"></i> 查看全部内容 <i class="bi bi-arrow-right"></i></div>';
+  }
+  h += '<div class="text-muted mt-1" style="font-size:.75rem">' + escLib(it.creator_name || '') + ' · ' + dateStr + '</div>';
+  h += '</div></div></div>';
+  return h;
+}
+
 function loadLibrary() {
-  var cat = document.getElementById('libFilterCat').value;
   var key = document.getElementById('libFilterKey').value.trim().toLowerCase();
-  var filtered = libItems.filter(function(it) {
-    if (cat && it.category !== cat) return false;
+  var sf = libItems.filter(function(it) {
     if (key && (it.title||'').toLowerCase().indexOf(key) < 0 && (it.content||'').toLowerCase().indexOf(key) < 0) return false;
     return true;
   });
-  var html = '';
-  if (!filtered.length) { html = '<div class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2">暂无记录</p></div>'; }
-  else {
-    filtered.forEach(function(it) {
-      var badgeStyle = 'background:#6c757d;color:#fff';
-      if (libCatColors[it.category]) {
-        var c = libCatColors[it.category];
-        var r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b = parseInt(c.slice(5,7),16);
-        var luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
-        badgeStyle = 'background:' + c + ';color:' + (luminance > 0.5 ? '#000' : '#fff');
-      }
-      var hasFile = it.file_path;
-      var fileIcon = hasFile ? '<i class="bi bi-paperclip ms-1"></i>' : '';
-      var dateStr = String(it.created_at).slice(0, 10);
-      html += '<div class="card mb-2"><div class="card-body py-2 px-3"><div class="d-flex justify-content-between align-items-start"><div><span class="badge me-2" style="' + badgeStyle + '">' + (it.category||'') + '</span><strong>' + (it.title||'') + '</strong>' + fileIcon;
-      if (hasFile) {
-        html += ' <a href="/api/library/' + it.id + '/preview" target="_blank" class="btn btn-sm btn-primary ms-2" title="点击预览"><i class="bi bi-eye"></i> 预览</a><span class="text-muted small ms-2" style="font-size:.75rem">' + (it.file_original_name||'') + '</span>';
-      }
-      html += '</div>';
-      if (canEditLib) {
-        html += '<div class="d-flex gap-1"><button class="btn btn-outline-primary btn-sm" onclick="editLibItem(' + it.id + ')"><i class="bi bi-pencil-fill"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deleteLibItem(' + it.id + ')"><i class="bi bi-trash"></i></button></div>';
-      }
-      html += '</div>';
-      if (it.content) {
-        html += '<div class="text-muted small mt-2" style="font-size:.8rem;cursor:pointer" onclick="showLibContent(' + it.id + ')"><i class="bi bi-file-text"></i> 查看全部内容 <i class="bi bi-arrow-right"></i></div>';
-      }
-      html += '<div class="text-muted small mt-1">' + (it.creator_name||'') + ' · ' + dateStr + '</div>';
-      html += '</div></div>';
-    });
+  renderLibPills(sf);
+
+  /* 按配置分类分组，配置外的孤儿分类追加为灰色分组 */
+  var sections = [];
+  libCats.forEach(function(c) {
+    sections.push({ name: c, color: libCatColors[c] || '#6c757d', items: sf.filter(function(it) { return it.category === c; }) });
+  });
+  var seen = {};
+  libCats.forEach(function(c) { seen[c] = true; });
+  sf.forEach(function(it) {
+    var c = it.category || '未分类';
+    if (!seen[c]) {
+      seen[c] = true;
+      sections.push({ name: c, color: libCatColors[c] || '#6c757d', items: sf.filter(function(x) { return (x.category || '未分类') === c; }) });
+    }
+  });
+
+  var html = '', shown = 0;
+  sections.forEach(function(s) {
+    if (libFilterCat && s.name !== libFilterCat) return;
+    if (key && !s.items.length && libFilterCat !== s.name) return;
+    shown++;
+    var collapsed = !!libCollapsed[s.name];
+    var grid;
+    if (s.items.length) {
+      grid = '<div class="row g-2 lib-sec-grid mt-2' + (collapsed ? ' d-none' : '') + '">' + s.items.map(libItemCard).join('') + '</div>';
+    } else {
+      grid = '<div class="text-muted text-center py-3 lib-sec-grid' + (collapsed ? ' d-none' : '') + '" style="font-size:.85rem">该分类暂无条目</div>';
+    }
+    html += '<div class="lib-section' + (collapsed ? ' collapsed' : '') + '" data-cat="' + escLib(s.name) + '">'
+      + '<div class="card lib-sec-head" style="border-left:4px solid ' + s.color + '" onclick="toggleLibSection(this)">'
+      + '<div class="card-body d-flex align-items-center gap-2 py-2 px-3">'
+      + '<i class="bi bi-chevron-down lib-sec-chevron"></i>'
+      + '<span class="lib-sec-dot" style="background:' + s.color + '"></span>'
+      + '<strong>' + escLib(s.name) + '</strong>'
+      + '<span class="lib-sec-cnt">' + s.items.length + ' 条</span>'
+      + (canEditLib ? '<span class="ms-auto"><button type="button" class="btn btn-ico btn-ico-sm btn-primary" title="在此分类新增" onclick="event.stopPropagation();openLibModal(null, this.closest(\'.lib-section\').dataset.cat)"><i class="bi bi-plus-lg"></i></button></span>' : '')
+      + '</div></div>'
+      + grid
+      + '</div>';
+  });
+  if (!shown) {
+    html = libItems.length === 0
+      ? '<div class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2">暂无记录</p></div>'
+      : '<div class="text-center text-muted py-5"><i class="bi bi-search" style="font-size:2rem"></i><p class="mt-2">无匹配结果</p></div>';
   }
   document.getElementById('libList').innerHTML = html;
 }
 
-function openLibModal(item) {
+function toggleLibSection(el) {
+  var sec = el.closest('.lib-section'); if (!sec) return;
+  var collapsed = !sec.classList.contains('collapsed');
+  sec.classList.toggle('collapsed', collapsed);
+  var grid = sec.querySelector('.lib-sec-grid'); if (grid) grid.classList.toggle('d-none', collapsed);
+  try {
+    var st = JSON.parse(localStorage.getItem('libCollapsed') || '{}') || {};
+    st[sec.dataset.cat] = collapsed;
+    localStorage.setItem('libCollapsed', JSON.stringify(st));
+  } catch (e) { /* 忽略存储异常 */ }
+}
+
+function openLibModal(item, presetCat) {
   document.getElementById('libEditId').value = item ? item.id : '';
   document.getElementById('libTitle').value = item ? item.title : '';
-  document.getElementById('libCategory').value = item ? item.category : '法律法规';
+  document.getElementById('libCategory').value = item ? item.category : (presetCat && libCats.indexOf(presetCat) >= 0 ? presetCat : '法律法规');
   document.getElementById('libFile').value = '';
   document.getElementById('libModalTitle').textContent = item ? '编辑' : '新增';
   var modal = new bootstrap.Modal(document.getElementById('libModal'));
