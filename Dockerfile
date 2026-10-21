@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # apt 加超时重试，国内镜像慢时不会无限卡死
 RUN echo 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nAcquire::http::Pipeline-Depth "0";' > /etc/apt/apt.conf.d/99timeout \
-    && sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list \
+    && sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g; s@//security.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
       curl ca-certificates gnupg tzdata xz-utils \
