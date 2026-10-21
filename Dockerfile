@@ -28,12 +28,14 @@ COPY package*.json ./
 # 镜像内一场 npm ci（npmmirror + 超时/重试，国内网络下失败即带 [ERROR] 退出，不再 2000s 卡死）
 # 探针已实锤：宿主预装+bind 在无 node 的 Ubuntu 上只产出空目录 → 镜像依赖层被压成空 → app 无限 Restart(1)
 # 所以依赖必须/只能 ci 在镜像内这一层。
+# --omit=optional：跳过 canvas（pdfjs-dist 的可选渲染依赖）——其 install 脚本要从 GitHub Releases
+# 下载预编译二进制，国内服务器连不上会永久卡死；服务端只用 pdfjs 做静态文件/文本提取，不需要 canvas。
 RUN npm config set registry https://registry.npmmirror.com \
     && npm config set fetch-timeout 300000 \
     && npm config set fetch-retries 3 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
-    && npm ci --omit=dev --no-audit --no-fund
+    && npm ci --omit=dev --omit=optional --no-audit --no-fund
 
 COPY . .
 
