@@ -292,10 +292,25 @@ function toggleLibSection(el) {
   } catch (e) { /* 忽略存储异常 */ }
 }
 
+function setLibCat(val) {
+  var sel = document.getElementById('libCategory');
+  /* 孤儿分类（已被改名/删除的旧分类）不在配置下拉里：动态补一个临时选项，避免 select 变空导致保存报「无效的分类」 */
+  if (val) {
+    var exists = Array.prototype.some.call(sel.options, function(o) { return o.value === val; });
+    if (!exists) {
+      var o = document.createElement('option');
+      o.value = val;
+      o.textContent = val + '（未配置）';
+      sel.appendChild(o);
+    }
+  }
+  sel.value = val || '';
+}
+
 function openLibModal(item, presetCat) {
   document.getElementById('libEditId').value = item ? item.id : '';
   document.getElementById('libTitle').value = item ? item.title : '';
-  document.getElementById('libCategory').value = item ? item.category : (presetCat && libCats.indexOf(presetCat) >= 0 ? presetCat : '法律法规');
+  setLibCat(item ? item.category : (presetCat || libCats[0] || '法律法规'));
   document.getElementById('libFile').value = '';
   document.getElementById('libModalTitle').textContent = item ? '编辑' : '新增';
   var modal = new bootstrap.Modal(document.getElementById('libModal'));

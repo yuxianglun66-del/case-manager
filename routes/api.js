@@ -2531,14 +2531,40 @@ router.post('/cases/:id/history/:hid/delete', async (req, res, next) => {
 });
 
 // ==================== 法律法规案例库 ====================
+/* 兜底默认分类：仅当 app_settings.library_categories 未配置/损坏/为空时使用 */
 const LIBRARY_CATEGORIES = ['法律法规', '赔偿标准', '调解判决案例', '司法解释', '操作指引', '其他'];
+
+/* 设置页配置的分类（[{name,color}] JSON）→ 名称列表；校验与接口统一以配置为准 */
+async function getLibraryCategories() {
+  try {
+    const { rows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'library_categories'`);
+    const arr = JSON.parse(rows[0]?.value || '[]');
+    const names = Array.isArray(arr)
+      ? arr.map(c => (typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean)
+      : [];
+    if (names.length) return names;
+  } catch (e) { /* 配置缺失/损坏时走默认 */ }
+  return LIBRARY_CATEGORIES;
+}
+
+/* 分类合法性 = 配置中的 ∪ 默认 ∪ 库内已在用的（改名/删除配置后，存量条目和孤儿分组不被锁死） */
+async function isValidLibraryCategory(category) {
+  if (!category) return false;
+  const set = new Set(LIBRARY_CATEGORIES);
+  (await getLibraryCategories()).forEach(c => set.add(c));
+  try {
+    const { rows } = await pool.query(`SELECT DISTINCT category FROM library_items WHERE category IS NOT NULL AND category <> ''`);
+    rows.forEach(r => set.add(r.category));
+  } catch (e) { /* ignore */ }
+  return set.has(category);
+}
 
 router.get('/library', requireLogin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `SELECT l.*, u.display_name AS creator_name FROM library_items l LEFT JOIN users u ON u.id = l.created_by ORDER BY l.created_at DESC`
     );
-    res.json({ items: rows, categories: LIBRARY_CATEGORIES });
+    res.json({ items: rows, categories: await getLibraryCategories() });
   } catch (e) { next(e); }
 });
 
@@ -2546,7 +2572,7 @@ router.post('/library', requirePermission('cases.edit'), libraryUpload.single('f
   try {
     const { title, category, content } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: '标题不能为空' });
-    if (!category || !LIBRARY_CATEGORIES.includes(category)) return res.status(400).json({ error: '无效的分类' });
+    if (!(await isValidLibraryCategory(category))) return res.status(400).json({ error: '无效的分类' });
     const f = req.file;
     const filePath = f ? ('library/' + f.filename) : null;
     const { rows } = await pool.query(
@@ -2565,7 +2591,7 @@ router.put('/library/:lid', requirePermission('cases.edit'), libraryUpload.singl
     if (!existing) return res.status(404).json({ error: '记录不存在' });
     const { title, category, content } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: '标题不能为空' });
-    if (!category || !LIBRARY_CATEGORIES.includes(category)) return res.status(400).json({ error: '无效的分类' });
+    if (!(await isValidLibraryCategory(category))) return res.status(400).json({ error: '无效的分类' });
     const f = req.file;
     let filePath = existing.file_path;
     let fileOriginalName = existing.file_original_name;
