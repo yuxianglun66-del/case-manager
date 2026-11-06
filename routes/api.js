@@ -1278,6 +1278,24 @@ router.post('/users/:id/promote', requirePermission('system.users'), async (req,
   } catch (e) { next(e); }
 });
 
+/* ---------- 撤销：将 super_admin 降回 admin（仅 super_admin 可操作） ---------- */
+router.post('/users/:id/demote', requirePermission('system.users'), async (req, res, next) => {
+  try {
+    if (req.session.user.role !== 'super_admin') return res.status(403).json({ error: '仅超级管理员可执行此操作' });
+    const id = parseInt(req.params.id, 10);
+    if (id === req.session.user.id) return res.status(400).json({ error: '不能撤销自己的超级管理员身份' });
+    const target = (await pool.query(`SELECT id, role, display_name FROM users WHERE id = $1`, [id])).rows[0];
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+    if (target.role !== 'super_admin') return res.status(400).json({ error: '该用户不是超级管理员' });
+    /* 保护：系统必须至少保留一名超级管理员 */
+    const { rows: cnt } = await pool.query(`SELECT COUNT(*)::int AS n FROM users WHERE role = 'super_admin'`);
+    if (cnt[0].n <= 1) return res.status(400).json({ error: '不能撤销最后一名超级管理员' });
+    await pool.query(`UPDATE users SET role = 'admin' WHERE id = $1`, [id]);
+    await audit(req, '撤销超级管理员', { entity_type: 'user', entity_id: id, detail: '超级管理员 ' + target.display_name + ' → 管理员' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 /* ---------- 角色权限配置 ---------- */
 router.post('/roles/permissions', requirePermission('system.roles'), async (req, res, next) => {
   try {

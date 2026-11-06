@@ -42,6 +42,9 @@
                 <% if (isAdminTarget && user.role === 'super_admin' && u.id !== user.id) { %>
                 <button class="btn btn-ico btn-outline-success" title="提权为超级管理员" onclick="promoteUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-shield-fill-check"></i></button>
                 <% } %>
+                <% if (isTargetSuperAdmin && user.role === 'super_admin' && u.id !== user.id) { %>
+                <button class="btn btn-ico btn-outline-warning" title="撤销超级管理员（降为管理员）" onclick="demoteUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-shield-fill-x"></i></button>
+                <% } %>
                 <% if (u.role !== 'super_admin') { %>
                 <button class="btn btn-ico btn-outline-danger" title="删除账号" onclick="delUser(<%= u.id %>, '<%= u.display_name.replace(/[\\'"<>]/g,'') %>')"><i class="bi bi-trash"></i></button>
                 <% } %>
@@ -371,6 +374,15 @@
     try {
       await postJSON('/api/users/' + id + '/promote', {});
       toast('已提权为超级管理员', 'success');
+      setTimeout(() => location.reload(), 300);
+    } catch (err) { toast(err.message, 'danger'); }
+  }
+
+  async function demoteUser(id, name) {
+    if (!(await confirmBox('将「' + name + '」撤销超级管理员？撤销后该账户降为普通管理员，失去超级权限。', '确认撤销'))) return;
+    try {
+      await postJSON('/api/users/' + id + '/demote', {});
+      toast('已撤销超级管理员，降为管理员', 'success');
       setTimeout(() => location.reload(), 300);
     } catch (err) { toast(err.message, 'danger'); }
   }
